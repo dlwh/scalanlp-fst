@@ -35,4 +35,17 @@ object Semiring {
       val zero = Math.NEG_INF_DOUBLE;
     }
   }
+  
+  /**
+   * Provides access to the tropical algebra. The implicit is segregated because it conflicts with numericIsSemiring
+   */
+  object LogSpace {
+    implicit val doubleIsLogSpace:Semiring[Double] = new Semiring[Double] {
+      def plus(t1: Double, t2: Double) = Numerics.logSum(t1,t2);
+      def times(t1: Double, t2: Double) = t1 + t2;
+      val one = 0.0;
+      val zero = Math.NEG_INF_DOUBLE;
+    }
+  }
+  
 }
