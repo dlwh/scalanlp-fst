@@ -1,6 +1,6 @@
 package scalanlp.fst
 
-import scalanlp.math.Semiring;
+import scalanlp.math._;
 import scala.collection.Traversable;
 import scala.collection.mutable.PriorityQueue;
 
@@ -93,7 +93,7 @@ trait Automaton[W,State,T] { outer =>
    *  Relabels this autamaton according to this new scheme. This is a strict algorithm.
    */
   def relabel[U](newStates: Iterable[U]): Automaton[W,U,T] = new Automaton[W,U,T] {
-    val (arcs,uToState: Map[U,State], stateToU: Map[State,U]) =  {
+    val (arcs,stateToU) =  {
       val newLabels = collection.mutable.Map[State,U]();
       val seqArcs = new collection.mutable.ArrayBuffer[Arc];
       val uIter = newStates.iterator;
@@ -101,14 +101,70 @@ trait Automaton[W,State,T] { outer =>
 		    val newFrom = newLabels.getOrElseUpdate(from,uIter.next);
 	      seqArcs += Arc(newFrom,newLabels.getOrElseUpdate(to,uIter.next),label,score);
 		  }
-	    (seqArcs.groupBy(_.from),newLabels.map { case (k,v) => (v,k)}, newLabels);
+	    (seqArcs.groupBy(_.from),newLabels)
     }
+
+    val myFinalWeights = stateToU map { case (s,u) =>
+      (u, outer.finalWeight(s));
+    }
+    val initialStateWeights = outer.initialStateWeights map { case (k,v) =>
+      (stateToU(k),v) 
+    };
     
     def edgesFrom(s: U) = arcs(s);
-    def finalWeight(s: U) = outer.finalWeight(uToState(s));
-    val initialStateWeights = outer.initialStateWeights map { case (k,v) =>(stateToU(k),v) };
+    def finalWeight(s: U) = myFinalWeights(s);
     implicit val ring = outer.ring
   }
+
+  /**
+  * Determinizes the automaton lazily.
+  */
+  def determinize(implicit wld: WLDSemiring[W]): Automaton[W,Map[State,W],T] = new Automaton[W,Map[State,W],T] {
+    val ring = wld;
+    val initialStateWeights = {
+      val weight = outer.initialStateWeights.valuesIterator.foldLeft(ring.zero)(ring.plus _);
+      Map( outer.initialStateWeights -> weight);
+    }
+
+    def edgesFrom(map: Map[State,W]) = {
+      import collection.mutable._; 
+      val labeledWeights = Map[Option[T],W]();
+      val labeledStates = Map[Option[T],Map[State,W]]();
+      import ring._;
+
+      for((s,v) <- map;
+          outer.Arc(_,to,label,w) <- outer.edgesFrom(s)) {
+        // sum over all the different ways to follow arc with label label to 
+        // state to
+        val newTo = labeledStates.getOrElseUpdate(label,Map[State,W]())
+        val cur = newTo.getOrElse(to,zero);
+        newTo(to) = plus(cur,times(w,v));
+
+        val wcur = labeledWeights.getOrElse(label,zero);
+        labeledWeights(label) = plus(wcur,times(w,v));
+      }
+      
+      // normalize by w
+      val arcs = for((label,newState) <- labeledStates.elements;
+          w = labeledWeights(label)) yield {
+        newState.transform { (innerState,v) =>
+          leftDivide(w,v);
+        }
+        new Arc(map, collection.immutable.Map() ++ newState,label,w);
+      } 
+
+      arcs.toSequence;
+    }
+
+    def finalWeight(map: Map[State,W]) = {
+      val weights = for( (state,v) <- map.elements;
+          fW = outer.finalWeight(state))
+        yield ring.times(v,fW);
+      weights.foldLeft(ring.zero)(ring.plus _);
+    }
+    
+  }
+
 }
 
 object Automaton {
