@@ -63,6 +63,8 @@
           <args>
             <arg>-target:jvm-1.5</arg>
             <arg>-Yspecialize</arg>
+            <arg>-deprecation</arg>
+            <arg>-unchecked</arg>
           </args>
         </configuration>
       </plugin>
