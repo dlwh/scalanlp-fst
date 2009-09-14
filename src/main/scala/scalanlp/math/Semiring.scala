@@ -7,6 +7,13 @@ trait Semiring[T] {
   val one: T
 }
 
+trait WLDSemiring[T] extends Semiring[T] {
+  /**
+  * Return z^-1 times x
+  */
+  def leftDivide(z: T, x: T): T;
+}
+
 object Semiring {
   implicit val booleanSemiring = new Semiring[Boolean] {
     def plus(t1: Boolean, t2: Boolean) = t1 || t2;
@@ -15,21 +22,32 @@ object Semiring {
     val zero = true;
   }
   
-  implicit def numericIsSemiring[@specialized T:Numeric] = new Semiring[T] {
-    private val ops = evidence[Numeric[T]];
+  implicit def integralIsSemiring[@specialized T:Integral] = new Semiring[T] {
+    private val ops = evidence[Integral[T]];
     import ops._;
     def plus(t1: T, t2: T) = t1 + t2;
     def times(t1: T, t2: T) = t1 * t2;
     val one = ops.one;
     val zero = ops.zero;
   }
-  
+
+  implicit def fractionalIsDivSemiring[@specialized T:Fractional] = new WLDSemiring[T] {
+    private val ops = evidence[Fractional[T]];
+    import ops._;
+    def plus(t1: T, t2: T) = t1 + t2;
+    def times(t1: T, t2: T) = t1 * t2;
+    def leftDivide(t1: T, t2: T) = t2 / t1;
+    val one = ops.one;
+    val zero = ops.zero;
+  }
+
   /**
    * Provides access to the tropical algebra. The implicit is segregated because it conflicts with numericIsSemiring
    */
   object Tropical {
-    implicit val doubleIsTropical:Semiring[Double] = new Semiring[Double] {
+    implicit val doubleIsTropical:WLDSemiring[Double] = new WLDSemiring[Double] {
       def plus(t1: Double, t2: Double) = t1 max t2;
+      def leftDivide(t1: Double, t2: Double) = t2 - t1;
       def times(t1: Double, t2: Double) = t1 + t2;
       val one = 0.0;
       val zero = Math.NEG_INF_DOUBLE;
@@ -40,7 +58,7 @@ object Semiring {
    * Provides access to the tropical algebra. The implicit is segregated because it conflicts with numericIsSemiring
    */
   object LogSpace {
-    implicit val doubleIsLogSpace:Semiring[Double] = new Semiring[Double] {
+    implicit val doubleIsLogSpace:WLDSemiring[Double] = new WLDSemiring[Double] {
 	    private def logSum(a : Double, b : Double) = {
 	      import Math._;
 	      if(a == NEG_INF_DOUBLE) b
@@ -49,6 +67,7 @@ object Semiring {
 	      else a + log(1+exp(b-a));    
 	    }
       def plus(t1: Double, t2: Double) = logSum(t1,t2);
+      def leftDivide(t1: Double, t2: Double) = t2 - t1;
       def times(t1: Double, t2: Double) = t1 + t2;
       val one = 0.0;
       val zero = Math.NEG_INF_DOUBLE;
