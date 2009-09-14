@@ -41,7 +41,14 @@ object Semiring {
    */
   object LogSpace {
     implicit val doubleIsLogSpace:Semiring[Double] = new Semiring[Double] {
-      def plus(t1: Double, t2: Double) = Numerics.logSum(t1,t2);
+	    private def logSum(a : Double, b : Double) = {
+	      import Math._;
+	      if(a == NEG_INF_DOUBLE) b
+	      else if (b == NEG_INF_DOUBLE) a
+	      else if(a < b) b + log(1 + exp(a-b))
+	      else a + log(1+exp(b-a));    
+	    }
+      def plus(t1: Double, t2: Double) = logSum(t1,t2);
       def times(t1: Double, t2: Double) = t1 + t2;
       val one = 0.0;
       val zero = Math.NEG_INF_DOUBLE;

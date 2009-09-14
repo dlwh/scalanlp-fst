@@ -41,11 +41,6 @@
       <version>4.4</version>
       <scope>test</scope>
     </dependency>
-    <dependency>
-    	<groupId>org.scalanlp</groupId>
-    	<artifactId>scalanlp-core</artifactId>
-    	<version>0.2-SNAPSHOT</version>
-    </dependency>
   </dependencies>
 
   <build>
