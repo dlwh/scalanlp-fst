@@ -97,33 +97,31 @@ trait Automaton[W,State,T] { outer =>
   }
   
   /**
-   *  Relabels this autamaton according to this new scheme. This is a strict algorithm.
+   *  Relabels this automaton according to this new scheme. This is a strict algorithm.
    */
   def relabel[U](newStates: Iterable[U]): Automaton[W,U,T] = {
-    new Automaton[W,U,T] {
-      val (arcs,stateToU) =  {
-        val newLabels = collection.mutable.Map[State,U]();
-        val seqArcs = new collection.mutable.ArrayBuffer[Arc[W,U,T]];
-        val uIter = newStates.iterator;
+    val (arcs,stateToU) = {
+      val newLabels = collection.mutable.Map[State,U]();
+      val seqArcs = new collection.mutable.ArrayBuffer[Arc[W,U,T]];
+      val uIter = newStates.iterator;
         outer.breadthFirstSearch { case Arc(from,to,label,score) =>
-          val newFrom = newLabels.getOrElseUpdate(from,uIter.next);
-          seqArcs += Arc(newFrom,newLabels.getOrElseUpdate(to,uIter.next),label,score);
-        }
-        (seqArcs.groupBy(_.from),newLabels)
+        val newFrom = newLabels.getOrElseUpdate(from,uIter.next);
+        seqArcs += Arc(newFrom,newLabels.getOrElseUpdate(to,uIter.next),label,score);
       }
-
-      val myFinalWeights = stateToU map { case (s,u) =>
-        (u, outer.finalWeight(s));
-      }
-      val initialStateWeights = outer.initialStateWeights map { case (k,v) =>
-        (stateToU(k),v) 
-      };
-      
-      def edgesFrom(s: U) = arcs.getOrElse(s,Seq[Arc[W,U,T]]());
-      def finalWeight(s: U) = myFinalWeights.getOrElse(s,ring.zero);
-      implicit val ring = outer.ring
+      (seqArcs,newLabels)
     }
+
+    val myFinalWeights = Map() ++ stateToU.iterator.map { case (s,u) =>
+      (u, outer.finalWeight(s));
+    }
+
+    val initialStateWeights = outer.initialStateWeights map { case (k,v) =>
+      (stateToU(k),v) 
+    };
+
+    automaton[W,U,T](initialStateWeights,myFinalWeights)(arcs:_*);
   }
+      
 
   /**
   * Determinizes the automaton lazily.
@@ -188,6 +186,16 @@ object Automaton {
     }
   }
 
+  def automaton[W:Semiring,S,T](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,T]*): Automaton[W,S,T] = {
+    val arcMap = arcs.groupBy(_.from);
+    new Automaton[W,S,T] {
+      val ring = evidence[Semiring[W]];
+      val initialStateWeights = initialStates;
+      def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
+      def edgesFrom(s: S) = arcMap.getOrElse(s,Seq());
+    }
+  }
+
   class DSL[W:Semiring] {
     class Extras[S](to: S) {
       def apply[T](label: T, weight: W) = (to,Some(label),weight);
@@ -199,20 +207,14 @@ object Automaton {
 
     def automaton[S,T](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: (S,(S,Option[T],W))*): Automaton[W,S,T] = {
       val realArcs = for( (from,(to,label,w)) <- arcs) yield Arc(from,to,label,w);
-      val arcMap = realArcs.groupBy(_.from);
-      new Automaton[W,S,T] {
-        val ring = evidence[Semiring[W]];
-        val initialStateWeights = initialStates;
-        def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
-        def edgesFrom(s: S) = arcMap.getOrElse(s,Seq());
-      }
+      Automaton.automaton(initialStates,finalWeights)(realArcs:_*);
     }
   }
   
   {
     val dsl = new DSL[Double];
     import dsl._;
-    automaton(initialStates=Map(1->1.0),finalWeights=Map(3->1.0))(
+    dsl.automaton(initialStates=Map(1->1.0),finalWeights=Map(3->1.0))(
       1 -> 2 (label='3',weight=10.),
       1 -> 3 (label='4',weight=11.),
       2 -> 3 (label='5',weight=1.0),
