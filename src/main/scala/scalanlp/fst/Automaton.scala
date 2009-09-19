@@ -170,7 +170,6 @@ trait Automaton[W,State,T] { outer =>
         yield ring.times(v,fW);
       weights.foldLeft(ring.zero)(ring.plus _);
     }
-    
   }
 
 }
@@ -187,6 +186,39 @@ object Automaton {
       if(s == x.length) Array[Arc[W,Int,T]]();
       else Array(Arc(s,s+1,Some(x(s)),sring.one));
     }
+  }
+
+  class DSL[W:Semiring] {
+    class Extras[S](to: S) {
+      def apply[T](label: T, weight: W) = (to,Some(label),weight);
+      def apply(label: eps.type, weight: W) = (to,None,weight);
+    }
+    object eps;
+
+    implicit def extras[S](t: S) = new Extras(t);
+
+    def automaton[S,T](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: (S,(S,Option[T],W))*): Automaton[W,S,T] = {
+      val realArcs = for( (from,(to,label,w)) <- arcs) yield Arc(from,to,label,w);
+      val arcMap = realArcs.groupBy(_.from);
+      new Automaton[W,S,T] {
+        val ring = evidence[Semiring[W]];
+        val initialStateWeights = initialStates;
+        def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
+        def edgesFrom(s: S) = arcMap.getOrElse(s,Seq());
+      }
+    }
+  }
+  
+  {
+    val dsl = new DSL[Double];
+    import dsl._;
+    automaton(initialStates=Map(1->1.0),finalWeights=Map(3->1.0))(
+      1 -> 2 (label='3',weight=10.),
+      1 -> 3 (label='4',weight=11.),
+      2 -> 3 (label='5',weight=1.0),
+      1 -> 2 (label=eps,weight=1.0),
+      2 -> 2 (label='3',weight= -1.0)
+    );
   }
   
 }
