@@ -16,11 +16,12 @@ trait Automaton[W,State,T] { outer =>
   def edgesFrom(a: State):Seq[Arc];
   
   def &[S](that: Automaton[W,S,T]):Automaton[W,(State,S),T] = new Automaton[W,(State,S),T] {
+    protected implicit val ring = outer.ring;
+
     val initialStateWeights = for {
       (k1,w1) <- outer.initialStateWeights;
       (k2,w2) <-  that.initialStateWeights
     } yield ((k1,k2),ring.times(w1,w1))
-    protected implicit val ring = outer.ring;
     
     
     def finalWeight(s: (State,S)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
@@ -61,11 +62,18 @@ trait Automaton[W,State,T] { outer =>
     val sb = new StringBuilder;
     sb ++= "digraph A {\n";
     
+    val states = collection.mutable.Set[State]();
     breadthFirstSearch{ case Arc(s,to,label,weight) =>
 	    sb ++= "    \"" + escape(s.toString) + "\"->\"" + escape(to.toString) +"\"";
-		  sb ++= "[ label=\""+label.getOrElse("&epsilon;")+" " + weight +"\"]\n";
+		  sb ++= "[ label=\""+label.getOrElse("&epsilon;")+"/" + weight +"\"]\n";
+      states += s;
+      states += to;
 	  }
     
+    for(s <- states) {
+	    sb ++= "    \"" + escape(s.toString) + "\"";
+		  sb ++= "[ label=\""+ escape(s.toString) + " " + finalWeight(s) + "\"]\n";
+    }
     sb ++= "}";
     sb.toString;
   }
@@ -92,28 +100,30 @@ trait Automaton[W,State,T] { outer =>
   /**
    *  Relabels this autamaton according to this new scheme. This is a strict algorithm.
    */
-  def relabel[U](newStates: Iterable[U]): Automaton[W,U,T] = new Automaton[W,U,T] {
-    val (arcs,stateToU) =  {
-      val newLabels = collection.mutable.Map[State,U]();
-      val seqArcs = new collection.mutable.ArrayBuffer[Arc];
-      val uIter = newStates.iterator;
-	    outer.breadthFirstSearch { case outer.Arc(from,to,label,score) =>
-		    val newFrom = newLabels.getOrElseUpdate(from,uIter.next);
-	      seqArcs += Arc(newFrom,newLabels.getOrElseUpdate(to,uIter.next),label,score);
-		  }
-	    (seqArcs.groupBy(_.from),newLabels)
-    }
+  def relabel[U](newStates: Iterable[U]): Automaton[W,U,T] = {
+    new Automaton[W,U,T] {
+      val (arcs,stateToU) =  {
+        val newLabels = collection.mutable.Map[State,U]();
+        val seqArcs = new collection.mutable.ArrayBuffer[Arc];
+        val uIter = newStates.iterator;
+        outer.breadthFirstSearch { case outer.Arc(from,to,label,score) =>
+          val newFrom = newLabels.getOrElseUpdate(from,uIter.next);
+          seqArcs += Arc(newFrom,newLabels.getOrElseUpdate(to,uIter.next),label,score);
+        }
+        (seqArcs.groupBy(_.from),newLabels)
+      }
 
-    val myFinalWeights = stateToU map { case (s,u) =>
-      (u, outer.finalWeight(s));
+      val myFinalWeights = stateToU map { case (s,u) =>
+        (u, outer.finalWeight(s));
+      }
+      val initialStateWeights = outer.initialStateWeights map { case (k,v) =>
+        (stateToU(k),v) 
+      };
+      
+      def edgesFrom(s: U) = arcs.getOrElse(s,Seq[this.Arc]());
+      def finalWeight(s: U) = myFinalWeights.getOrElse(s,ring.zero);
+      implicit val ring = outer.ring
     }
-    val initialStateWeights = outer.initialStateWeights map { case (k,v) =>
-      (stateToU(k),v) 
-    };
-    
-    def edgesFrom(s: U) = arcs(s);
-    def finalWeight(s: U) = myFinalWeights(s);
-    implicit val ring = outer.ring
   }
 
   /**
@@ -122,8 +132,7 @@ trait Automaton[W,State,T] { outer =>
   def determinize(implicit wld: WLDSemiring[W]): Automaton[W,Map[State,W],T] = new Automaton[W,Map[State,W],T] {
     val ring = wld;
     val initialStateWeights = {
-      val weight = outer.initialStateWeights.valuesIterator.foldLeft(ring.zero)(ring.plus _);
-      Map( outer.initialStateWeights -> weight);
+      Map( outer.initialStateWeights -> ring.one);
     }
 
     def edgesFrom(map: Map[State,W]) = {
@@ -135,7 +144,7 @@ trait Automaton[W,State,T] { outer =>
       for((s,v) <- map;
           outer.Arc(_,to,label,w) <- outer.edgesFrom(s)) {
         // sum over all the different ways to follow arc with label label to 
-        // state to
+        // state t
         val newTo = labeledStates.getOrElseUpdate(label,Map[State,W]())
         val cur = newTo.getOrElse(to,zero);
         newTo(to) = plus(cur,times(w,v));
@@ -170,7 +179,7 @@ trait Automaton[W,State,T] { outer =>
 object Automaton {
   
   def constant[T,W](x: Seq[T], w: W)(implicit sring: Semiring[W]) = new Automaton[W,Int,T] {
-    val initialStateWeights = Map(0 -> ring.one);
+    val initialStateWeights = Map(0 -> sring.one);
     def finalWeight(s: Int) = if(s == x.length) w else sring.zero;
     protected implicit val ring = sring;
     
