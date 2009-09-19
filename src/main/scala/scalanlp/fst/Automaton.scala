@@ -12,8 +12,7 @@ trait Automaton[W,State,T] { outer =>
   val initialStateWeights: Map[State,W];
   def finalWeight(s: State): W;
   
-  case class Arc(from: State, to: State, label: Option[T], weight: W);
-  def edgesFrom(a: State):Seq[Arc];
+  def edgesFrom(a: State):Seq[Arc[W,State,T]];
   
   def &[S](that: Automaton[W,S,T]):Automaton[W,(State,S),T] = new Automaton[W,(State,S),T] {
     protected implicit val ring = outer.ring;
@@ -26,8 +25,8 @@ trait Automaton[W,State,T] { outer =>
     
     def finalWeight(s: (State,S)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
     def edgesFrom(s: (State,S)) = {
-      for(outer.Arc(_,to1,l1,w1) <- outer.edgesFrom(s._1);
-          that.Arc(_,to2,`l1`,w2) <- that.edgesFrom(s._2)) yield {
+      for(Arc(_,to1,l1,w1) <- outer.edgesFrom(s._1);
+          Arc(_,to2,`l1`,w2) <- that.edgesFrom(s._2)) yield {
         Arc(s,(to1,to2),l1,ring.times(w1,w2));
       }
     }
@@ -42,10 +41,10 @@ trait Automaton[W,State,T] { outer =>
     
     def edgesFrom(s: Either[State,S]) = s match {
       case l@Left(os) => 
-        for(outer.Arc(_,to,label,weight) <- outer.edgesFrom(os))
+        for(Arc(_,to,label,weight) <- outer.edgesFrom(os))
           yield Arc(l,Left(to),label,weight);
       case l@Right(os) => 
-        for(that.Arc(_,to,label,weight) <- that.edgesFrom(os))
+        for(Arc(_,to,label,weight) <- that.edgesFrom(os))
           yield Arc(l,Right(to),label,weight);
     }
     
@@ -78,7 +77,7 @@ trait Automaton[W,State,T] { outer =>
     sb.toString;
   }
   
-  protected final def breadthFirstSearch(func: Arc=>Unit) = {
+  protected final def breadthFirstSearch(func: Arc[W,State,T]=>Unit) = {
     val visited = collection.mutable.Set[State]();
     val queue = new collection.mutable.Queue[State]();
     for(s <- initialStateWeights.keysIterator) {
@@ -104,9 +103,9 @@ trait Automaton[W,State,T] { outer =>
     new Automaton[W,U,T] {
       val (arcs,stateToU) =  {
         val newLabels = collection.mutable.Map[State,U]();
-        val seqArcs = new collection.mutable.ArrayBuffer[Arc];
+        val seqArcs = new collection.mutable.ArrayBuffer[Arc[W,U,T]];
         val uIter = newStates.iterator;
-        outer.breadthFirstSearch { case outer.Arc(from,to,label,score) =>
+        outer.breadthFirstSearch { case Arc(from,to,label,score) =>
           val newFrom = newLabels.getOrElseUpdate(from,uIter.next);
           seqArcs += Arc(newFrom,newLabels.getOrElseUpdate(to,uIter.next),label,score);
         }
@@ -120,7 +119,7 @@ trait Automaton[W,State,T] { outer =>
         (stateToU(k),v) 
       };
       
-      def edgesFrom(s: U) = arcs.getOrElse(s,Seq[this.Arc]());
+      def edgesFrom(s: U) = arcs.getOrElse(s,Seq[Arc[W,U,T]]());
       def finalWeight(s: U) = myFinalWeights.getOrElse(s,ring.zero);
       implicit val ring = outer.ring
     }
@@ -142,7 +141,7 @@ trait Automaton[W,State,T] { outer =>
       import ring._;
 
       for((s,v) <- map;
-          outer.Arc(_,to,label,w) <- outer.edgesFrom(s)) {
+          Arc(_,to,label,w) <- outer.edgesFrom(s)) {
         // sum over all the different ways to follow arc with label label to 
         // state t
         val newTo = labeledStates.getOrElseUpdate(label,Map[State,W]())
@@ -159,7 +158,7 @@ trait Automaton[W,State,T] { outer =>
         newState.transform { (innerState,v) =>
           leftDivide(w,v);
         }
-        new Arc(map, collection.immutable.Map() ++ newState,label,w);
+        Arc(map, collection.immutable.Map() ++ newState,label,w);
       } 
 
       arcs.toSequence;
@@ -177,6 +176,7 @@ trait Automaton[W,State,T] { outer =>
 }
 
 object Automaton {
+  final case class Arc[+W,+State,+T](from: State, to: State, label: Option[T], weight: W);
   
   def constant[T,W](x: Seq[T], w: W)(implicit sring: Semiring[W]) = new Automaton[W,Int,T] {
     val initialStateWeights = Map(0 -> sring.one);
@@ -184,7 +184,7 @@ object Automaton {
     protected implicit val ring = sring;
     
     def edgesFrom(s: Int) = {
-      if(s == x.length) Array[Arc]();
+      if(s == x.length) Array[Arc[W,Int,T]]();
       else Array(Arc(s,s+1,Some(x(s)),sring.one));
     }
   }
