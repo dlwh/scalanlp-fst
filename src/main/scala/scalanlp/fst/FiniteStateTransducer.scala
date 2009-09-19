@@ -2,15 +2,21 @@ package scalanlp.fst
 
 import scalanlp.math._;
 
-trait FiniteStateTransducer {
+/**
+ * @param F The input alphabet
+ * @param T The output alphabet
+ */
+trait FiniteStateTransducer[F,T] {
   type State;
   /**
-   * The type of the Alphabet characters
-   * 
+   * The weight attached to any arc.
    */
-  type T;
   type W;
   implicit val ring: Semiring[W];
   
-  def admits
+  val states: Set[State];
+  val initialState : State;
+  
+  case class Arc(from: State, to: State, weight: W, in: F, out: T)
+                  
 }
