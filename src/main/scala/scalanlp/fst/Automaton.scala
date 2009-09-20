@@ -95,9 +95,15 @@ trait Automaton[W,State,T] { outer =>
       visited += s;
     }
   }
+
+
+  /**
+   *  Relabels this automaton with integers. This is a strict algorithm.
+   */
+  def relabel:Automaton[W,Int,T] = relabel(Stream.from(0));
   
   /**
-   *  Relabels this automaton according to this new scheme. This is a strict algorithm.
+   *  Relabels this automaton according to a new scheme. This is a strict algorithm.
    */
   def relabel[U](newStates: Iterable[U]): Automaton[W,U,T] = {
     val (arcs,stateToU) = {
