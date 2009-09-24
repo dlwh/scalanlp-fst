@@ -2,20 +2,23 @@ package scalanlp.fst
 
 import scalanlp.math._;
 import scala.collection.Traversable;
+import scala.collection.Sequence;
 import scala.collection.mutable.PriorityQueue;
 
 trait Transducer[W,State,In,Out] { outer =>
   import Transducer._;
-  
+
   protected implicit val ring: Semiring[W];
   
   val initialStateWeights: Map[State,W];
   def finalWeight(s: State): W;
   
   def edgesFrom(a: State):Seq[Arc[W,State,In,Out]];
-  
-  /*
-  def &[S](that: Automaton[W,S,T]):Automaton[W,(State,S),T] = new Automaton[W,(State,S),T] {
+
+  /**
+  * Epsilon-free composition
+  */ 
+  def >!>[S,Out2](that: Transducer[W,S,In,Out2]):Transducer[W,(State,S),In,Out2] = new Transducer[W,(State,S),In,Out2] {
     protected implicit val ring = outer.ring;
 
     val initialStateWeights = for {
@@ -26,38 +29,43 @@ trait Transducer[W,State,In,Out] { outer =>
     
     def finalWeight(s: (State,S)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
     def edgesFrom(s: (State,S)) = {
-      for(Arc(_,to1,l1,w1) <- outer.edgesFrom(s._1);
-          Arc(_,to2,`l1`,w2) <- that.edgesFrom(s._2)) yield {
-        Arc(s,(to1,to2),l1,ring.times(w1,w2));
-      }
+      (for(Arc(_,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
+          Arc(_,to2,`out1`,out2,w2) <- that.edgesFrom(s._2)) yield {
+        Arc(s,(to1,to2),in1,out2,ring.times(w1,w2));
+      })
     }
   }
-  
-  def |[S](that: Automaton[W,S,T]): Automaton[W,Either[State,S],T] = new Automaton[W,Either[State,S],T] {
-    val initialStateWeights = Map[Either[State,S],W]() ++ outer.initialStateWeights.map { case(k,v) =>
-      (Left(k),v);
-    } ++ that.initialStateWeights.map { case (k,v) =>
-	    (Right(k),v)
-    };
-    
-    def edgesFrom(s: Either[State,S]) = s match {
-      case l@Left(os) => 
-        for(Arc(_,to,label,weight) <- outer.edgesFrom(os))
-          yield Arc(l,Left(to),label,weight);
-      case l@Right(os) => 
-        for(Arc(_,to,label,weight) <- that.edgesFrom(os))
-          yield Arc(l,Right(to),label,weight);
-    }
-    
-    def finalWeight(s: Either[State,S]) = s match {
-      case Left(s) => outer.finalWeight(s);
-      case Right(s) => that.finalWeight(s);
-    }
-    
-    protected override val ring = outer.ring;
-  }
-  
+
+
+  /**
+  * Composition of two transducers in the general case
   */
+  def >>[S,Out2](that: Transducer[W,S,In,Out2]):Transducer[W,(State,S,InboundEpsilon),In,Out2] = new Transducer[W,(State,S,InboundEpsilon),In,Out2] {
+    protected implicit val ring = outer.ring;
+
+    val initialStateWeights: Map[(State,S,InboundEpsilon),W] = for {
+      (k1,w1) <- outer.initialStateWeights;
+      (k2,w2) <-  that.initialStateWeights
+    } yield ((k1,k2,NoEps:InboundEpsilon),ring.times(w1,w2))
+    
+    
+    def finalWeight(s: (State,S,InboundEpsilon)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
+    def edgesFrom(s: (State,S,InboundEpsilon)) = {
+      val arcs = collection.mutable.ArrayBuffer[Arc[W,(State,S,InboundEpsilon),In,Out2]]()
+      for(Arc(_,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
+          Arc(_,to2,out1,out2,w2) <- that.edgesFrom(s._2)
+          ) {
+        (out1,s._3) match {
+          case (Some(_),_) => 
+          case (None,LeftEps) =>
+          case (_,_) =>
+            arcs += Arc(s,(to1,to2,s._3),in1,out2,ring.times(w1,w2));
+        }
+      }
+      arcs;
+    }
+  }
+
   override def toString = {
     def escape(s: String) = s.replaceAll("\"","\\\"");
     val sb = new StringBuilder;
@@ -189,10 +197,10 @@ object Transducer {
   def transducer[W:Semiring,S,In,Out](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,In,Out]*): Transducer[W,S,In,Out] = {
     val arcMap = arcs.groupBy(_.from);
     new Transducer[W,S,In,Out] {
-      val ring = evidence[Semiring[W]];
+      val ring = implicitly[Semiring[W]];
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
-      def edgesFrom(s: S) = arcMap.getOrElse(s,Seq());
+      def edgesFrom(s: S) = arcMap.getOrElse(s,Seq.empty);
     }
   }
 
@@ -225,4 +233,8 @@ object Transducer {
     );
   }
   
+  sealed class InboundEpsilon;
+  case object NoEps extends InboundEpsilon;
+  case object LeftEps extends InboundEpsilon;
+  case object RightEps extends InboundEpsilon;
 }

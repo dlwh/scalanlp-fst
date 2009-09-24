@@ -139,7 +139,7 @@ trait Automaton[W,State,T] { outer =>
     }
 
     def edgesFrom(map: Map[State,W]) = {
-      import collection.mutable._; 
+      import collection.mutable.Map; 
       val labeledWeights = Map[Option[T],W]();
       val labeledStates = Map[Option[T],Map[State,W]]();
       import ring._;
@@ -165,7 +165,7 @@ trait Automaton[W,State,T] { outer =>
         Arc(map, collection.immutable.Map() ++ newState,label,w);
       } 
 
-      arcs.toSequence;
+      Seq() ++ arcs
     }
 
     def finalWeight(map: Map[State,W]) = {
@@ -187,15 +187,15 @@ object Automaton {
     protected implicit val ring = sring;
     
     def edgesFrom(s: Int) = {
-      if(s == x.length) Array[Arc[W,Int,T]]();
-      else Array(Arc(s,s+1,Some(x(s)),sring.one));
+      if(s == x.length) Seq[Arc[W,Int,T]]();
+      else Seq(Arc(s,s+1,Some(x(s)),sring.one));
     }
   }
 
   def automaton[W:Semiring,S,T](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,T]*): Automaton[W,S,T] = {
     val arcMap = arcs.groupBy(_.from);
     new Automaton[W,S,T] {
-      val ring = evidence[Semiring[W]];
+      val ring = implicitly[Semiring[W]];
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
       def edgesFrom(s: S) = arcMap.getOrElse(s,Seq());

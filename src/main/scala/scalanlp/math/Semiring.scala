@@ -23,7 +23,7 @@ object Semiring {
   }
   
   implicit def integralIsSemiring[@specialized T:Integral] = new Semiring[T] {
-    private val ops = evidence[Integral[T]];
+    private val ops = implicitly[Integral[T]];
     import ops._;
     def plus(t1: T, t2: T) = t1 + t2;
     def times(t1: T, t2: T) = t1 * t2;
@@ -32,7 +32,7 @@ object Semiring {
   }
 
   implicit def fractionalIsDivSemiring[@specialized T:Fractional] = new WLDSemiring[T] {
-    private val ops = evidence[Fractional[T]];
+    private val ops = implicitly[Fractional[T]];
     import ops._;
     def plus(t1: T, t2: T) = t1 + t2;
     def times(t1: T, t2: T) = t1 * t2;
