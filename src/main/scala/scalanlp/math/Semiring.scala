@@ -19,7 +19,7 @@ object Semiring {
     def plus(t1: Boolean, t2: Boolean) = t1 || t2;
     def times(t1:Boolean, t2: Boolean) = t1 && t2;
     val one = true;
-    val zero = true;
+    val zero = false;
   }
   
   implicit def integralIsSemiring[@specialized T:Integral] = new Semiring[T] {
