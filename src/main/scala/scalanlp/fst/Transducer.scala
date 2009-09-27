@@ -20,7 +20,7 @@ trait Transducer[W,State,In,Out] { outer =>
   /**
   * Epsilon-free composition
   */ 
-  def >!>[S,Out2](that: Transducer[W,S,In,Out2]):Transducer[W,(State,S),In,Out2] = new Transducer[W,(State,S),In,Out2] {
+  def >!>[S,Out2](that: Transducer[W,S,Out,Out2]):Transducer[W,(State,S),In,Out2] = new Transducer[W,(State,S),In,Out2] {
     protected implicit val ring = outer.ring;
 
     val initialStateWeights = for {
@@ -31,9 +31,23 @@ trait Transducer[W,State,In,Out] { outer =>
     
     def finalWeight(s: (State,S)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
 
+    override def edgesWithInput(s: (State,S), trans: Option[In]): Seq[Arc[W,(State,S),In,Out2]] = {
+      for(Arc(_,to1,in1,out1,w1) <- outer.edgesWithInput(s._1,trans);
+          Arc(_,to2,_,out2,w2) <- that.edgesWithInput(s._2,out1)) yield {
+        Arc(s,(to1,to2),in1,out2,ring.times(w1,w2));
+      }
+    }
+    override def edgesWithOutput(s: (State,S), trans: Option[Out2]): Seq[Arc[W,(State,S),In,Out2]] = {
+      for(Arc(_,to2,out1,out2,w2) <- that.edgesWithOutput(s._2,trans);
+          Arc(_,to1,in1,_,w1) <- outer.edgesWithOutput(s._1,out1)
+          ) yield {
+        Arc(s,(to1,to2),in1,out2,ring.times(w1,w2));
+      }
+    }
+
     def edgesFrom(s: (State,S)) = {
       (for(Arc(_,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
-          Arc(_,to2,`out1`,out2,w2) <- that.edgesFrom(s._2)) yield {
+          Arc(_,to2,_,out2,w2) <- that.edgesWithInput(s._2,out1)) yield {
         Arc(s,(to1,to2),in1,out2,ring.times(w1,w2));
       })
     }
@@ -53,6 +67,78 @@ trait Transducer[W,State,In,Out] { outer =>
     
     
     def finalWeight(s: (State,S,InboundEpsilon)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
+
+    // ugh a lot of code duplication. What to do? XXX
+    override def edgesWithInput(s: (State,S,InboundEpsilon), trans: Option[In]) = {
+      val arcs = collection.mutable.ArrayBuffer[Arc[W,(State,S,InboundEpsilon),In,Out2]]()
+      for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesWithInput(s._1,trans);
+          if out1 != None;
+          a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
+          w = ring.times(w1,w2)) {
+        arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
+      }
+      
+      // Handle epsilon case
+      s._3 match {
+        case NoEps =>
+          for( Arc(_,to1,`trans`,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+            arcs += Arc(s,(to1,s._2,LeftEps),trans,None,w);
+            for( Arc(_,to2,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+              arcs += Arc(s,(to1,to2,NoEps),trans,out2,w);
+            }
+          }
+          if(trans == None)
+            for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+              arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
+            }
+        case LeftEps =>
+          for( Arc(_,to1,`trans`,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+            arcs += Arc(s,(to1,s._2,LeftEps),trans,None,w);
+          }
+        case RightEps if trans == None =>
+          for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+            arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
+          }
+        case RightEps =>
+      }
+      arcs;
+    }
+
+    override def edgesWithOutput(s: (State,S,InboundEpsilon), trans: Option[Out2]) = {
+      val arcs = collection.mutable.ArrayBuffer[Arc[W,(State,S,InboundEpsilon),In,Out2]]()
+      for(a2 @ Arc(from2,to2,out1,out2,w2) <- that.edgesWithOutput(s._2,trans);
+          if out1 != None;
+          a1 @ Arc(from1,to1,in1,_,w1) <- outer.edgesWithOutput(s._1,out1);
+          w = ring.times(w1,w2)) {
+        arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
+      }
+      
+      // Handle epsilon case
+      s._3 match {
+        case NoEps =>
+          for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+            if(trans == None)
+              arcs += Arc(s,(to1,s._2,LeftEps),in1,None,w);
+            for( Arc(_,to2,None,_,w)  <- that.edgesWithOutput(s._2,trans) ) {
+              arcs += Arc(s,(to1,to2,NoEps),in1,trans,w);
+            }
+          }
+          for( Arc(_,to,None,`trans`,w)  <- that.edgesWithInput(s._2,None) ) {
+            arcs += Arc(s,(s._1,to,RightEps),None,`trans`,w);
+          }
+        case LeftEps if trans == None  =>
+          for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+            arcs += Arc(s,(to1,s._2,LeftEps),in1,None,w);
+          }
+        case LeftEps =>
+        case RightEps =>
+          for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+            arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
+          }
+      }
+      arcs;
+    }
+
     def edgesFrom(s: (State,S,InboundEpsilon)) = {
       val arcs = collection.mutable.ArrayBuffer[Arc[W,(State,S,InboundEpsilon),In,Out2]]()
       for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
@@ -83,7 +169,6 @@ trait Transducer[W,State,In,Out] { outer =>
             arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
           }
       }
-
       arcs;
     }
   }
