@@ -14,6 +14,8 @@ trait Transducer[W,State,In,Out] { outer =>
   def finalWeight(s: State): W;
   
   def edgesFrom(a: State):Seq[Arc[W,State,In,Out]];
+  def edgesWithInput(a: State, trans: Option[In]): Seq[Arc[W,State,In,Out]] =   edgesFrom(a).filter(_.in == trans);
+  def edgesWithOutput(a: State, trans: Option[Out]): Seq[Arc[W,State,In,Out]] = edgesFrom(a).filter(_.out == trans);
 
   /**
   * Epsilon-free composition
@@ -28,6 +30,7 @@ trait Transducer[W,State,In,Out] { outer =>
     
     
     def finalWeight(s: (State,S)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
+
     def edgesFrom(s: (State,S)) = {
       (for(Arc(_,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
           Arc(_,to2,`out1`,out2,w2) <- that.edgesFrom(s._2)) yield {
@@ -40,7 +43,7 @@ trait Transducer[W,State,In,Out] { outer =>
   /**
   * Composition of two transducers in the general case
   */
-  def >>[S,Out2](that: Transducer[W,S,In,Out2]):Transducer[W,(State,S,InboundEpsilon),In,Out2] = new Transducer[W,(State,S,InboundEpsilon),In,Out2] {
+  def >>[S,Out2](that: Transducer[W,S,Out,Out2]):Transducer[W,(State,S,InboundEpsilon),In,Out2] = new Transducer[W,(State,S,InboundEpsilon),In,Out2] {
     protected implicit val ring = outer.ring;
 
     val initialStateWeights: Map[(State,S,InboundEpsilon),W] = for {
@@ -52,16 +55,35 @@ trait Transducer[W,State,In,Out] { outer =>
     def finalWeight(s: (State,S,InboundEpsilon)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
     def edgesFrom(s: (State,S,InboundEpsilon)) = {
       val arcs = collection.mutable.ArrayBuffer[Arc[W,(State,S,InboundEpsilon),In,Out2]]()
-      for(Arc(_,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
-          Arc(_,to2,out1,out2,w2) <- that.edgesFrom(s._2)
-          ) {
-        (out1,s._3) match {
-          case (Some(_),_) => 
-          case (None,LeftEps) =>
-          case (_,_) =>
-            arcs += Arc(s,(to1,to2,s._3),in1,out2,ring.times(w1,w2));
-        }
+      for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
+          if out1 != None;
+          a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
+          w = ring.times(w1,w2)) {
+        arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
       }
+      
+      // Handle epsilon case
+      s._3 match {
+        case NoEps =>
+          for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+            arcs += Arc(s,(to1,s._2,LeftEps),in1,None,w);
+            for( Arc(_,to2,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+              arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
+            }
+          }
+          for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+            arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
+          }
+        case LeftEps =>
+          for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+            arcs += Arc(s,(to1,s._2,LeftEps),in1,None,w);
+          }
+        case RightEps =>
+          for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+            arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
+          }
+      }
+
       arcs;
     }
   }
@@ -204,8 +226,8 @@ object Transducer {
     }
   }
 
-  class DSL[W:Semiring] {
-    class Extras[S](to: S) {
+  class DSL[S,W:Semiring] {
+    class Extras(to: S) {
       def apply[T,U](in: T, out: U, weight: W) = (to,Some(in),Some(out),weight);
       def apply[T](in: T, out: eps.type, weight: W) = (to,Some(in),None,weight);
       def apply[U](in: eps.type, out: U, weight: W) = (to,None,Some(out),weight);
@@ -213,16 +235,16 @@ object Transducer {
     }
     object eps;
 
-    implicit def extras[S](t: S) = new Extras(t);
+    implicit def extras(t: S) = new Extras(t);
 
-    def transducer[S,In,Out](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: (S,(S,Option[In],Option[Out],W))*): Transducer[W,S,In,Out] = {
+    def transducer[In,Out](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: (S,(S,Option[In],Option[Out],W))*): Transducer[W,S,In,Out] = {
       val realArcs = for( (from,(to,in,out,w)) <- arcs) yield Arc(from,to,in,out,w);
       Transducer.transducer(initialStates,finalWeights)(realArcs:_*);
     }
   }
   
   {
-    val dsl = new DSL[Double];
+    val dsl = new DSL[Int,Double];
     import dsl._;
     dsl.transducer(initialStates=Map(1->1.0),finalWeights=Map(3->1.0))(
       1 -> 2 (in='3',out=eps,weight=10.),
@@ -232,6 +254,24 @@ object Transducer {
       2 -> 2 (in='3',out=eps,weight= -1.0)
     );
   }
+
+    val dsl = new DSL[Int,Boolean];
+    import dsl._;
+    val a = 
+      dsl.transducer(Map(0->true),Map(4->true)) (    
+        0 -> 1 (in='a',out='a',weight=true),
+        1 -> 2 (in='b',out=eps,weight=true),
+        2->3 (in='c',out=eps,weight=true),  
+        3->4 (in='d',out='d',weight=true)
+      ); 
+    val b = 
+      dsl.transducer(Map(0->true),Map(3->true)) (    
+        0 -> 1 (in='a',out='d',weight=true),
+        1 -> 2 (in=eps,out='e',weight=true),
+        2->3 (in='d',out='a',weight=true)
+      ); 
+
+
   
   sealed class InboundEpsilon;
   case object NoEps extends InboundEpsilon;
