@@ -5,6 +5,8 @@ trait Semiring[T] {
   def times(t1: T, t2: T): T;
   val zero : T
   val one: T
+  // Not a real semiring operation, but we need it
+  def closeTo(t1: T, t2: T): Boolean = t1 == t2;
 }
 
 trait WLDSemiring[T] extends Semiring[T] {
@@ -71,6 +73,7 @@ object Semiring {
       def times(t1: Double, t2: Double) = t1 + t2;
       val one = 0.0;
       val zero = Math.NEG_INF_DOUBLE;
+      override def closeTo(x: Double, y: Double) = Math.abs( (x-y)/x)  < 1E-6;
     }
   }
   

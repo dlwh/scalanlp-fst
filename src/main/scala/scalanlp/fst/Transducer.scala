@@ -77,6 +77,8 @@ trait Transducer[W,State,In,Out] { outer =>
     }
   }
 
+  def compose[S,Out2](that: Transducer[W,S,Out,Out2]) = this >> that;
+
 
   /**
   * Composition of two transducers in the general case
@@ -318,6 +320,58 @@ trait Transducer[W,State,In,Out] { outer =>
         yield ring.times(v,fW);
       weights.foldLeft(ring.zero)(ring.plus _);
     }
+  }
+
+  lazy val cost = {
+    val costs = allPathDistances;
+    var cost = ring.zero;
+    for( (s,w) <- costs) {
+      cost = ring.plus(cost,ring.times(w,finalWeight(s)));
+    }
+    cost;
+  }
+
+  /**
+  * Implements Generic-Single-Source-Shortest-Distance described in Mohri (2002)
+  */
+  def allPathDistances:Map[State,W] = {
+    val d = new collection.mutable.HashMap[State,W] { 
+      override def default(k:State) = ring.zero;
+    };
+    val r = new collection.mutable.HashMap[State,W] { 
+      override def default(k:State) = ring.zero;
+    };
+    val S = new collection.mutable.Queue[State]();
+    for( (s,w) <- initialStateWeights) {
+      d(s) = w;
+      r(s) = w;
+      S += s;
+    }
+
+    while(!S.isEmpty) {
+      val  q = S.head;
+      S.dequeue();
+      val rq = r(q);
+      r -= q;
+      for( Arc(_,to,_,_,w) <- edgesFrom(q)) {
+        val dt = d(to);
+        val rqw = ring.times(rq,w);
+        val dt_p_rqw = ring.plus(dt,rqw);
+        if(!ring.closeTo(dt,dt_p_rqw)) {
+          r(to) = ring.plus(r(to),rqw);
+          d(to) = dt_p_rqw;
+          if(!S.contains(to)) {
+            S += to;
+          }
+        }
+      }
+    }
+
+    for( (s,w) <- initialStateWeights) {
+      d(s) = w;
+    }
+    Map.empty ++ d;
+
   }
 
 }
