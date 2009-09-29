@@ -17,7 +17,7 @@ trait Transducer[W,State,In,Out] { outer =>
   def edgesWithInput(a: State, trans: Option[In]): Seq[Arc[W,State,In,Out]] =   edgesFrom(a).filter(_.in == trans);
   def edgesWithOutput(a: State, trans: Option[Out]): Seq[Arc[W,State,In,Out]] = edgesFrom(a).filter(_.out == trans);
 
-  def inputProjection = new Automaton[W,State,In] {
+  def inputProjection:Automaton[W,State,In] = new Automaton[W,State,In] {
     val ring = outer.ring;
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
@@ -29,7 +29,7 @@ trait Transducer[W,State,In,Out] { outer =>
     }
   }
 
-  def outputProjection = new Automaton[W,State,Out] {
+  def outputProjection: Automaton[W,State,Out] = new Automaton[W,State,Out] {
     val ring = outer.ring;
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
@@ -434,8 +434,6 @@ object Transducer {
         2->3 (in='d',out='a',weight=true)
       ); 
 
-
-  
   sealed class InboundEpsilon;
   case object NoEps extends InboundEpsilon;
   case object LeftEps extends InboundEpsilon;
