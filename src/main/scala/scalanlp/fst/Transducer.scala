@@ -17,6 +17,30 @@ trait Transducer[W,State,In,Out] { outer =>
   def edgesWithInput(a: State, trans: Option[In]): Seq[Arc[W,State,In,Out]] =   edgesFrom(a).filter(_.in == trans);
   def edgesWithOutput(a: State, trans: Option[Out]): Seq[Arc[W,State,In,Out]] = edgesFrom(a).filter(_.out == trans);
 
+  def inputProjection = new Automaton[W,State,In] {
+    val ring = outer.ring;
+    val initialStateWeights = outer.initialStateWeights;
+    def finalWeight(s: State) = outer.finalWeight(s);
+    def edgesFrom(a: State) = outer.edgesFrom(a).map { 
+      case Arc(from,to,in,out,w) => Arc(from,to,in,in,w)
+    }
+    override def edgesWithInput(a: State, trans: Option[In]) = outer.edgesWithInput(a,trans).map { 
+      case Arc(from,to,in,_,w) => Arc(from,to,in,in,w);
+    }
+  }
+
+  def outputProjection = new Automaton[W,State,Out] {
+    val ring = outer.ring;
+    val initialStateWeights = outer.initialStateWeights;
+    def finalWeight(s: State) = outer.finalWeight(s);
+    def edgesFrom(a: State) = outer.edgesFrom(a).map { 
+      case Arc(from,to,in,out,w) => Arc(from,to,out,out,w)
+    }
+    override def edgesWithInput(a: State, trans: Option[Out]) = outer.edgesWithOutput(a,trans).map { 
+      case Arc(from,to,_,out,w) => Arc(from,to,out,out,w);
+    }
+  }
+
   /**
   * Epsilon-free composition
   */ 
