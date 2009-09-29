@@ -17,6 +17,21 @@ trait Transducer[W,State,In,Out] { outer =>
   def edgesWithInput(a: State, trans: Option[In]): Seq[Arc[W,State,In,Out]] =   edgesFrom(a).filter(_.in == trans);
   def edgesWithOutput(a: State, trans: Option[Out]): Seq[Arc[W,State,In,Out]] = edgesFrom(a).filter(_.out == trans);
 
+  def swapLabels: Transducer[W,State,Out,In] = new Transducer[W,State,Out,In] {
+    val ring = outer.ring;
+    val initialStateWeights = outer.initialStateWeights;
+    def finalWeight(s: State) = outer.finalWeight(s);
+    def edgesFrom(s: State) = outer.edgesFrom(s).map {
+      case Arc(from,to,in,out,w) => Arc(from,to,out,in,w);
+    }
+    override def edgesWithInput(s: State, trans: Option[Out]) = outer.edgesWithOutput(s,trans).map {
+      case Arc(from,to,in,out,w) => Arc(from,to,out,in,w);
+    }
+    override def edgesWithOutput(s: State, trans: Option[In]) = outer.edgesWithInput(s,trans).map {
+      case Arc(from,to,in,out,w) => Arc(from,to,out,in,w);
+    }
+  }
+
   def inputProjection:Automaton[W,State,In] = new Automaton[W,State,In] {
     val ring = outer.ring;
     val initialStateWeights = outer.initialStateWeights;
