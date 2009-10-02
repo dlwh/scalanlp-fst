@@ -92,125 +92,168 @@ trait Transducer[W,State,In,Out] { outer =>
     }
   }
 
-  def compose[S,Out2](that: Transducer[W,S,Out,Out2]) = this >> that;
+  /**
+  * Lifts this/that into something like an expectation semiring where, if
+  * the weights in the left are "probabilties" p and the weights on the right are
+  * the things we are trying to compute expectations for w, this creates new machine
+  * where the weights are (p,p * v), addition is (p1 + p2, v1 + v2) and multiplication
+  * is (p1p2,p1v1 + p2v2). The requirement is that addition for this's W  is multiplication 
+  * for that's W. This implies that this's zero is that's one.
+  *
+  * See Eisner (2001) "Expectation semirings..."
+  */
+  def expectationCompose[S,Out2](that: Transducer[W,S,Out,Out2]) = {
+    val ring = new Semiring[(W,W)] {
+      val one = (outer.ring.one,that.ring.zero);
+      val zero = (outer.ring.zero,that.ring.zero);
+      def times(x: (W,W), y: (W,W)) = {
+        import outer.ring.{plus=>pls,times=> tmes};
+        (tmes(x._1,y._1),pls(tmes(x._1,y._2),tmes(y._1,x._2)));
+      }
+      def plus(x: (W,W), y: (W,W)) = {
+        import outer.ring.{plus=>pls};
+        (pls(x._1,y._1),pls(x._2,y._2))
+      }
+    }
 
+    def mkExp(thisW: W, thatW: W) = (thisW,outer.ring.times(thisW,thatW));
+
+    compose(that,mkExp)(ring);
+  }
+
+  /**
+  * Simple composition in the general epsilon-ful case.
+  */
+  def >>[S,Out2](that: Transducer[W,S,Out,Out2]) = compose[S,Out2,W,W](that,ring.times(_,_));
 
   /**
   * Composition of two transducers in the general case
   */
-  def >>[S,Out2](that: Transducer[W,S,Out,Out2]):Transducer[W,(State,S,InboundEpsilon),In,Out2] = new Transducer[W,(State,S,InboundEpsilon),In,Out2] {
-    protected implicit val ring = outer.ring;
+  def compose[S,Out2,W2,W3](that: Transducer[W2,S,Out,Out2],
+                            composeW: (W,W2)=>W3)
+                          (implicit sr: Semiring[W3]):Transducer[W3,(State,S,InboundEpsilon),In,Out2] = {
+    new Transducer[W3,(State,S,InboundEpsilon),In,Out2] {
+      protected implicit val ring = sr;
 
-    val initialStateWeights: Map[(State,S,InboundEpsilon),W] = for {
-      (k1,w1) <- outer.initialStateWeights;
-      (k2,w2) <-  that.initialStateWeights
-    } yield ((k1,k2,NoEps:InboundEpsilon),ring.times(w1,w2))
-    
-    
-    def finalWeight(s: (State,S,InboundEpsilon)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
-
-    // ugh a lot of code duplication. What to do? XXX
-    override def edgesWithInput(s: (State,S,InboundEpsilon), trans: Option[In]) = {
-      val arcs = collection.mutable.ArrayBuffer[Arc[W,(State,S,InboundEpsilon),In,Out2]]()
-      for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesWithInput(s._1,trans);
-          if out1 != None;
-          a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
-          w = ring.times(w1,w2)) {
-        arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
-      }
+      val initialStateWeights: Map[(State,S,InboundEpsilon),W3] = for {
+        (k1,w1) <- outer.initialStateWeights;
+        (k2,w2) <-  that.initialStateWeights
+      } yield ((k1,k2,NoEps:InboundEpsilon),composeW(w1,w2));
       
-      // Handle epsilon case
-      s._3 match {
-        case NoEps =>
-          for( Arc(_,to1,`trans`,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
-            arcs += Arc(s,(to1,s._2,LeftEps),trans,None,w);
-            for( Arc(_,to2,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
-              arcs += Arc(s,(to1,to2,NoEps),trans,out2,w);
-            }
-          }
-          if(trans == None)
-            for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
-              arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
-            }
-        case LeftEps =>
-          for( Arc(_,to1,`trans`,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
-            arcs += Arc(s,(to1,s._2,LeftEps),trans,None,w);
-          }
-        case RightEps if trans == None =>
-          for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
-            arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
-          }
-        case RightEps =>
-      }
-      arcs;
-    }
-
-    override def edgesWithOutput(s: (State,S,InboundEpsilon), trans: Option[Out2]) = {
-      val arcs = collection.mutable.ArrayBuffer[Arc[W,(State,S,InboundEpsilon),In,Out2]]()
-      for(a2 @ Arc(from2,to2,out1,out2,w2) <- that.edgesWithOutput(s._2,trans);
-          if out1 != None;
-          a1 @ Arc(from1,to1,in1,_,w1) <- outer.edgesWithOutput(s._1,out1);
-          w = ring.times(w1,w2)) {
-        arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
-      }
       
-      // Handle epsilon case
-      s._3 match {
-        case NoEps =>
-          for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+      def finalWeight(s: (State,S,InboundEpsilon)) = composeW(outer.finalWeight(s._1),that.finalWeight(s._2));
+
+      // ugh a lot of code duplication. What to do? XXX
+      override def edgesWithInput(s: (State,S,InboundEpsilon), trans: Option[In]) = {
+        val arcs = collection.mutable.ArrayBuffer[Arc[W3,(State,S,InboundEpsilon),In,Out2]]()
+        for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesWithInput(s._1,trans);
+            if out1 != None;
+            a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
+            w = composeW(w1,w2)) {
+          arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
+        }
+        
+        // Handle epsilon case
+        s._3 match {
+          case NoEps =>
+            for( Arc(_,to1,`trans`,None,w1)  <- outer.edgesWithOutput(s._1,None) ) {
+              // normal semiring composeW: w times 1 = w, as expected
+              // expectation semiring: composeW(w,that.ring.one) = composeW(w,outer.ring.zero) = (w,0)
+              //    --> i.e. we can take an epsilon step and incur a probability cost,
+              //        with no change in expectation
+              arcs += Arc(s,(to1,s._2,LeftEps),trans,None,composeW(w1,that.ring.one));
+              for( Arc(_,to2,None,out2,w2)  <- that.edgesWithInput(s._2,None) ) {
+                arcs += Arc(s,(to1,to2,NoEps),trans,out2,composeW(w1,w2));
+              }
+            }
             if(trans == None)
-              arcs += Arc(s,(to1,s._2,LeftEps),in1,None,w);
-            for( Arc(_,to2,None,_,w)  <- that.edgesWithOutput(s._2,trans) ) {
-              arcs += Arc(s,(to1,to2,NoEps),in1,trans,w);
+              for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+                // normal semiring composeW: 1 times w = w, as expected
+                // expectation semiring: composeW(outer.ring.one,w) = composeW(w,outer.ring.zero) = (w,0)
+                //    --> i.e. we can take an epsilon step and incur no probability cost,
+                //        and change the expectation
+                arcs += Arc(s,(s._1,to,RightEps),None,out2,composeW(outer.ring.one,w));
+              }
+          case LeftEps =>
+            for( Arc(_,to1,`trans`,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+              arcs += Arc(s,(to1,s._2,LeftEps),trans,None,composeW(w,that.ring.one));
             }
-          }
-          for( Arc(_,to,None,`trans`,w)  <- that.edgesWithInput(s._2,None) ) {
-            arcs += Arc(s,(s._1,to,RightEps),None,`trans`,w);
-          }
-        case LeftEps if trans == None  =>
-          for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
-            arcs += Arc(s,(to1,s._2,LeftEps),in1,None,w);
-          }
-        case LeftEps =>
-        case RightEps =>
-          for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
-            arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
-          }
+          case RightEps if trans == None =>
+            for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+              arcs += Arc(s,(s._1,to,RightEps),None,out2,composeW(outer.ring.one,w));
+            }
+          case RightEps =>
+        }
+        arcs;
       }
-      arcs;
-    }
 
-    def edgesFrom(s: (State,S,InboundEpsilon)) = {
-      val arcs = collection.mutable.ArrayBuffer[Arc[W,(State,S,InboundEpsilon),In,Out2]]()
-      for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
-          if out1 != None;
-          a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
-          w = ring.times(w1,w2)) {
-        arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
-      }
-      
-      // Handle epsilon case
-      s._3 match {
-        case NoEps =>
-          for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
-            arcs += Arc(s,(to1,s._2,LeftEps),in1,None,w);
-            for( Arc(_,to2,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
-              arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
+      override def edgesWithOutput(s: (State,S,InboundEpsilon), trans: Option[Out2]) = {
+        val arcs = collection.mutable.ArrayBuffer[Arc[W3,(State,S,InboundEpsilon),In,Out2]]()
+        for(a2 @ Arc(from2,to2,out1,out2,w2) <- that.edgesWithOutput(s._2,trans);
+            if out1 != None;
+            a1 @ Arc(from1,to1,in1,_,w1) <- outer.edgesWithOutput(s._1,out1);
+            w = composeW(w1,w2)) {
+          arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
+        }
+        
+        // Handle epsilon case
+        s._3 match {
+          case NoEps =>
+            for( Arc(_,to1,in1,None,w1)  <- outer.edgesWithOutput(s._1,None) ) {
+              if(trans == None)
+                arcs += Arc(s,(to1,s._2,LeftEps),in1,None,composeW(w1,that.ring.one));
+              for( Arc(_,to2,None,_,w2)  <- that.edgesWithOutput(s._2,trans) ) {
+                arcs += Arc(s,(to1,to2,NoEps),in1,trans,composeW(w1,w2));
+              }
             }
-          }
-          for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
-            arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
-          }
-        case LeftEps =>
-          for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
-            arcs += Arc(s,(to1,s._2,LeftEps),in1,None,w);
-          }
-        case RightEps =>
-          for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
-            arcs += Arc(s,(s._1,to,RightEps),None,out2,w);
-          }
+            for( Arc(_,to,None,`trans`,w)  <- that.edgesWithInput(s._2,None) ) {
+              arcs += Arc(s,(s._1,to,RightEps),None,`trans`,composeW(outer.ring.one,w));
+            }
+          case LeftEps if trans == None  =>
+            for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+              arcs += Arc(s,(to1,s._2,LeftEps),in1,None,composeW(w,that.ring.one));
+            }
+          case LeftEps => // nothing
+          case RightEps =>
+            for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+              arcs += Arc(s,(s._1,to,RightEps),None,out2,composeW(outer.ring.one,w));
+            }
+        }
+        arcs;
       }
-      arcs;
+
+      def edgesFrom(s: (State,S,InboundEpsilon)) = {
+        val arcs = collection.mutable.ArrayBuffer[Arc[W3,(State,S,InboundEpsilon),In,Out2]]()
+        for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
+            if out1 != None;
+            a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
+            w = composeW(w1,w2)) {
+          arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
+        }
+        
+        // Handle epsilon case
+        s._3 match {
+          case NoEps =>
+            for( Arc(_,to1,in1,None,w1)  <- outer.edgesWithOutput(s._1,None) ) {
+              arcs += Arc(s,(to1,s._2,LeftEps),in1,None,composeW(w1,that.ring.one));
+              for( Arc(_,to2,None,out2,w2)  <- that.edgesWithInput(s._2,None) ) {
+                arcs += Arc(s,(to1,to2,NoEps),in1,out2,composeW(w1,w2));
+              }
+            }
+            for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+              arcs += Arc(s,(s._1,to,RightEps),None,out2,composeW(outer.ring.one,w));
+            }
+          case LeftEps =>
+            for( Arc(_,to1,in1,None,w)  <- outer.edgesWithOutput(s._1,None) ) {
+              arcs += Arc(s,(to1,s._2,LeftEps),in1,None,composeW(w,that.ring.one));
+            }
+          case RightEps =>
+            for( Arc(_,to,None,out2,w)  <- that.edgesWithInput(s._2,None) ) {
+              arcs += Arc(s,(s._1,to,RightEps),None,out2,composeW(outer.ring.one,w));
+            }
+        }
+        arcs;
+      }
     }
   }
 
