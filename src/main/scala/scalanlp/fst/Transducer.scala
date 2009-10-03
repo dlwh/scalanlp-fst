@@ -5,18 +5,53 @@ import scala.collection.Traversable;
 import scala.collection.Sequence;
 import scala.collection.mutable.PriorityQueue;
 
+/**
+* A Transducer is a graph that assigns scores in some semiring over weights W to pairs of sequences of Ins and Outs.
+* They are analgous to Finite State Machines with weighted arcs that have input and output symbols.
+* Another way of thinking about them is that they convert an input string to an output string with some score W, which 
+* is like a probability.
+* 
+* The representation is a set of states, and a set of arcs from some state to another state, where each arc is labeled
+* with a weight W, an input symbol, and an output symbol. A symbol may be None, in which case no symbol is emitted
+* for that input or output for that transition.
+*
+* In practice, we only need initial states, the arcs going from one state to another state, and the
+* final states.
+*
+* @author dlwh
+*
+*/
 trait Transducer[W,State,In,Out] { outer =>
   import Transducer._;
 
   protected implicit val ring: Semiring[W];
   
+  /**
+  * Maps states to scores W. This is the "probability" that a given sequence starts in this state.
+  */
   val initialStateWeights: Map[State,W];
+  /**
+  * Maps states to scores W. This is the "probability" that a given sequence terminates in this state.
+  */
   def finalWeight(s: State): W;
   
+  /**
+  * Returns all Arcs leaving this node to some other node.
+  */
   def edgesFrom(a: State):Seq[Arc[W,State,In,Out]];
+
+  /**
+  * Returns all Arcs leaving this node to some other node with this input label. A None is an "epsilon".
+  */
   def edgesWithInput(a: State, trans: Option[In]): Seq[Arc[W,State,In,Out]] =   edgesFrom(a).filter(_.in == trans);
+  /**
+  * Returns all Arcs leaving this node to some other node with this output label. A None is an "epsilon".
+  */
   def edgesWithOutput(a: State, trans: Option[Out]): Seq[Arc[W,State,In,Out]] = edgesFrom(a).filter(_.out == trans);
 
+  /**
+  * Returns a transducer where each arc's input and output are swapped.
+  */
   def swapLabels: Transducer[W,State,Out,In] = new Transducer[W,State,Out,In] {
     val ring = outer.ring;
     val initialStateWeights = outer.initialStateWeights;
@@ -32,6 +67,9 @@ trait Transducer[W,State,In,Out] { outer =>
     }
   }
 
+  /**
+  * Returns an automaton where each arc is labeled only with the input.
+  */
   def inputProjection:Automaton[W,State,In] = new Automaton[W,State,In] {
     val ring = outer.ring;
     val initialStateWeights = outer.initialStateWeights;
@@ -44,6 +82,9 @@ trait Transducer[W,State,In,Out] { outer =>
     }
   }
 
+  /**
+  * Returns an automaton where each arc is labeled only with the output.
+  */
   def outputProjection: Automaton[W,State,Out] = new Automaton[W,State,Out] {
     val ring = outer.ring;
     val initialStateWeights = outer.initialStateWeights;
@@ -57,7 +98,8 @@ trait Transducer[W,State,In,Out] { outer =>
   }
 
   /**
-  * Epsilon-free composition
+  * Epsilon-free composition. If you have epsilons, this will almost certainly generate incorrect results.
+  * Basically, we take the cartesian product over states.
   */ 
   def >!>[S,Out2](that: Transducer[W,S,Out,Out2]):Transducer[W,(State,S),In,Out2] = new Transducer[W,(State,S),In,Out2] {
     protected implicit val ring = outer.ring;
@@ -127,7 +169,10 @@ trait Transducer[W,State,In,Out] { outer =>
   def >>[S,Out2](that: Transducer[W,S,Out,Out2]) = compose[S,Out2,W,W](that,ring.times(_,_));
 
   /**
-  * Composition of two transducers in the general case
+  * Composition of two transducers in the general case.
+  * Special handling for epsilons described in Mohri (2002). This supports an extension
+  * where we can handle two distinct weight types as long as we have a way of composing them
+  * into a composite weight. In normal composition, this is just product.
   */
   def compose[S,Out2,W2,W3](that: Transducer[W2,S,Out,Out2],
                             composeW: (W,W2)=>W3)
@@ -257,6 +302,9 @@ trait Transducer[W,State,In,Out] { outer =>
     }
   }
 
+  /**
+  * Prints out a graph in DOT format. Useful for visualization and inspection.
+  */
   override def toString = {
     def escape(s: String) = s.replaceAll("\"","\\\"");
     val sb = new StringBuilder;
@@ -380,6 +428,9 @@ trait Transducer[W,State,In,Out] { outer =>
     }
   }
 
+  /**
+  * Computes the total value of all paths through the transducer.
+  */
   lazy val cost = {
     val costs = allPathDistances;
     var cost = ring.zero;
@@ -435,8 +486,15 @@ trait Transducer[W,State,In,Out] { outer =>
 }
 
 object Transducer {
+  /**
+  * An arc represents an edge from a state to another state, with input label in, output label out, and weight W.
+  * None as a label means epsilon.
+  */
   final case class Arc[+W,+State,+In, +Out](from: State, to: State, in: Option[In], out: Option[Out], weight: W);
 
+  /**
+  * Creates a transducer with the given initial states, final states, and arcs.
+  */
   def transducer[W:Semiring,S,In,Out](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,In,Out]*): Transducer[W,S,In,Out] = {
     val arcMap = arcs.groupBy(_.from);
     new Transducer[W,S,In,Out] {
@@ -447,6 +505,23 @@ object Transducer {
     }
   }
 
+  /**
+  * This class can be used to create transducers with a dot-like syntax:
+  <code>
+   {
+    val dsl = new DSL[Int,Double];
+    import dsl._;
+    dsl.transducer(initialStates=Map(1-&gt;1.0),finalWeights=Map(3-&gt;1.0))(
+      1 -&gt; 2 (in='3',out=eps,weight=10.),
+      1 -&gt; 3 (in='4',out=eps,weight=11.),
+      2 -&gt; 3 (in='5',out=eps,weight=1.0),
+      1 -&gt; 2 (in=eps,out='3',weight=1.0),
+      2 -&gt; 2 (in='3',out=eps,weight= -1.0)
+    );
+  }
+  </code>
+  *
+  */
   class DSL[S,W:Semiring] {
     class Extras(to: S) {
       def apply[T,U](in: T, out: U, weight: W) = (to,Some(in),Some(out),weight);
@@ -476,6 +551,7 @@ object Transducer {
     );
   }
 
+/*
     val dsl = new DSL[Int,Boolean];
     import dsl._;
     val a = 
@@ -491,7 +567,13 @@ object Transducer {
         1 -> 2 (in=eps,out='e',weight=true),
         2->3 (in='d',out='a',weight=true)
       ); 
+      */
 
+  /**
+  * These classes represent bookkeeping states for doing composition
+  * in the presence of epsilons. They are essential, but you can
+  * safely ignore them.
+  */
   sealed class InboundEpsilon;
   case object NoEps extends InboundEpsilon;
   case object LeftEps extends InboundEpsilon;

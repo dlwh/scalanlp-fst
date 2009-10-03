@@ -5,13 +5,23 @@ import scala.collection.Traversable;
 import scala.collection.mutable.PriorityQueue;
 
 import Transducer._;
+
+/**
+* A weighted automaton is just a transducer where the input label is the same as the output label. 
+*/
 trait Automaton[W,State,T] extends Transducer[W,State,T,T] { outer =>
   import Automaton._;
 
   override def edgesWithOutput(s: State, l: Option[T]) = edgesWithInput(s,l);
   
+  /**
+  * Computes the weighted intersection of two automata.
+  */
   def &[S](that: Automaton[W,S,T]):Automaton[W,(State,S,InboundEpsilon),T] = (this >> that).inputProjection;
   
+  /**
+  * Computes the weighted union of two automata. Left(S) is this's state, Right(S) is that's state.
+  */
   def |[S](that: Automaton[W,S,T]): Automaton[W,Either[State,S],T] = new Automaton[W,Either[State,S],T] {
     val initialStateWeights = Map[Either[State,S],W]() ++ outer.initialStateWeights.map { case(k,v) =>
       (Left(k),v);
@@ -41,7 +51,10 @@ trait Automaton[W,State,T] extends Transducer[W,State,T,T] { outer =>
   override def relabel[U](newStates: Iterable[U]) = super.relabel(newStates).inputProjection;
   override def determinize(implicit wld: WLDSemiring[W]) = super.determinize.inputProjection;
   
-  
+  /**
+  * Outputs the automaton's graph in DOT format for easy visualization. 
+  * It shouldn't be too hard to read this input either...
+  */
   override def toString = {
     def escape(s: String) = s.replaceAll("\"","\\\"");
     val sb = new StringBuilder;
@@ -66,6 +79,9 @@ trait Automaton[W,State,T] extends Transducer[W,State,T,T] { outer =>
 }
 
 object Automaton {
+  /**
+  * Create an automaton that accepts this word and only this word with the given weight.
+  */
   def constant[T,W](x: Seq[T], w: W)(implicit sring: Semiring[W]) = new Automaton[W,Int,T] {
     val initialStateWeights = Map(0 -> sring.one);
     def finalWeight(s: Int) = if(s == x.length) w else sring.zero;
@@ -83,6 +99,10 @@ object Automaton {
     }
   }
 
+  /**
+  * Factory method for automaton. Creates an automaton with the
+  * given initial states, final weights, and arcs.
+  */
   def automaton[W:Semiring,S,T](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,T,T]*): Automaton[W,S,T] = {
     val arcMap = arcs.groupBy(_.from);
     new Automaton[W,S,T] {
@@ -93,6 +113,24 @@ object Automaton {
     }
   }
 
+  /**
+  * This can be used to make automata in a pleasing-to-the-eye
+  * kind of way. Example:
+  *
+  * <code>
+  {
+    val dsl = new DSL[Double]; // Double is the weight type we chose.
+    import dsl._;
+    dsl.automaton(initialStates=Map(1-&gt;1.0),finalWeights=Map(3-&gt;1.0))(
+      1 -&gt; 2 (label='3',weight=10.),
+      1 -&gt; 3 (label='4',weight=11.),
+      2 -&gt; 3 (label='5',weight=1.0),
+      1 -&gt; 2 (label=eps,weight=1.0),
+      2 -&gt; 2 (label='3',weight= -1.0)
+    );
+  }
+  * </code>
+  */
   class DSL[W:Semiring] {
     class Extras[S](to: S) {
       def apply[T](label: T, weight: W) = (to,Some(label),weight);
@@ -106,18 +144,6 @@ object Automaton {
       val realArcs = for( (from,(to,label,w)) <- arcs) yield Arc(from,to,label,label,w);
       Automaton.automaton(initialStates,finalWeights)(realArcs:_*);
     }
-  }
-  
-  {
-    val dsl = new DSL[Double];
-    import dsl._;
-    dsl.automaton(initialStates=Map(1->1.0),finalWeights=Map(3->1.0))(
-      1 -> 2 (label='3',weight=10.),
-      1 -> 3 (label='4',weight=11.),
-      2 -> 3 (label='5',weight=1.0),
-      1 -> 2 (label=eps,weight=1.0),
-      2 -> 2 (label='3',weight= -1.0)
-    );
   }
   
 }
