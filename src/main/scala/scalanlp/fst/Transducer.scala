@@ -2,7 +2,7 @@ package scalanlp.fst
 
 import scalanlp.math._;
 import scala.collection.Traversable;
-import scala.collection.Sequence;
+import scala.collection.Seq;
 import scala.collection.mutable.PriorityQueue;
 
 /**
@@ -417,7 +417,7 @@ trait Transducer[W,State,In,Out] { outer =>
         Arc(map, collection.immutable.Map() ++ newState,label._1,label._2,w);
       } 
 
-      arcs.toSequence;
+      arcs.toSeq;
     }
 
     def finalWeight(map: Map[State,W]) = {
