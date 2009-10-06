@@ -60,14 +60,15 @@ object Semiring {
    * Provides access to the tropical algebra. The implicit is segregated because it conflicts with numericIsSemiring
    */
   object LogSpace {
+    def logSum(a : Double, b : Double) = {
+      import Math._;
+      if(a == NEG_INF_DOUBLE) b
+      else if (b == NEG_INF_DOUBLE) a
+      else if(a < b) b + java.lang.Math.log1p(exp(a-b))
+        else a + java.lang.Math.log1p(exp(b-a));    
+    }
     implicit val doubleIsLogSpace:WLDSemiring[Double] = new WLDSemiring[Double] {
-	    private def logSum(a : Double, b : Double) = {
-	      import Math._;
-	      if(a == NEG_INF_DOUBLE) b
-	      else if (b == NEG_INF_DOUBLE) a
-	      else if(a < b) b + log(1 + exp(a-b))
-	      else a + log(1+exp(b-a));    
-	    }
+
       def plus(t1: Double, t2: Double) = logSum(t1,t2);
       def leftDivide(t1: Double, t2: Double) = t2 - t1;
       def times(t1: Double, t2: Double) = t1 + t2;
