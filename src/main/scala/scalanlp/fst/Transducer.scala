@@ -97,6 +97,27 @@ trait Transducer[W,State,In,Out] { outer =>
     }
   }
 
+
+  /**
+  * Transforms the weights but otherwise returns the same automata.
+  */
+  def reweight[W2:Semiring](f: W=>W2) = new Transducer[W2,State,In,Out] {
+    val ring = implicitly[Semiring[W2]];
+
+    val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,f(v))}
+    def finalWeight(s: State) = f(outer.finalWeight(s));
+    def edgesFrom(s: State) = outer.edgesFrom(s) map {
+      case Arc(from,to,in,out,w) => Arc(from,to,in,out,f(w));
+    }
+    override def edgesWithInput(s: State, in: Option[In]) = outer.edgesWithInput(s,in) map {
+      case Arc(from,to,in,out,w) => Arc(from,to,in,out,f(w));
+    }
+
+    override def edgesWithOutput(s: State, out: Option[Out]) = outer.edgesWithOutput(s,out) map {
+      case Arc(from,to,in,out,w) => Arc(from,to,in,out,f(w));
+    }
+  }
+
   /**
   * Epsilon-free composition. If you have epsilons, this will almost certainly generate incorrect results.
   * Basically, we take the cartesian product over states.
