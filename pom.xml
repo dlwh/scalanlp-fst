@@ -26,6 +26,14 @@
     </repository>
   </repositories>
 
+  <distributionManagement>
+    <repository>
+      <id>scalanlp.org</id>
+      <name>Scalanlp Repository</name>
+      <url>dav:http://repo.scalanlp.org/repo/</url>
+    </repository>
+  </distributionManagement>
+
   <pluginRepositories>
     <pluginRepository>
       <id>scala-tools.org</id>
@@ -64,6 +72,7 @@
           </execution>
         </executions>
         <configuration>
+          <displayCmd>true</displayCmd>
           <scalaVersion>${scala.version}</scalaVersion>
           <args>
             <arg>-target:jvm-1.5</arg>
