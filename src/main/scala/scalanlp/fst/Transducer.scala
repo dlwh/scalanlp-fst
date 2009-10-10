@@ -6,17 +6,21 @@ import scala.collection.Seq;
 import scala.collection.mutable.PriorityQueue;
 
 /**
-* A Transducer is a graph that assigns scores in some semiring over weights W to pairs of sequences of Ins and Outs.
-* They are analgous to Finite State Machines with weighted arcs that have input and output symbols.
-* Another way of thinking about them is that they convert an input string to an output string with some score W, which 
+* A Transducer is a graph that assigns scores in some semiring over
+*weights W to pairs of sequences of Ins and Outs. They are analgous
+*to Finite State Machines with weighted arcs that have input and
+*output symbols. Another way of thinking about them is that they
+*convert an input string to an output string with some score W, which
 * is like a probability.
 * 
-* The representation is a set of states, and a set of arcs from some state to another state, where each arc is labeled
-* with a weight W, an input symbol, and an output symbol. A symbol may be None, in which case no symbol is emitted
-* for that input or output for that transition.
+*The representation is a set of states, and a set of arcs from some
+*state to another state, where each arc is labeled with a weight
+*W, an input symbol, and an output symbol. A symbol may be None,
+*in which case no symbol is emitted for that input or output for
+*that transition.
 *
-* In practice, we only need initial states, the arcs going from one state to another state, and the
-* final states.
+*In practice, we only need initial states, the arcs going from one
+*state to another state, and the final states.
 *
 * @author dlwh
 *
@@ -176,6 +180,11 @@ trait Transducer[W,State,In,Out] { outer =>
       def plus(x: (W,W), y: (W,W)) = {
         import outer.ring.{plus=>pls};
         (pls(x._1,y._1),pls(x._2,y._2))
+      }
+
+      def closure(x: (W,W)) = {
+        val pc = outer.ring.closure(x._1);
+        (pc,outer.ring.times(pc,outer.ring.times(pc,x._2)));
       }
     }
 
@@ -463,7 +472,8 @@ trait Transducer[W,State,In,Out] { outer =>
   }
 
   /**
-  * Implements Generic-Single-Source-Shortest-Distance described in Mohri (2002)
+  * Implements Generic-Single-Source-Shortest-Distance described in Mohri (2002), with extra support for doing closure operations on 
+  * selfloops.
   */
   def allPathDistances:Map[State,W] = {
     val d = new collection.mutable.HashMap[State,W] { 
@@ -472,6 +482,11 @@ trait Transducer[W,State,In,Out] { outer =>
     val r = new collection.mutable.HashMap[State,W] { 
       override def default(k:State) = ring.zero;
     };
+
+    val extraW = new collection.mutable.HashMap[State,W] {
+      override def default(k:State) = ring.zero;
+    }
+
     val S = new collection.mutable.Queue[State]();
     for( (s,w) <- initialStateWeights) {
       d(s) = w;
@@ -480,17 +495,31 @@ trait Transducer[W,State,In,Out] { outer =>
     }
 
     while(!S.isEmpty) {
-      val  q = S.head;
+      val from = S.head;
       S.dequeue();
-      val rq = r(q);
-      r -= q;
-      for( Arc(_,to,_,_,w) <- edgesFrom(q)) {
+      val rFrom = r(from);
+      r -= from;
+      extraW.clear();
+      var selfLoopMass = ring.one;
+
+      // find all the self-loop map, save everything else
+      for( Arc(_,to,_,_,w) <- edgesFrom(from)) {
+        if(from == to) {
+          selfLoopMass = ring.plus(selfLoopMass,ring.closure(w));
+        } else {
+          extraW(to) = ring.plus(extraW(to),w);
+        }
+      }
+      // give myself all my selfloops
+      d(from) = ring.times(d(from),selfLoopMass);
+      
+      for( (to,w) <- extraW) {
         val dt = d(to);
-        val rqw = ring.times(rq,w);
-        val dt_p_rqw = ring.plus(dt,rqw);
-        if(!ring.closeTo(dt,dt_p_rqw)) {
-          r(to) = ring.plus(r(to),rqw);
-          d(to) = dt_p_rqw;
+        val wRFrom = ring.times(rFrom,w);
+        val dt_p_wRFrom = ring.plus(dt,wRFrom);
+        if(!ring.closeTo(dt,dt_p_wRFrom)) {
+          r(to) = ring.plus(r(to),wRFrom);
+          d(to) = dt_p_wRFrom;
           if(!S.contains(to)) {
             S += to;
           }
@@ -624,7 +653,7 @@ object Transducer {
                                                    b: Transducer[Double,S2,Mid,Out]) = {
     val ring = new Semiring[LogExpectedWeight] {
       import scalanlp.math.Semiring.LogSpace.logSum;
-      import scalanlp.math.Semiring.LogSpace.doubleIsLogSpace.{zero=>logZero,one=>logOne};
+      import scalanlp.math.Semiring.LogSpace.doubleIsLogSpace.{zero=>logZero,one=>logOne,closure=>logClosure};
       // scores are in log log space
       val one = LogExpectedWeight(logOne,b.ring.zero);
       val zero = LogExpectedWeight(logZero,b.ring.zero);
@@ -647,6 +676,10 @@ object Transducer {
             x.score + java.lang.Math.log1p(-exp(y.score - x.score));
         }
         LogExpectedWeight(sign,score,prob);
+      }
+      def closure(x: LogExpectedWeight) = {
+        val pc = logClosure(x.prob);
+        LogExpectedWeight(x.sign,pc,pc + pc + x.score);
       }
     }
     a.compose(b,LogExpectedWeight(_:Double,_:Double))(ring);
