@@ -534,18 +534,20 @@ trait Transducer[W,State,In,Out] { outer =>
       val rFrom = r(from);
       r -= from;
       extraW.clear();
-      var selfLoopMass = ring.one;
+      var selfLoopMass = ring.zero;
 
       // find all the self-loop map, save everything else
       for( Arc(_,to,_,_,w) <- edgesFrom(from)) {
         if(from == to) {
-          selfLoopMass = ring.plus(selfLoopMass,ring.closure(w));
+          selfLoopMass = ring.plus(selfLoopMass,w);
         } else {
           extraW(to) = ring.plus(extraW(to),w);
         }
       }
       // give myself all my selfloops
-      d(from) = ring.times(d(from),selfLoopMass);
+      d(from) = 
+        if(selfLoopMass == ring.zero) d(from)
+        else ring.times(d(from),ring.closure(selfLoopMass));
       
       for( (to,w) <- extraW) {
         val dt = d(to);
@@ -561,9 +563,6 @@ trait Transducer[W,State,In,Out] { outer =>
       }
     }
 
-    for( (s,w) <- initialStateWeights) {
-      d(s) = w;
-    }
     Map.empty ++ d;
 
   }
