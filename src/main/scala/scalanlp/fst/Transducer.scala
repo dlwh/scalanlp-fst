@@ -3,6 +3,7 @@ package scalanlp.fst
 import scalanlp.math._;
 import scala.collection.Traversable;
 import scala.collection.Seq;
+import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
 
 /**
@@ -52,6 +53,15 @@ trait Transducer[W,State,In,Out] { outer =>
   * Returns all Arcs leaving this node to some other node with this output label. A None is an "epsilon".
   */
   def edgesWithOutput(a: State, trans: Option[Out]): Seq[Arc[W,State,In,Out]] = edgesFrom(a).filter(_.out == trans);
+
+  /**
+  * Returns all edges in the FST: will expand all the states.
+  */
+  def allEdges :Seq[Arc[W,State,In,Out]] = {
+    val buf = new ArrayBuffer[Arc[W,State,In,Out]]();
+    breadthFirstSearch( buf += _ );
+    buf
+  }
 
   /**
   * Returns a transducer where each arc's input and output are swapped.
@@ -358,6 +368,30 @@ trait Transducer[W,State,In,Out] { outer =>
     sb ++= "}";
     sb.toString;
   }
+
+  override def hashCode = {
+    initialStateWeights.hashCode;
+  }
+
+  override def equals(that: Any) =  that match {
+    case that: Transducer[_,_,_,_] => (this eq that) || (
+        this.ring == that.ring
+      &&this.initialStateWeights == that.initialStateWeights
+      && { 
+        val theseEdges = this.allEdges;
+        val thoseEdges = that.allEdges;
+        (
+         Set(theseEdges:_*) == Set(that.allEdges:_*) &&
+         {for(Arc(from,to,_,_,_) <- thoseEdges) yield (
+           finalWeight(from.asInstanceOf[State]) == that.finalWeight(from)
+           && finalWeight(to.asInstanceOf[State]) == that.finalWeight(to)
+         ) }.forall ( x => x )
+       )
+      }
+    )
+    case _ => false;
+  }
+
   
   protected final def breadthFirstSearch(func: Arc[W,State,In,Out]=>Unit) = {
     val visited = collection.mutable.Set[State]();
@@ -553,6 +587,7 @@ object Transducer {
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
       def edgesFrom(s: S) = arcMap.getOrElse(s,Seq.empty);
+      override def allEdges = arcs;
     }
   }
 
