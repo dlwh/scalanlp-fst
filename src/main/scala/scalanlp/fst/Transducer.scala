@@ -111,7 +111,6 @@ trait Transducer[W,State,In,Out] { outer =>
     }
   }
 
-
   /**
   * Transforms the weights but otherwise returns the same automata.
   */
@@ -506,8 +505,11 @@ trait Transducer[W,State,In,Out] { outer =>
   }
 
   /**
-  * Implements Generic-Single-Source-Shortest-Distance described in Mohri (2002), with extra support for doing closure operations on 
-  * selfloops.
+  * Implements Generic-Single-Source-Shortest-Distance described
+  * in Mohri (2002), with extra support for doing closure operations
+  * on selfloops.
+  *
+  * Returns State --&gt; distance to that state from the start
   */
   def allPathDistances:Map[State,W] = {
     val d = new collection.mutable.HashMap[State,W] { 
@@ -564,9 +566,42 @@ trait Transducer[W,State,In,Out] { outer =>
     }
 
     Map.empty ++ d;
-
   }
 
+  def reverse: Transducer[W,State,In,Out] = {
+    val buf = allEdges map { case Arc(from,to,in,out,w) => Arc(to,from,in,out,w) }
+
+    val myInit = Map.empty ++ (
+      for(a <- buf;
+          s = a.from;
+          w = finalWeight(s);
+          if w != ring.zero)
+        yield (s,w)
+    );
+
+    val finalWeights = initialStateWeights;
+
+    Transducer.transducer(myInit,finalWeights)(buf:_*);
+  }
+
+  def pushWeights(implicit r2: WLDSemiring[W]):Transducer[W,State,In,Out] = {
+    import r2._;
+
+    val rev = reverse;
+    val costs = reverse.allPathDistances; // \sum_{state q in final} weight(path(p,q))
+    val initWeights = initialStateWeights map { case (k,v) => (k,times(v,costs(k))) }
+    val finalWeights = for( (s,w) <- rev.initialStateWeights;
+      d = costs(s);
+      if d != zero)
+      yield (s,leftDivide(d,w));
+
+    // re-reverse and reweight
+    val arcs = rev.allEdges map { case Arc(to,from,in,out,w) => 
+      Arc(from,to,in,out,leftDivide(costs(from),times(w,costs(to))))
+    }
+
+    Transducer.transducer(initWeights,finalWeights)(arcs:_*);
+  }
 }
 
 object Transducer {
@@ -718,5 +753,6 @@ object Transducer {
     }
     a.compose(b,LogExpectedWeight(_:Double,_:Double))(ring);
   }
+
 
 }
