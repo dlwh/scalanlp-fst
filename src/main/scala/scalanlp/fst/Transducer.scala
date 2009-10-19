@@ -351,7 +351,7 @@ trait Transducer[W,State,In,Out] { outer =>
     sb ++= "digraph A {\n";
     
     val states = collection.mutable.Set[State]();
-    breadthFirstSearch{ case Arc(s,to,in,out,weight) =>
+    for(Arc(s,to,in,out,weight) <- allEdges) {
 	    sb ++= "    \"" + escape(s.toString) + "\"->\"" + escape(to.toString) +"\"";
 		  sb ++= "[ label=\""+in.getOrElse("&epsilon;")
 		  sb ++= ":" + out.getOrElse("&epsilon;");
@@ -401,13 +401,15 @@ trait Transducer[W,State,In,Out] { outer =>
     
     while(!queue.isEmpty) {
       val s = queue.dequeue(); 
-      for(arc@Arc(_,to,_,_,_) <- edgesFrom(s)) {
-        func(arc);
-	      if(!visited(to)){
-	       queue += to; 
-	      }
+      if(!visited(s)) {
+        for(arc@Arc(_,to,_,_,_) <- edgesFrom(s)) {
+          func(arc);
+          if(!visited(to)){
+          queue += to; 
+          }
+        }
+        visited += s;
       }
-      visited += s;
     }
   }
 
