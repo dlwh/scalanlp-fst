@@ -32,7 +32,7 @@ object Semiring {
 
   object Probability {
     implicit val semiring = new ProbSemiring;
-    class ProbSemiring extends Semiring[Double] {
+    class ProbSemiring extends WLDSemiring[Double] {
       def plus(t1: Double, t2: Double) = t1 + t2;
       def times(t1: Double, t2: Double) = t1 * t2;
       def leftDivide(t1: Double, t2: Double) = t2 / t1;
