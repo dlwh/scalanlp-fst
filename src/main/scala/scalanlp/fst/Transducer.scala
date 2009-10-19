@@ -694,7 +694,7 @@ object Transducer {
   * in the presence of epsilons. They are essential, but you can
   * safely ignore them.
   */
-  sealed class InboundEpsilon;
+  sealed abstract class InboundEpsilon;
   case object NoEps extends InboundEpsilon;
   case object LeftEps extends InboundEpsilon;
   case object RightEps extends InboundEpsilon;
