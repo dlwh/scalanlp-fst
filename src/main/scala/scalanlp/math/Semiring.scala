@@ -62,17 +62,17 @@ object Semiring {
    */
   object Tropical {
     implicit val doubleIsTropical:WLDSemiring[Double] = new WLDSemiring[Double] {
-      def plus(t1: Double, t2: Double) = t1 max t2;
+      def plus(t1: Double, t2: Double) = t1 min t2;
       def leftDivide(t1: Double, t2: Double) = t2 - t1;
       def times(t1: Double, t2: Double) = t1 + t2;
-      def closure(t: Double) = if(t <= 0) t else Math.POS_INF_DOUBLE;
+      def closure(t: Double) = if(t >= 0) t else Math.NEG_INF_DOUBLE;
       val one = 0.0;
-      val zero = Math.NEG_INF_DOUBLE;
+      val zero = Math.POS_INF_DOUBLE;
     }
   }
   
   /**
-   * Provides access to the tropical algebra. The implicit is segregated because it conflicts with numericIsSemiring
+   * Provides access to the logspace algebra. The implicit is segregated because it conflicts with numericIsSemiring
    */
   object LogSpace {
     def logSum(a : Double, b : Double) = {
