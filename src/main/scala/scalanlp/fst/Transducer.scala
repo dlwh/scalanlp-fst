@@ -128,6 +128,21 @@ trait Transducer[W,State,In,Out] { outer =>
   /**
   * Transforms the weights but otherwise returns the same automata.
   */
+  def scaleInitialWeights(f: W) = new Transducer[W,State,In,Out] {
+    val ring = outer.ring;
+
+    val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,ring.times(f,v)) }
+    def finalWeight(s: State) = outer.finalWeight(s);
+    def edgesFrom(s: State) = outer.edgesFrom(s);
+    override def edgesWithInput(s: State, in: Option[In]) = outer.edgesWithInput(s,in);
+    override def edgesWithOutput(s: State, out: Option[Out]) = outer.edgesWithOutput(s,out);
+  }
+
+
+
+  /**
+  * Transforms the weights but otherwise returns the same automata.
+  */
   def reweight[W2:Semiring](f: W=>W2) = new Transducer[W2,State,In,Out] {
     val ring = implicitly[Semiring[W2]];
 
