@@ -123,8 +123,6 @@ class TransducerTest extends FunSuite with Checkers {
       1 -> 3 ('e',None,0),
       1 -> 3 ('f',None,1)
     );
-    println(Set((minimized.allEdges):_*));
-    println(Set(fst.minimize(doubleIsTropical).allEdges:_*));
     assert(minimized === fst.minimize(doubleIsTropical));
   }
 
