@@ -3,6 +3,7 @@ package scalanlp.fst
 import scalanlp.math._;
 import scala.collection.Traversable;
 import scala.collection.Seq;
+import scala.collection.{mutable=>muta}
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
 
@@ -62,6 +63,19 @@ trait Transducer[W,State,In,Out] { outer =>
     breadthFirstSearch( buf += _ );
     buf
   }
+
+  /**
+  * Retyrns a map from states to all edges in the FST. Will expand all states.
+  */
+  def allEdgesByOrigin = allEdges.groupBy(_.from);
+
+  def allStates = Set() ++ initialStateWeights.keysIterator ++ allEdges.iterator.map(_.to);
+
+  /**
+  * Returns a map from states to its final weight. may expand all nodes.
+  */
+  def finalStateWeights = Map.empty ++ allStates.map { s => (s,finalWeight(s)) }
+
 
   /**
   * Returns a transducer where each arc's input and output are swapped.
@@ -604,6 +618,44 @@ trait Transducer[W,State,In,Out] { outer =>
 
     Transducer.transducer(initWeights,finalWeights)(arcs:_*);
   }
+
+  def minimize(implicit r2: WLDSemiring[W]): Transducer[W,State,In,Out] = {
+    val pushed = this.pushWeights;
+    val edgesByOrigin = pushed.allEdgesByOrigin;
+
+    val equivalentStates = pushed.allStates.toSeq.groupBy{ state =>
+      val myEdges = edgesByOrigin.getOrElse(state,Seq.empty).view;
+      val edgesWithoutOrigin = Set() ++ myEdges.map { case Arc(_,to,in,out,w) => (to,in,out,w) };
+      edgesWithoutOrigin
+    } map (_._2);
+    val stateMap = (Map.empty ++ (
+      for(klass <- equivalentStates;
+          val chosenOne = klass.head;
+          s <- klass)
+        yield (s,chosenOne)
+    ))
+
+
+    val initWeights = new muta.HashMap[State,W] {
+      override def default(k: State) = r2.zero;
+    }
+    for( (s,w) <- pushed.initialStateWeights) {
+      initWeights(stateMap(s)) = r2.plus(initWeights(stateMap(s)),w);
+    }
+      
+    val finalWeights = new muta.HashMap[State,W] {
+      override def default(k: State) = r2.zero;
+    }
+    for( (s,w) <- pushed.finalStateWeights) {
+      finalWeights(stateMap(s)) = r2.plus(finalWeights(stateMap(s)),w);
+    }
+
+    Transducer.transducer(Map.empty ++ initWeights,Map.empty ++ finalWeights)( (Set() ++ pushed.allEdges.map {
+        case Arc(from,to,in,out,w) => Arc(stateMap(from),stateMap(to),in,out,w)
+      }).toSeq :_*
+    );
+          
+  }
 }
 
 object Transducer {
@@ -619,9 +671,11 @@ object Transducer {
   def transducer[W:Semiring,S,In,Out](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,In,Out]*): Transducer[W,S,In,Out] = {
     val arcMap = arcs.groupBy(_.from);
     new Transducer[W,S,In,Out] {
+      override def allEdgesByOrigin = arcMap;
       val ring = implicitly[Semiring[W]];
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
+      override val finalStateWeights = finalWeights;
       def edgesFrom(s: S) = arcMap.getOrElse(s,Seq.empty);
       override def allEdges = arcs;
     }

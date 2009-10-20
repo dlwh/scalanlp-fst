@@ -99,5 +99,33 @@ class TransducerTest extends FunSuite with Checkers {
     assert(pushed === fst.pushWeights(semiring));
   }
 
+  test("Mohri hwa fig12d weight pushing") {
+    import Semiring.Tropical._;
+    val dsl = new DSL[Int,Double]()(doubleIsTropical);
+    import dsl._;
+    val fst = transducer(Map(0->0.0),Map(3->0.0))(
+      0 -> 1 ('a',None,0),
+      0 -> 1 ('b',None,1),
+      0 -> 1 ('c',None,5),
+      0 -> 2 ('d',None,0),
+      0 -> 2 ('e',None,1),
+      1 -> 3 ('e',None,0),
+      1 -> 3 ('f',None,1),
+      2 -> 3 ('e',None,4),
+      2 -> 3 ('f',None,5)
+    );
+    val minimized = transducer(Map(0->0.0),Map(3->0.0))(
+      0 -> 1 ('a',None,0),
+      0 -> 1 ('b',None,1),
+      0 -> 1 ('c',None,5),
+      0 -> 1 ('d',None,4),
+      0 -> 1 ('e',None,5),
+      1 -> 3 ('e',None,0),
+      1 -> 3 ('f',None,1)
+    );
+    println(Set((minimized.allEdges):_*));
+    println(Set(fst.minimize(doubleIsTropical).allEdges:_*));
+    assert(minimized === fst.minimize(doubleIsTropical));
+  }
 
 }
