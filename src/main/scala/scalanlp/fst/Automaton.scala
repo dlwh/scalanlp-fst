@@ -9,7 +9,7 @@ import Transducer._;
 /**
 * A weighted automaton is just a transducer where the input label is the same as the output label. 
 */
-trait Automaton[W,State,T] extends Transducer[W,State,T,T] { outer =>
+abstract class Automaton[W,State,T](implicit ring: Semiring[W]) extends Transducer[W,State,T,T] { outer =>
   import Automaton._;
 
   override def edgesWithOutput(s: State, l: Option[T]) = edgesWithInput(s,l);
@@ -42,8 +42,6 @@ trait Automaton[W,State,T] extends Transducer[W,State,T,T] { outer =>
       case Left(s) => outer.finalWeight(s);
       case Right(s) => that.finalWeight(s);
     }
-    
-    protected override val ring = outer.ring;
   }
 
 
@@ -56,21 +54,21 @@ trait Automaton[W,State,T] extends Transducer[W,State,T,T] { outer =>
   * It shouldn't be too hard to read this input either...
   */
   override def toString = {
-    def escape(s: String) = s.replaceAll("\"","\\\"");
+    def escape2(s: String) = s.replaceAll("\"","\\\"");
     val sb = new StringBuilder;
     sb ++= "digraph A {\n";
     
     val states = collection.mutable.Set[State]();
     breadthFirstSearch{ case Arc(s,to,label,_,weight) =>
-	    sb ++= "    \"" + escape(s.toString) + "\"->\"" + escape(to.toString) +"\"";
+	    sb ++= "    \"" + escape2(s.toString) + "\"->\"" + escape2(to.toString) +"\"";
 		  sb ++= "[ label=\""+label.getOrElse("&epsilon;")+"/" + weight +"\"]\n";
       states += s;
       states += to;
 	  }
     
     for(s <- states) {
-	    sb ++= "    \"" + escape(s.toString) + "\"";
-		  sb ++= "[ label=\""+ escape(s.toString) + " " + finalWeight(s) + "\"]\n";
+	    sb ++= "    \"" + escape2(s.toString) + "\"";
+		  sb ++= "[ label=\""+ escape2(s.toString) + " " + finalWeight(s) + "\"]\n";
     }
     sb ++= "}";
     sb.toString;
@@ -82,10 +80,9 @@ object Automaton {
   /**
   * Create an automaton that accepts this word and only this word with the given weight.
   */
-  def constant[T,W](x: Seq[T], w: W)(implicit sring: Semiring[W]) = new Automaton[W,Int,T] {
+  def constant[T,W](x: Seq[T], w: W)(implicit sring: Semiring[W]): Automaton[W,Int,T] = new Automaton[W,Int,T]()(sring) {
     val initialStateWeights = Map(0 -> sring.one);
     def finalWeight(s: Int) = if(s == x.length) w else sring.zero;
-    protected implicit val ring = sring;
     
     def edgesFrom(s: Int) = {
       if(s == x.length) Seq[Arc[W,Int,T,T]]();
@@ -105,8 +102,7 @@ object Automaton {
   */
   def automaton[W:Semiring,S,T](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,T,T]*): Automaton[W,S,T] = {
     val arcMap = arcs.groupBy(_.from);
-    new Automaton[W,S,T] {
-      val ring = implicitly[Semiring[W]];
+    new Automaton[W,S,T]()(implicitly[Semiring[W]]) {
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
       def edgesFrom(s: S) = arcMap.getOrElse(s,Seq());

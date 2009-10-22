@@ -27,11 +27,9 @@ import scala.collection.mutable.PriorityQueue;
 * @author dlwh
 *
 */
-trait Transducer[W,State,In,Out] { outer =>
+abstract class Transducer[W,State,In,Out](protected implicit final val ring: Semiring[W]) { outer =>
   import Transducer._;
 
-  protected implicit val ring: Semiring[W];
-  
   /**
   * Maps states to scores W. This is the "probability" that a given sequence starts in this state.
   */
@@ -81,7 +79,6 @@ trait Transducer[W,State,In,Out] { outer =>
   * Returns a transducer where each arc's input and output are swapped.
   */
   def swapLabels: Transducer[W,State,Out,In] = new Transducer[W,State,Out,In] {
-    val ring = outer.ring;
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
     def edgesFrom(s: State) = outer.edgesFrom(s).map {
@@ -99,7 +96,6 @@ trait Transducer[W,State,In,Out] { outer =>
   * Returns an automaton where each arc is labeled only with the input.
   */
   def inputProjection:Automaton[W,State,In] = new Automaton[W,State,In] {
-    val ring = outer.ring;
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
     def edgesFrom(a: State) = outer.edgesFrom(a).map { 
@@ -114,7 +110,6 @@ trait Transducer[W,State,In,Out] { outer =>
   * Returns an automaton where each arc is labeled only with the output.
   */
   def outputProjection: Automaton[W,State,Out] = new Automaton[W,State,Out] {
-    val ring = outer.ring;
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
     def edgesFrom(a: State) = outer.edgesFrom(a).map { 
@@ -129,8 +124,6 @@ trait Transducer[W,State,In,Out] { outer =>
   * Transforms the weights but otherwise returns the same automata.
   */
   def scaleInitialWeights(f: W) = new Transducer[W,State,In,Out] {
-    val ring = outer.ring;
-
     val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,ring.times(f,v)) }
     def finalWeight(s: State) = outer.finalWeight(s);
     def edgesFrom(s: State) = outer.edgesFrom(s);
@@ -143,9 +136,7 @@ trait Transducer[W,State,In,Out] { outer =>
   /**
   * Transforms the weights but otherwise returns the same automata.
   */
-  def reweight[W2:Semiring](f: W=>W2) = new Transducer[W2,State,In,Out] {
-    val ring = implicitly[Semiring[W2]];
-
+  def reweight[W2:Semiring](f: W=>W2): Transducer[W2,State,In,Out] = new Transducer[W2,State,In,Out]()(implicitly[Semiring[W2]]) {
     val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,f(v))}
     def finalWeight(s: State) = f(outer.finalWeight(s));
     def edgesFrom(s: State) = outer.edgesFrom(s) map {
@@ -165,8 +156,6 @@ trait Transducer[W,State,In,Out] { outer =>
   * Basically, we take the cartesian product over states.
   */ 
   def >!>[S,Out2](that: Transducer[W,S,Out,Out2]):Transducer[W,(State,S),In,Out2] = new Transducer[W,(State,S),In,Out2] {
-    protected implicit val ring = outer.ring;
-
     val initialStateWeights = for {
       (k1,w1) <- outer.initialStateWeights;
       (k2,w2) <-  that.initialStateWeights
@@ -235,7 +224,7 @@ trait Transducer[W,State,In,Out] { outer =>
   /**
   * Simple composition in the general epsilon-ful case.
   */
-  def >>[S,Out2](that: Transducer[W,S,Out,Out2]) = compose[S,Out2,W,W](that,ring.times(_,_));
+  def >>[S,Out2](that: Transducer[W,S,Out,Out2]) = compose[S,Out2,W,W](that,implicitly[Semiring[W]].times(_,_));
 
   /**
   * Composition of two transducers in the general case.
@@ -246,9 +235,7 @@ trait Transducer[W,State,In,Out] { outer =>
   def compose[S,Out2,W2,W3](that: Transducer[W2,S,Out,Out2],
                             composeW: (W,W2)=>W3)
                           (implicit sr: Semiring[W3]):Transducer[W3,(State,S,InboundEpsilon),In,Out2] = {
-    new Transducer[W3,(State,S,InboundEpsilon),In,Out2] {
-      protected implicit val ring = sr;
-
+    new Transducer[W3,(State,S,InboundEpsilon),In,Out2]()(sr) {
       val initialStateWeights: Map[(State,S,InboundEpsilon),W3] = for {
         (k1,w1) <- outer.initialStateWeights;
         (k2,w2) <-  that.initialStateWeights
@@ -478,8 +465,7 @@ trait Transducer[W,State,In,Out] { outer =>
   /**
   * Determinizes the transducer lazily.
   */
-  def determinize(implicit wld: WLDSemiring[W]): Transducer[W,Map[State,W],In,Out] = new Transducer[W,Map[State,W],In,Out] {
-    val ring = wld;
+  def determinize(implicit wld: WLDSemiring[W]): Transducer[W,Map[State,W],In,Out] = new Transducer[W,Map[State,W],In,Out]()(wld) {
     val initialStateWeights = {
       Map(outer.initialStateWeights -> ring.one);
     }
@@ -488,7 +474,7 @@ trait Transducer[W,State,In,Out] { outer =>
       import collection.mutable._; 
       val labeledWeights = Map[(Option[In],Option[Out]),W]();
       val labeledStates = Map[(Option[In],Option[Out]), Map[State,W]]();
-      import ring._;
+      import wld._;
 
       for((s,v) <- map;
           Arc(_,to,in,out,w) <- outer.edgesFrom(s)) {
@@ -507,7 +493,7 @@ trait Transducer[W,State,In,Out] { outer =>
       val arcs = for((label,newState) <- labeledStates.elements;
           w = labeledWeights(label)) yield {
         newState.transform { (innerState,v) =>
-          leftDivide(w,v);
+          wld.leftDivide(w,v);
         }
         Arc(map, collection.immutable.Map() ++ newState,label._1,label._2,w);
       } 
@@ -685,9 +671,8 @@ object Transducer {
   */
   def transducer[W:Semiring,S,In,Out](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,In,Out]*): Transducer[W,S,In,Out] = {
     val arcMap = arcs.groupBy(_.from);
-    new Transducer[W,S,In,Out] {
+    new Transducer[W,S,In,Out]()(implicitly[Semiring[W]]) {
       override def allEdgesByOrigin = arcMap;
-      val ring = implicitly[Semiring[W]];
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
       override val finalStateWeights = finalWeights;
