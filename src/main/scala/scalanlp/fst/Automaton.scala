@@ -9,10 +9,13 @@ import Transducer._;
 /**
 * A weighted automaton is just a transducer where the input label is the same as the output label. 
 */
-abstract class Automaton[W,State,T](implicit ring: Semiring[W]) extends Transducer[W,State,T,T] { outer =>
+abstract class Automaton[W,State,T](implicit ring: Semiring[W], alpha: Alphabet[T]) extends Transducer[W,State,T,T] { outer =>
   import Automaton._;
 
-  override def edgesWithOutput(s: State, l: Option[T]) = edgesWithInput(s,l);
+  /**
+  * Forwards calls to edgesWithInput
+  */
+  override def edgesWithOutput(s: State, l: T) = edgesWithInput(s,l);
   
   /**
   * Computes the weighted intersection of two automata.
@@ -61,7 +64,7 @@ abstract class Automaton[W,State,T](implicit ring: Semiring[W]) extends Transduc
     val states = collection.mutable.Set[State]();
     breadthFirstSearch{ case Arc(s,to,label,_,weight) =>
 	    sb ++= "    \"" + escape2(s.toString) + "\"->\"" + escape2(to.toString) +"\"";
-		  sb ++= "[ label=\""+label.getOrElse("&epsilon;")+"/" + weight +"\"]\n";
+		  sb ++= "[ label=\""+label+"/" + weight +"\"]\n";
       states += s;
       states += to;
 	  }
@@ -80,18 +83,19 @@ object Automaton {
   /**
   * Create an automaton that accepts this word and only this word with the given weight.
   */
-  def constant[T,W](x: Seq[T], w: W)(implicit sring: Semiring[W]): Automaton[W,Int,T] = new Automaton[W,Int,T]()(sring) {
+  def constant[@specialized("Char") T,W](x: Seq[T], w: W)(implicit sring: Semiring[W], alpha: Alphabet[T]): Automaton[W,Int,T] = new Automaton[W,Int,T]()(sring,alpha) {
     val initialStateWeights = Map(0 -> sring.one);
     def finalWeight(s: Int) = if(s == x.length) w else sring.zero;
-    
-    def edgesFrom(s: Int) = {
-      if(s == x.length) Seq[Arc[W,Int,T,T]]();
-      else Seq(Arc(s,s+1,Some(x(s)),Some(x(s)),sring.one));
-    }
 
-    override def edgesWithInput(s: Int, l: Option[T]) = {
-      if (l == x(s)) 
-        Seq(Arc(s,s+1,Some(x(s)),Some(x(s)),sring.one));
+    final val myEdges:Seq[Arc[W,Int,T,T]] = (for(s <- Array.range(0,x.length)) yield {
+      Arc(s,s+1,(x(s)),(x(s)),sring.one);
+    } ) toSeq
+
+    def edgesFrom(s: Int) = if(s == x.length) Seq.empty else Seq(myEdges(s));
+
+    override def edgesWithInput(s: Int, l: T) = {
+      if (s < x.length && l == x(s)) 
+        Seq(myEdges(s));
       else Seq.empty
     }
   }
@@ -100,9 +104,9 @@ object Automaton {
   * Factory method for automaton. Creates an automaton with the
   * given initial states, final weights, and arcs.
   */
-  def automaton[W:Semiring,S,T](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,T,T]*): Automaton[W,S,T] = {
+  def automaton[W:Semiring,S,T:Alphabet](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,T,T]*): Automaton[W,S,T] = {
     val arcMap = arcs.groupBy(_.from);
-    new Automaton[W,S,T]()(implicitly[Semiring[W]]) {
+    new Automaton[W,S,T]()(implicitly[Semiring[W]], implicitly[Alphabet[T]]) {
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
       def edgesFrom(s: S) = arcMap.getOrElse(s,Seq());
@@ -127,16 +131,17 @@ object Automaton {
   }
   * </code>
   */
-  class DSL[W:Semiring] {
+  class DSL[W:Semiring,T:Alphabet] {
+    private val epsilonT = implicitly[Alphabet[T]].epsilon;
     class Extras[S](to: S) {
-      def apply[T](label: T, weight: W) = (to,Some(label),weight);
-      def apply(label: eps.type, weight: W) = (to,None,weight);
+      def apply(label: T, weight: W) = (to,(label),weight);
+      def apply(label: eps.type, weight: W) = (to,epsilonT,weight);
     }
     object eps;
 
     implicit def extras[S](t: S) = new Extras(t);
 
-    def automaton[S,T](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: (S,(S,Option[T],W))*): Automaton[W,S,T] = {
+    def automaton[S](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: (S,(S,T,W))*): Automaton[W,S,T] = {
       val realArcs = for( (from,(to,label,w)) <- arcs) yield Arc(from,to,label,label,w);
       Automaton.automaton(initialStates,finalWeights)(realArcs:_*);
     }
