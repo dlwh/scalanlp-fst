@@ -1,6 +1,6 @@
 package scalanlp.fst
 
-abstract class Alphabet[@specialized("Char, Int") T] {
+abstract class Alphabet[T] {
   val epsilon: T;
 }
 

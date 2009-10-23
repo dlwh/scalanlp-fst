@@ -665,10 +665,10 @@ object Transducer {
   /**
   * An arc represents an edge from a state to another state, with input label in, output label out, and weight W.
   */
-  final case class Arc[@specialized("Double") +W,
+  final case class Arc[+W,
                        +State,
-                       @specialized("Char") +In,
-                       @specialized("Char") +Out](from: State, to: State, in: In, out: Out, weight: W);
+                       +In,
+                       +Out](from: State, to: State, in: In, out: Out, weight: W);
 
   /**
   * Creates a transducer with the given initial states, final states, and arcs.
