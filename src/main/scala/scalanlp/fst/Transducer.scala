@@ -6,6 +6,7 @@ import scala.collection.Seq;
 import scala.collection.{mutable=>muta}
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
+import scala.collection.immutable.IntMap;
 
 /**
 * A Transducer is a graph that assigns scores in some semiring over
@@ -31,6 +32,8 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
                                           protected final val outAlpha: Alphabet[Out]) { outer =>
   import Transducer._;
 
+  type Arc = scalanlp.fst.Arc[W,State,In,Out];
+
   /**
   * Maps states to scores W. This is the "probability" that a given sequence starts in this state.
   */
@@ -43,22 +46,22 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   /**
   * Returns all Arcs leaving this node to some other node.
   */
-  def edgesFrom(a: State):Seq[Arc[W,State,In,Out]];
+  def edgesFrom(s: State):Seq[Arc];
 
   /**
   * Returns all Arcs leaving this node to some other node with this input label.
   */
-  def edgesWithInput(a: State, trans: In): Seq[Arc[W,State,In,Out]] =  edgesFrom(a).filter(_.in == trans);
+  def edgesWithInput(a: State, trans: In): Seq[Arc] =  edgesFrom(a).filter(_.in == trans);
   /**
   * Returns all Arcs leaving this node to some other node with this output label.
   */
-  def edgesWithOutput(a: State, trans: Out): Seq[Arc[W,State,In,Out]] = edgesFrom(a).filter(_.out == trans);
+  def edgesWithOutput(a: State, trans: Out): Seq[Arc] = edgesFrom(a).filter(_.out == trans);
 
   /**
   * Returns all edges in the FST: will expand all the states.
   */
-  def allEdges :Seq[Arc[W,State,In,Out]] = {
-    val buf = new ArrayBuffer[Arc[W,State,In,Out]]();
+  def allEdges :Seq[Arc] = {
+    val buf = new ArrayBuffer[Arc]();
     breadthFirstSearch( buf += _ );
     buf
   }
@@ -164,13 +167,13 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     
     def finalWeight(s: (State,S)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
 
-    override def edgesWithInput(s: (State,S), trans: In): Seq[Arc[W,(State,S),In,Out2]] = {
+    override def edgesWithInput(s: (State,S), trans: In): Seq[Arc] = {
       for(Arc(_,to1,in1,out1,w1) <- outer.edgesWithInput(s._1,trans);
           Arc(_,to2,_,out2,w2) <- that.edgesWithInput(s._2,out1)) yield {
         Arc(s,(to1,to2),in1,out2,ring.times(w1,w2));
       }
     }
-    override def edgesWithOutput(s: (State,S), trans: Out2): Seq[Arc[W,(State,S),In,Out2]] = {
+    override def edgesWithOutput(s: (State,S), trans: Out2): Seq[Arc] = {
       for(Arc(_,to2,out1,out2,w2) <- that.edgesWithOutput(s._2,trans);
           Arc(_,to1,in1,_,w1) <- outer.edgesWithOutput(s._1,out1)
           ) yield {
@@ -249,7 +252,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
 
       // ugh a lot of code duplication. What to do? XXX
       override def edgesWithInput(s: (State,S,InboundEpsilon), trans: In) = {
-        val arcs = collection.mutable.ArrayBuffer[Arc[W3,(State,S,InboundEpsilon),In,Out2]]()
+        val arcs = collection.mutable.ArrayBuffer[Arc]()
         for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesWithInput(s._1,trans);
             if out1 != Out1Eps;
             a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
@@ -288,7 +291,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       }
 
       override def edgesWithOutput(s: (State,S,InboundEpsilon), trans: Out2) = {
-        val arcs = collection.mutable.ArrayBuffer[Arc[W3,(State,S,InboundEpsilon),In,Out2]]()
+        val arcs = collection.mutable.ArrayBuffer[Arc]()
         for(a2 @ Arc(from2,to2,out1,out2,w2) <- that.edgesWithOutput(s._2,trans);
             if out1 != Out1Eps;
             a1 @ Arc(from1,to1,in1,_,w1) <- outer.edgesWithOutput(s._1,out1);
@@ -323,7 +326,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       }
 
       def edgesFrom(s: (State,S,InboundEpsilon)) = {
-        val arcs = collection.mutable.ArrayBuffer[Arc[W3,(State,S,InboundEpsilon),In,Out2]]()
+        val arcs = collection.mutable.ArrayBuffer[Arc]()
         for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
             if out1 != Out1Eps;
             a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
@@ -407,7 +410,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   }
 
   
-  protected final def breadthFirstSearch(func: Arc[W,State,In,Out]=>Unit) = {
+  protected final def breadthFirstSearch(func: Arc=>Unit) = {
     val visited = collection.mutable.Set[State]();
     val queue = new collection.mutable.Queue[State]();
     for(s <- initialStateWeights.keysIterator) {
@@ -432,34 +435,34 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   /**
    *  Relabels this transducer's states with integers. This is a strict algorithm.
    */
-  def relabel:Transducer[W,Int,In,Out] = relabel(Stream.from(0));
-  
-  /**
-   *  Relabels this transducer's states according to a new scheme. This is a strict algorithm.
-   */
-  def relabel[U](newStates: Iterable[U]): Transducer[W,U,In,Out] = {
+  def relabel:Transducer[W,Int,In,Out] = {
+    var _nextIndex = 0;
+    def nextIndex = {
+      val nn = _nextIndex;
+      _nextIndex += 1;
+      nn;
+    }
     val (arcs,stateToU) = {
-      val newStateMap = collection.mutable.Map[State,U]();
-      val seqArcs = new collection.mutable.ArrayBuffer[Arc[W,U,In,Out]];
-      val uIter = newStates.iterator;
-        outer.breadthFirstSearch { case Arc(from,to,in,out,score) =>
-        val newFrom = newStateMap.getOrElseUpdate(from,uIter.next);
-        seqArcs += Arc(newFrom,newStateMap.getOrElseUpdate(to,uIter.next),in,out,score);
+      val newStateMap = collection.mutable.Map[State,Int]();
+      val seqArcs = new collection.mutable.ArrayBuffer[scalanlp.fst.Arc[W,Int,In,Out]];
+      outer.breadthFirstSearch { case Arc(from,to,in,out,score) =>
+        val newFrom = newStateMap.getOrElseUpdate(from,nextIndex);
+        seqArcs += Arc(newFrom,newStateMap.getOrElseUpdate(to,nextIndex),in,out,score);
       }
       (seqArcs,newStateMap)
     }
 
-    val myFinalWeights = Map() ++ stateToU.iterator.map { case (s,u) =>
+    val myFinalWeights = IntMap(stateToU.iterator.map { case (s,u) =>
       (u, outer.finalWeight(s));
-    }
+    }.toSeq:_*);
 
-    val initialStateWeights = outer.initialStateWeights map { case (k,v) =>
+    val initialStateWeights = IntMap(outer.initialStateWeights.map { case (k,v) =>
       (stateToU(k),v) 
-    };
+    }.toSeq:_*);
 
     println("Arcs " + arcs.length + " states " + stateToU.size);
 
-    transducer[W,U,In,Out](initialStateWeights,myFinalWeights)(arcs:_*);
+    transducer[W,Int,In,Out](initialStateWeights,myFinalWeights)(arcs:_*);
   }
       
 
@@ -663,12 +666,19 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
 
 object Transducer {
   /**
-  * An arc represents an edge from a state to another state, with input label in, output label out, and weight W.
+  * Creates a transducer with the given initial states, final states, and arcs.
   */
-  final case class Arc[+W,
-                       +State,
-                       +In,
-                       +Out](from: State, to: State, in: In, out: Out, weight: W);
+  def transducer[W:Semiring,In:Alphabet,Out:Alphabet](initialStates: IntMap[W], finalWeights: IntMap[W])(arcs: Arc[W,Int,In,Out]*): Transducer[W,Int,In,Out] = {
+    val arcMap = IntMap( arcs.groupBy(_.from).toSeq:_*);
+    new Transducer[W,Int,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
+      override def allEdgesByOrigin = arcMap;
+      val initialStateWeights = initialStates;
+      def finalWeight(s: Int) = finalWeights.getOrElse(s,ring.zero);
+      override val finalStateWeights = finalWeights;
+      def edgesFrom(s: Int) = arcMap.getOrElse(s,Seq.empty);
+      override def allEdges = arcs;
+    }
+  }
 
   /**
   * Creates a transducer with the given initial states, final states, and arcs.

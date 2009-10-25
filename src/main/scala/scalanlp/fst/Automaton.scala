@@ -48,9 +48,7 @@ abstract class Automaton[W,State,T](implicit ring: Semiring[W], alpha: Alphabet[
   }
 
 
-  override def relabel = super.relabel(Stream.from(0)).inputProjection;
-  override def relabel[U](newStates: Iterable[U]) = super.relabel(newStates).inputProjection;
-  override def determinize(implicit wld: WLDSemiring[W]) = super.determinize.inputProjection;
+  override def relabel = super.relabel.inputProjection;
   
   /**
   * Outputs the automaton's graph in DOT format for easy visualization. 
@@ -87,7 +85,7 @@ object Automaton {
     val initialStateWeights = Map(0 -> sring.one);
     def finalWeight(s: Int) = if(s == x.length) w else sring.zero;
 
-    final val myEdges:Seq[Arc[W,Int,T,T]] = (for(s <- Array.range(0,x.length)) yield {
+    final val myEdges:Seq[Arc] = (for(s <- Array.range(0,x.length)) yield {
       Arc(s,s+1,(x(s)),(x(s)),sring.one);
     } ) toSeq
 
