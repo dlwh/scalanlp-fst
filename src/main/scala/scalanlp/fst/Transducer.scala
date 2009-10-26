@@ -191,33 +191,33 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
             w = composeW(w1,w2)) {
           arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
         }
-        
-        // Handle epsilon case
+
         s._3 match {
           case NoEps =>
-            for( Arc(_,to1,in1,Out1Eps,w1)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
-              // normal semiring composeW: w times 1 = w, as expected
-              // expectation semiring: composeW(w,that.ring.one) = composeW(w,outer.ring.zero) = (w,0)
-              //    --> i.e. we can take an epsilon step and incur a probability cost,
-              //        with no change in expectation
-              arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w1,that.ring.one));
-              for( Arc(_,to2,_,out2,w2)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
-                arcs += Arc(s,(to1,to2,NoEps),in1,out2,composeW(w1,w2));
+            if(in != InEps) {
+              for( Arc(_,to1,in1,_,w1)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
+                if(out == Out2Eps || out == that.outAlpha.sigma)
+                  arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w1,that.ring.one));
+                for( Arc(_,to2,_,out2,w2)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
+                  arcs += Arc(s,(to1,to2,NoEps),in1,out2,composeW(w1,w2));
+                }
               }
-            }
-            if(in == InEps)
-              for( Arc(_,to,Out1Eps,out2,w)  <- that.edgesMatching(s._2, Out1Eps, out) ) {
+            } 
+            if(in == InEps || in == outer.inAlpha.sigma) {
+              for( Arc(_,to,_,out2,w)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
                 arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
               }
-          case LeftEps =>
-            for( Arc(_,to1,in1,Out1Eps,w)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
-              arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w,that.ring.one));
             }
-          case RightEps if in == InEps =>
-            for( Arc(_,to,_,out2,w)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
-              arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
-            }
+          case LeftEps=>
+            if(out == Out2Eps || out == that.outAlpha.sigma)
+              for( Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
+                arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w,that.ring.one));
+              }
           case RightEps =>
+            if(in == InEps || in == outer.inAlpha.sigma)
+              for( Arc(_,to,_,out2,w)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
+                arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
+              }
         }
         arcs;
       }

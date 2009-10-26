@@ -20,6 +20,37 @@ import scala.collection.mutable.PriorityQueue;
 class TransducerTest extends FunSuite with Checkers {
   import Transducer._;
 
+  test("Mohri hwa fig 7 epsilon-full composition") {
+    val dsl = new DSL[Int,Boolean,Char,Char]();
+    import dsl._;
+    val t1 = transducer( Map(0->true), Map(4->true))(
+      0 -> 1 ('a','a',true),
+      1 -> 2 ('b',eps,true),
+      2 -> 3 ('c',eps,true),
+      3 -> 4 ('d','d',true)
+    );
+    val t2 = transducer( Map(0->true), Map(3->true))(
+      0 -> 1 ('a','d',true),
+      1 -> 2 (eps,'e',true),
+      2 -> 3 ('d','a',true)
+    );
+
+    val result = {
+      val dsl = new DSL[(Int,Int,InboundEpsilon),Boolean,Char,Char]();
+      import dsl._;
+      transducer(Map((0,0,NoEps:InboundEpsilon)->true),Map( (4,3,NoEps:InboundEpsilon)-> true))( 
+        (0,0,NoEps)   -> (1,1,NoEps)    ('a','d',true),
+        (1,1,NoEps)   -> (2,1,LeftEps)  ('b',eps,true),
+        (1,1,NoEps)   -> (2,2,NoEps)    ('b','e',true),
+        (1,1,NoEps)   -> (1,2,RightEps) (eps,'e',true),
+        (2,1,LeftEps) -> (3,1,LeftEps)  ('c',eps,true),
+        (2,2,NoEps)   -> (3,2,LeftEps)  ('c',eps,true),
+        (3,2,LeftEps) -> (4,3,NoEps)    ('d','a',true)
+      )
+    };
+    assert(result === (t1 >> t2))
+  }
+
   test("cost of a no-arc system is correct") {
     import Semiring.LogSpace._;
     val fst = Transducer.transducer[Double,Int,Char,Char](Map(0->0.0),Map(0->0.0))();
