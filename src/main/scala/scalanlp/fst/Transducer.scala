@@ -42,20 +42,23 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   * Maps states to scores W. This is the "probability" that a given sequence terminates in this state.
   */
   def finalWeight(s: State): W;
+
+  def edgesMatching(s: State, in: In, out: Out): Seq[Arc];
   
   /**
   * Returns all Arcs leaving this node to some other node.
   */
-  def edgesFrom(s: State):Seq[Arc];
+  final def edgesFrom(s: State):Seq[Arc] = edgesMatching(s,inAlpha.sigma,outAlpha.sigma);
 
   /**
   * Returns all Arcs leaving this node to some other node with this input label.
   */
-  def edgesWithInput(a: State, trans: In): Seq[Arc] =  edgesFrom(a).filter(_.in == trans);
+  final def edgesWithInput(a: State, trans: In): Seq[Arc] = edgesMatching(a,trans,outAlpha.sigma)
+
   /**
   * Returns all Arcs leaving this node to some other node with this output label.
   */
-  def edgesWithOutput(a: State, trans: Out): Seq[Arc] = edgesFrom(a).filter(_.out == trans);
+  final def edgesWithOutput(a: State, trans: Out): Seq[Arc] = edgesMatching(a,inAlpha.sigma,trans);
 
   /**
   * Returns all edges in the FST: will expand all the states.
@@ -85,13 +88,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   def swapLabels: Transducer[W,State,Out,In] = new Transducer[W,State,Out,In]()(ring, outAlpha, inAlpha) {
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
-    def edgesFrom(s: State) = outer.edgesFrom(s).map {
-      case Arc(from,to,in,out,w) => Arc(from,to,out,in,w);
-    }
-    override def edgesWithInput(s: State, trans: Out) = outer.edgesWithOutput(s,trans).map {
-      case Arc(from,to,in,out,w) => Arc(from,to,out,in,w);
-    }
-    override def edgesWithOutput(s: State, trans: In) = outer.edgesWithInput(s,trans).map {
+    def edgesMatching(s: State, out: Out, in: In) = outer.edgesMatching(s,in,out).map {
       case Arc(from,to,in,out,w) => Arc(from,to,out,in,w);
     }
   }
@@ -102,11 +99,8 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   def inputProjection:Automaton[W,State,In] = new Automaton[W,State,In]()(ring, inAlpha) {
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
-    def edgesFrom(a: State) = outer.edgesFrom(a).map { 
+    def edgesMatching(a: State, trans: In) = outer.edgesMatching(a,trans, outer.outAlpha.sigma).map { 
       case Arc(from,to,in,out,w) => Arc(from,to,in,in,w)
-    }
-    override def edgesWithInput(a: State, trans: In) = outer.edgesWithInput(a,trans).map { 
-      case Arc(from,to,in,_,w) => Arc(from,to,in,in,w);
     }
   }
 
@@ -116,11 +110,8 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   def outputProjection: Automaton[W,State,Out] = new Automaton[W,State,Out]()(ring, outAlpha) {
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
-    def edgesFrom(a: State) = outer.edgesFrom(a).map { 
+    def edgesMatching(a: State, trans: Out) = outer.edgesMatching(a, outer.inAlpha.sigma, trans).map { 
       case Arc(from,to,in,out,w) => Arc(from,to,out,out,w)
-    }
-    override def edgesWithInput(a: State, trans: Out) = outer.edgesWithOutput(a,trans).map { 
-      case Arc(from,to,_,out,w) => Arc(from,to,out,out,w);
     }
   }
 
@@ -130,9 +121,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   def scaleInitialWeights(f: W) = new Transducer[W,State,In,Out]()(ring, inAlpha, outAlpha) {
     val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,ring.times(f,v)) }
     def finalWeight(s: State) = outer.finalWeight(s);
-    def edgesFrom(s: State) = outer.edgesFrom(s);
-    override def edgesWithInput(s: State, in: In) = outer.edgesWithInput(s,in);
-    override def edgesWithOutput(s: State, out: Out) = outer.edgesWithOutput(s,out);
+    def edgesMatching(s: State, in:In, out: Out) = outer.edgesMatching(s,in,out);
   }
 
 
@@ -142,14 +131,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   def reweight[W2:Semiring](f: W=>W2): Transducer[W2,State,In,Out] = new Transducer[W2,State,In,Out]()(implicitly[Semiring[W2]], inAlpha, outAlpha) {
     val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,f(v))}
     def finalWeight(s: State) = f(outer.finalWeight(s));
-    def edgesFrom(s: State) = outer.edgesFrom(s) map {
-      case Arc(from,to,in,out,w) => Arc(from,to,in,out,f(w));
-    }
-    override def edgesWithInput(s: State, in: In) = outer.edgesWithInput(s,in) map {
-      case Arc(from,to,in,out,w) => Arc(from,to,in,out,f(w));
-    }
-
-    override def edgesWithOutput(s: State, out: Out) = outer.edgesWithOutput(s,out) map {
+    def edgesMatching(s: State, in: In, out: Out) = outer.edgesMatching(s,in,out) map {
       case Arc(from,to,in,out,w) => Arc(from,to,in,out,f(w));
     }
   }
@@ -167,62 +149,13 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     
     def finalWeight(s: (State,S)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
 
-    override def edgesWithInput(s: (State,S), trans: In): Seq[Arc] = {
-      for(Arc(_,to1,in1,out1,w1) <- outer.edgesWithInput(s._1,trans);
-          Arc(_,to2,_,out2,w2) <- that.edgesWithInput(s._2,out1)) yield {
+    override def edgesMatching(s: (State,S), in: In, out: Out2): Seq[Arc] = {
+      for(Arc(_,to1,in1,out1,w1) <- outer.edgesMatching(s._1,in,outer.outAlpha.sigma);
+          Arc(_,to2,_,out2,w2) <- that.edgesMatching(s._2,out1,out)) yield {
         Arc(s,(to1,to2),in1,out2,ring.times(w1,w2));
       }
-    }
-    override def edgesWithOutput(s: (State,S), trans: Out2): Seq[Arc] = {
-      for(Arc(_,to2,out1,out2,w2) <- that.edgesWithOutput(s._2,trans);
-          Arc(_,to1,in1,_,w1) <- outer.edgesWithOutput(s._1,out1)
-          ) yield {
-        Arc(s,(to1,to2),in1,out2,ring.times(w1,w2));
-      }
-    }
-
-    def edgesFrom(s: (State,S)) = {
-      (for(Arc(_,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
-          Arc(_,to2,_,out2,w2) <- that.edgesWithInput(s._2,out1)) yield {
-        Arc(s,(to1,to2),in1,out2,ring.times(w1,w2));
-      })
     }
   }
-
-  /**
-  * Lifts this/that into something like an expectation semiring where, if
-  * the weights in the left are "probabilties" p and the weights on the right are
-  * the things we are trying to compute expectations for w, this creates new machine
-  * where the weights are (p,p * v), addition is (p1 + p2, v1 + v2) and multiplication
-  * is (p1p2,p1v1 + p2v2). The requirement is that addition for this's W  is multiplication 
-  * for that's W. This implies that this's zero is that's one.
-  *
-  * See Eisner (2001) "Expectation semirings..."
-  */
-  def expectationCompose[S,Out2](that: Transducer[W,S,Out,Out2]) = {
-    val ring = new Semiring[(W,W)] {
-      val one = (outer.ring.one,that.ring.zero);
-      val zero = (outer.ring.zero,that.ring.zero);
-      def times(x: (W,W), y: (W,W)) = {
-        import outer.ring.{plus=>pls,times=> tmes};
-        (tmes(x._1,y._1),pls(tmes(x._1,y._2),tmes(y._1,x._2)));
-      }
-      def plus(x: (W,W), y: (W,W)) = {
-        import outer.ring.{plus=>pls};
-        (pls(x._1,y._1),pls(x._2,y._2))
-      }
-
-      def closure(x: (W,W)) = {
-        val pc = outer.ring.closure(x._1);
-        (pc,outer.ring.times(pc,outer.ring.times(pc,x._2)));
-      }
-    }
-
-    def mkExp(thisW: W, thatW: W) = (thisW,outer.ring.times(thisW,thatW));
-
-    compose(that,mkExp)(ring);
-  }
-
 
   /**
   * Simple composition in the general epsilon-ful case.
@@ -250,12 +183,11 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       
       def finalWeight(s: (State,S,InboundEpsilon)) = composeW(outer.finalWeight(s._1),that.finalWeight(s._2));
 
-      // ugh a lot of code duplication. What to do? XXX
-      override def edgesWithInput(s: (State,S,InboundEpsilon), trans: In) = {
+      override def edgesMatching(s: (State,S,InboundEpsilon), in: In, out: Out2) = {
         val arcs = collection.mutable.ArrayBuffer[Arc]()
-        for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesWithInput(s._1,trans);
+        for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesMatching(s._1,in,outer.outAlpha.sigma);
             if out1 != Out1Eps;
-            a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
+            a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesMatching(s._2,out1,out);
             w = composeW(w1,w2)) {
           arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
         }
@@ -263,97 +195,29 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
         // Handle epsilon case
         s._3 match {
           case NoEps =>
-            for( Arc(_,to1,`trans`,Out1Eps,w1)  <- outer.edgesWithOutput(s._1,Out1Eps) ) {
+            for( Arc(_,to1,in1,Out1Eps,w1)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
               // normal semiring composeW: w times 1 = w, as expected
               // expectation semiring: composeW(w,that.ring.one) = composeW(w,outer.ring.zero) = (w,0)
               //    --> i.e. we can take an epsilon step and incur a probability cost,
               //        with no change in expectation
-              arcs += Arc(s,(to1,s._2,LeftEps),trans,Out2Eps,composeW(w1,that.ring.one));
-              for( Arc(_,to2,Out1Eps,out2,w2)  <- that.edgesWithInput(s._2,Out1Eps) ) {
-                arcs += Arc(s,(to1,to2,NoEps),trans,out2,composeW(w1,w2));
-              }
-            }
-            if(trans == InEps)
-              for( Arc(_,to,Out1Eps,out2,w)  <- that.edgesWithInput(s._2,Out1Eps) ) {
-                arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
-              }
-          case LeftEps =>
-            for( Arc(_,to1,`trans`,Out1Eps,w)  <- outer.edgesWithOutput(s._1,Out1Eps) ) {
-              arcs += Arc(s,(to1,s._2,LeftEps),trans,Out2Eps,composeW(w,that.ring.one));
-            }
-          case RightEps if trans == InEps =>
-            for( Arc(_,to,_,out2,w)  <- that.edgesWithInput(s._2,Out1Eps) ) {
-              arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
-            }
-          case RightEps =>
-        }
-        arcs;
-      }
-
-      override def edgesWithOutput(s: (State,S,InboundEpsilon), trans: Out2) = {
-        val arcs = collection.mutable.ArrayBuffer[Arc]()
-        for(a2 @ Arc(from2,to2,out1,out2,w2) <- that.edgesWithOutput(s._2,trans);
-            if out1 != Out1Eps;
-            a1 @ Arc(from1,to1,in1,_,w1) <- outer.edgesWithOutput(s._1,out1);
-            w = composeW(w1,w2)) {
-          arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
-        }
-        
-        // Handle epsilon case
-        s._3 match {
-          case NoEps =>
-            for( Arc(_,to1,in1,_,w1)  <- outer.edgesWithOutput(s._1,Out1Eps) ) {
-              if(trans == Out2Eps)
-                arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w1,that.ring.one));
-              for( Arc(_,to2,Out1Eps,_,w2)  <- that.edgesWithOutput(s._2,trans) ) {
-                arcs += Arc(s,(to1,to2,NoEps),in1,trans,composeW(w1,w2));
-              }
-            }
-            for( Arc(_,to,_,`trans`,w)  <- that.edgesWithInput(s._2,Out1Eps) ) {
-              arcs += Arc(s,(s._1,to,RightEps),InEps,`trans`,composeW(outer.ring.one,w));
-            }
-          case LeftEps if trans == Out2Eps  =>
-            for( Arc(_,to1,in1,Out1Eps,w)  <- outer.edgesWithOutput(s._1,Out1Eps) ) {
-              arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w,that.ring.one));
-            }
-          case LeftEps => // nothing
-          case RightEps =>
-            for( Arc(_,to,_,out2,w)  <- that.edgesWithInput(s._2,Out1Eps) ) {
-              arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
-            }
-        }
-        arcs;
-      }
-
-      def edgesFrom(s: (State,S,InboundEpsilon)) = {
-        val arcs = collection.mutable.ArrayBuffer[Arc]()
-        for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesFrom(s._1);
-            if out1 != Out1Eps;
-            a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesWithInput(s._2,out1);
-            w = composeW(w1,w2)) {
-          arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
-        }
-        
-        // Handle epsilon case
-        s._3 match {
-          case NoEps =>
-            for( Arc(_,to1,in1,_,w1)  <- outer.edgesWithOutput(s._1,Out1Eps) ) {
               arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w1,that.ring.one));
-              for( Arc(_,to2,Out1Eps,out2,w2)  <- that.edgesWithInput(s._2,Out1Eps) ) {
+              for( Arc(_,to2,_,out2,w2)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
                 arcs += Arc(s,(to1,to2,NoEps),in1,out2,composeW(w1,w2));
               }
             }
-            for( Arc(_,to,_,out2,w)  <- that.edgesWithInput(s._2,Out1Eps) ) {
-              arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
-            }
+            if(in == InEps)
+              for( Arc(_,to,Out1Eps,out2,w)  <- that.edgesMatching(s._2, Out1Eps, out) ) {
+                arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
+              }
           case LeftEps =>
-            for( Arc(_,to1,in1,_,w)  <- outer.edgesWithOutput(s._1,Out1Eps) ) {
+            for( Arc(_,to1,in1,Out1Eps,w)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
               arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w,that.ring.one));
             }
-          case RightEps =>
-            for( Arc(_,to,_,out2,w)  <- that.edgesWithInput(s._2,Out1Eps) ) {
+          case RightEps if in == InEps =>
+            for( Arc(_,to,_,out2,w)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
               arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
             }
+          case RightEps =>
         }
         arcs;
       }
@@ -460,8 +324,6 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       (stateToU(k),v) 
     }.toSeq:_*);
 
-    println("Arcs " + arcs.length + " states " + stateToU.size);
-
     transducer[W,Int,In,Out](initialStateWeights,myFinalWeights)(arcs:_*);
   }
       
@@ -474,15 +336,15 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       Map(outer.initialStateWeights -> ring.one);
     }
 
-    def edgesFrom(map: Map[State,W]) = {
+    def edgesMatching(map: Map[State,W], in: In, out: Out) = {
       import collection.mutable._; 
       val labeledWeights = Map[(In,Out),W]();
       val labeledStates = Map[(In,Out), Map[State,W]]();
       import wld._;
 
       for((s,v) <- map;
-          Arc(_,to,in,out,w) <- outer.edgesFrom(s)) {
-          val label = (in,out);
+          Arc(_,to,in1,out1,w) <- outer.edgesMatching(s,in,out)) {
+          val label = (in1,out1);
         // sum over all the different ways to follow arc with label label to 
         // state t
         val newTo = labeledStates.getOrElseUpdate(label,Map[State,W]())
@@ -554,14 +416,16 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     while(!S.isEmpty) {
       val from = S.head;
       S.dequeue();
-      println(from);
+      println("State" + from);
       val rFrom = r(from);
       r -= from;
       extraW.clear();
       var selfLoopMass = ring.zero;
 
       // find all the self-loop map, save everything else
-      for( Arc(_,to,_,_,w) <- edgesFrom(from)) {
+      println("?");
+      for( a@Arc(_,to,_,_,w) <- edgesFrom(from)) {
+        println(a);
         if(from == to) {
           selfLoopMass = ring.plus(selfLoopMass,w);
         } else {
@@ -574,6 +438,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
         else ring.times(d(from),ring.closure(selfLoopMass));
       
       for( (to,w) <- extraW) {
+        println( from + " " + (to,w));
         val dt = d(to);
         val wRFrom = ring.times(rFrom,w);
         val dt_p_wRFrom = ring.plus(dt,wRFrom);
@@ -668,21 +533,6 @@ object Transducer {
   /**
   * Creates a transducer with the given initial states, final states, and arcs.
   */
-  def transducer[W:Semiring,In:Alphabet,Out:Alphabet](initialStates: IntMap[W], finalWeights: IntMap[W])(arcs: Arc[W,Int,In,Out]*): Transducer[W,Int,In,Out] = {
-    val arcMap = IntMap( arcs.groupBy(_.from).toSeq:_*);
-    new Transducer[W,Int,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
-      override def allEdgesByOrigin = arcMap;
-      val initialStateWeights = initialStates;
-      def finalWeight(s: Int) = finalWeights.getOrElse(s,ring.zero);
-      override val finalStateWeights = finalWeights;
-      def edgesFrom(s: Int) = arcMap.getOrElse(s,Seq.empty);
-      override def allEdges = arcs;
-    }
-  }
-
-  /**
-  * Creates a transducer with the given initial states, final states, and arcs.
-  */
   def transducer[W:Semiring,S,In:Alphabet,Out:Alphabet](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,In,Out]*): Transducer[W,S,In,Out] = {
     val arcMap = arcs.groupBy(_.from);
     new Transducer[W,S,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
@@ -690,7 +540,15 @@ object Transducer {
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
       override val finalStateWeights = finalWeights;
-      def edgesFrom(s: S) = arcMap.getOrElse(s,Seq.empty);
+      def edgesMatching(s: S, in: In, out: Out) = {
+        if(in == inAlpha.sigma && out == outAlpha.sigma) {
+          arcMap.getOrElse(s,Seq.empty)
+        } else {
+          arcMap.getOrElse(s,Seq.empty) filter { arc =>
+            (in == inAlpha.sigma || in == arc.in) && (out == outAlpha.sigma || out == arc.out)
+          };
+        }
+      }
       override def allEdges = arcs;
     }
   }

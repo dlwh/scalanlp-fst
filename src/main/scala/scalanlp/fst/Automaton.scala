@@ -13,9 +13,16 @@ abstract class Automaton[W,State,T](implicit ring: Semiring[W], alpha: Alphabet[
   import Automaton._;
 
   /**
-  * Forwards calls to edgesWithInput
+  * Forwards calls to edgesMatching w/ one arg
   */
-  override def edgesWithOutput(s: State, l: T) = edgesWithInput(s,l);
+  override def edgesMatching(s: State, in: T, out: T) = { 
+    if(in == out) edgesMatching(s,in) 
+    else if(in == alpha.sigma) edgesMatching(s,out)
+    else if(out == alpha.sigma) edgesMatching(s,in)
+    else Seq.empty;
+  }
+
+  def edgesMatching(s: State, l: T):Seq[Arc] 
   
   /**
   * Computes the weighted intersection of two automata.
@@ -32,12 +39,12 @@ abstract class Automaton[W,State,T](implicit ring: Semiring[W], alpha: Alphabet[
 	    (Right(k),v)
     };
     
-    def edgesFrom(s: Either[State,S]) = s match {
+    def edgesMatching(s: Either[State,S], label: T):Seq[Arc] = s match {
       case l@Left(os) => 
-        for(Arc(_,to,label,_,weight) <- outer.edgesFrom(os))
+        for(Arc(_,to,label,_,weight) <- outer.edgesMatching(os,label))
           yield Arc(l,Left(to),label,label,weight);
       case l@Right(os) => 
-        for(Arc(_,to,label,_,weight) <- that.edgesFrom(os))
+        for(Arc(_,to,label,_,weight) <- that.edgesMatching(os,label))
           yield Arc(l,Right(to),label,label,weight);
     }
     
@@ -89,13 +96,7 @@ object Automaton {
       Arc(s,s+1,(x(s)),(x(s)),sring.one);
     } ) toSeq
 
-    def edgesFrom(s: Int) = if(s == x.length) Seq.empty else Seq(myEdges(s));
-
-    override def edgesWithInput(s: Int, l: T) = {
-      if (s < x.length && l == x(s)) 
-        Seq(myEdges(s));
-      else Seq.empty
-    }
+    def edgesMatching(s: Int, l: T) = if(s == x.length || myEdges(s).in != l) Seq.empty else Seq(myEdges(s));
   }
 
   /**
@@ -107,7 +108,15 @@ object Automaton {
     new Automaton[W,S,T]()(implicitly[Semiring[W]], implicitly[Alphabet[T]]) {
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
-      def edgesFrom(s: S) = arcMap.getOrElse(s,Seq());
+      def edgesMatching(s: S, l: T) = {
+        if(l == inAlpha.sigma) {
+          arcMap.getOrElse(s,Seq.empty)
+        } else {
+          arcMap.getOrElse(s,Seq.empty) filter { arc =>
+            (l == inAlpha.sigma || l == arc.in)
+          };
+        }
+      };
     }
   }
 
