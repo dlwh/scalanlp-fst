@@ -105,7 +105,9 @@ object Automaton {
       Arc(s,s+1,(x(s)),(x(s)),sring.one);
     } ) toSeq
 
-    def edgesMatching(s: Int, l: T) = if(s == x.length || myEdges(s).in != l) Seq.empty else Seq(myEdges(s));
+    def edgesMatching(s: Int, l: T) = {
+      if(s == x.length || (myEdges(s).in != l && l != alpha.sigma)) Seq.empty else Seq(myEdges(s));
+    }
   }
 
   /**
