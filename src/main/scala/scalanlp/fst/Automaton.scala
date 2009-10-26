@@ -63,13 +63,22 @@ abstract class Automaton[W,State,T](implicit ring: Semiring[W], alpha: Alphabet[
   */
   override def toString = {
     def escape2(s: String) = s.replaceAll("\"","\\\"");
+
+    val Eps = alpha.epsilon;
+    val Sig = alpha.sigma;
+    def transform(c: T) = c match {
+      case Eps => "&epsilon;"
+      case Sig => "&sigma;"
+      case x => x;
+    }
+
     val sb = new StringBuilder;
     sb ++= "digraph A {\n";
     
     val states = collection.mutable.Set[State]();
     breadthFirstSearch{ case Arc(s,to,label,_,weight) =>
 	    sb ++= "    \"" + escape2(s.toString) + "\"->\"" + escape2(to.toString) +"\"";
-		  sb ++= "[ label=\""+label+"/" + weight +"\"]\n";
+		  sb ++= "[ label=\""+transform(label)+"/" + weight +"\"]\n";
       states += s;
       states += to;
 	  }

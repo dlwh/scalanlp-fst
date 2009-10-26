@@ -229,14 +229,28 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   */
   override def toString = {
     def escape(s: String) = s.replaceAll("\"","\\\"");
+    val inEps = inAlpha.epsilon;
+    val inSig = inAlpha.sigma;
+    def transformIn(c: In) = c match {
+      case `inEps` => "&epsilon;"
+      case `inSig` => "&sigma;"
+      case x => x;
+    }
+    val outEps = outAlpha.epsilon;
+    val outSig = outAlpha.sigma;
+    def transformOut(c: Out) = c match {
+      case `outEps` => "&epsilon;"
+      case `outSig` => "&sigma;"
+      case x => x;
+    }
     val sb = new StringBuilder;
     sb ++= "digraph A {\n";
     
     val states = collection.mutable.Set[State]();
     for(Arc(s,to,in,out,weight) <- allEdges) {
 	    sb ++= "    \"" + escape(s.toString) + "\"->\"" + escape(to.toString) +"\"";
-		  sb ++= "[ label=\""+in;
-		  sb ++= ":" + out;
+		  sb ++= "[ label=\""+transformIn(in);
+		  sb ++= ":" + transformOut(out);
       sb ++= "/" + weight +"\"]\n";
       states += s;
       states += to;
