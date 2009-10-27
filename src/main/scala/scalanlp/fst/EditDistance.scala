@@ -22,9 +22,9 @@ class EditDistance(sub: Double, del: Double, alphabet: Set[Char])
     val subs = for(a <- alphabetSeq;
         b <- alphabetSeq)
       yield Arc((),(),a,b,if(a != b) sub else 0.0);
-    val dels = for(a <- alphabet iterator)
+    val dels = for(a <- alphabetSeq iterator)
       yield Arc((),(),a,`epsilon`,del);
-    val dels2 = for(a <- alphabet iterator)
+    val dels2 = for(a <- alphabetSeq iterator)
       yield Arc((),(),`epsilon`,a,del);
 
     subs ++ dels ++ dels2;
@@ -36,21 +36,32 @@ class EditDistance(sub: Double, del: Double, alphabet: Set[Char])
     } else if(a == inAlpha.sigma) {
       if(b == outAlpha.epsilon) {
         for(a <- alphabetSeq)
-          yield Arc((),(),a,a,del);
+          yield Arc((),(),a,b,del);
       } else {
-        for(a <- alphabetSeq)
-          yield Arc((),(),a,b,if(a != b) sub else 0.0);
+        (for(a <- alphabetSeq)
+          yield Arc((),(),a,b,if(a != b) sub else 0.0) ) ++
+        Seq(Arc((),(),inAlpha.epsilon,b,del))
       }
     } else if(b == outAlpha.sigma) {
-      if(a == outAlpha.epsilon) {
+      if(a == inAlpha.epsilon) {
         for(b <- alphabetSeq)
           yield Arc((),(),a,b,del);
       } else {
-        for(b <- alphabetSeq)
-          yield Arc((),(),a,b,if(a != b) sub else 0.0);
+        ((for(b <- alphabetSeq)
+          yield Arc((),(),a,b,if(a != b) sub else 0.0)) : Seq[Arc]) ++
+          Seq(Arc((),(),a,outAlpha.epsilon,del))
       }
+    } else if(a == b && b == inAlpha.epsilon) {
+      Seq.empty;
     } else {
-      Seq(Arc((),(),a,b,if(a != b) sub else 0.0));
+      val cost = {
+        if(a == inAlpha.epsilon || b == inAlpha.epsilon)
+          del
+        else if (a != b)
+          sub
+        else 0.0;
+      }
+      Seq(Arc((),(),a,b,cost));
     }
   }
 }
