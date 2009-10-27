@@ -44,6 +44,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.scalanlp</groupId>
+      <artifactId>scalanlp-core</artifactId>
+      <version>0.2-SNAPSHOT</version>
+    </dependency>
+    <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
       <version>${scala.version}</version>

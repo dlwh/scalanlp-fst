@@ -7,6 +7,7 @@ import scala.collection.{mutable=>muta}
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
 import scala.collection.immutable.IntMap;
+import scalanlp.collection.mutable.ArrayMap;
 
 /**
 * A Transducer is a graph that assigns scores in some semiring over
@@ -337,7 +338,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       (stateToU(k),v) 
     }.toSeq:_*);
 
-    transducer[W,Int,In,Out](initialStateWeights,myFinalWeights)(arcs:_*);
+    intTransducer[W,In,Out](initialStateWeights,myFinalWeights)(arcs:_*);
   }
       
 
@@ -429,16 +430,16 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     while(!S.isEmpty) {
       val from = S.head;
       S.dequeue();
-      println("State" + from);
+      //println("State" + from);
       val rFrom = r(from);
       r -= from;
       extraW.clear();
       var selfLoopMass = ring.zero;
 
       // find all the self-loop map, save everything else
-      println("?");
+      //println("?");
       for( a@Arc(_,to,_,_,w) <- edgesFrom(from)) {
-        println(a);
+        //println(a);
         if(from == to) {
           selfLoopMass = ring.plus(selfLoopMass,w);
         } else {
@@ -451,7 +452,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
         else ring.times(d(from),ring.closure(selfLoopMass));
       
       for( (to,w) <- extraW) {
-        println( from + " " + (to,w));
+        //println( from + " " + (to,w));
         val dt = d(to);
         val wRFrom = ring.times(rFrom,w);
         val dt_p_wRFrom = ring.plus(dt,wRFrom);
@@ -546,6 +547,39 @@ object Transducer {
   /**
   * Creates a transducer with the given initial states, final states, and arcs.
   */
+  def intTransducer[W:Semiring,In:Alphabet,Out:Alphabet](initialStates: Map[Int,W], finalWeights: Map[Int,W])(arcs: Arc[W,Int,In,Out]*): Transducer[W,Int,In,Out] = {
+    val arcMap = {
+      val map = new ArrayMap[ArrayBuffer[Arc[W,Int,In,Out]]] {
+        override def default(i: Int) = getOrElseUpdate(i,new ArrayBuffer[Arc[W,Int,In,Out]]);
+      }
+      for(a <- arcs) {
+        map(a.from) += a;
+      }
+      map
+    }
+
+    new Transducer[W,Int,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
+      override def allEdgesByOrigin = arcMap;
+      val initialStateWeights = initialStates;
+      def finalWeight(s: Int) = finalWeights.getOrElse(s,ring.zero);
+      override val finalStateWeights = finalWeights;
+      def edgesMatching(s: Int, in: In, out: Out) = {
+        if(in == inAlpha.sigma && out == outAlpha.sigma) {
+          arcMap.getOrElse(s,Seq.empty)
+        } else {
+          arcMap.getOrElse(s,Seq.empty) filter { arc =>
+            (in == inAlpha.sigma || in == arc.in) && (out == outAlpha.sigma || out == arc.out)
+          };
+        }
+      }
+      override def allEdges = arcs;
+    }
+  }
+
+
+  /**
+  * Creates a transducer with the given initial states, final states, and arcs.
+  */
   def transducer[W:Semiring,S,In:Alphabet,Out:Alphabet](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,In,Out]*): Transducer[W,S,In,Out] = {
     val arcMap = arcs.groupBy(_.from);
     new Transducer[W,S,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
@@ -613,24 +647,6 @@ object Transducer {
       2 -> 2 (in='3',out=eps,weight= -1.0)
     );
   }
-
-/*
-    val dsl = new DSL[Int,Boolean];
-    import dsl._;
-    val a = 
-      dsl.transducer(Map(0->true),Map(4->true)) (    
-        0 -> 1 (in='a',out='a',weight=true),
-        1 -> 2 (in='b',out=eps,weight=true),
-        2->3 (in='c',out=eps,weight=true),  
-        3->4 (in='d',out='d',weight=true)
-      ); 
-    val b = 
-      dsl.transducer(Map(0->true),Map(3->true)) (    
-        0 -> 1 (in='a',out='d',weight=true),
-        1 -> 2 (in=eps,out='e',weight=true),
-        2->3 (in='d',out='a',weight=true)
-      ); 
-      */
 
   /**
   * These classes represent bookkeeping states for doing composition
