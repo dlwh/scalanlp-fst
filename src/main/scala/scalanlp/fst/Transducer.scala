@@ -194,20 +194,19 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
 
         s._3 match {
           case NoEps =>
-            if(in != InEps) {
-              for( Arc(_,to1,in1,_,w1)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
-                if(out == Out2Eps || out == that.outAlpha.sigma)
-                  arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w1,that.ring.one));
-                for( Arc(_,to2,_,out2,w2)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
-                  arcs += Arc(s,(to1,to2,NoEps),in1,out2,composeW(w1,w2));
-                }
+            if(out == Out2Eps || out == that.outAlpha.sigma)
+              for( Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
+                arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w,that.ring.one));
               }
-            } 
-            if(in == InEps || in == outer.inAlpha.sigma) {
+            if(in == InEps || in == outer.inAlpha.sigma)
               for( Arc(_,to,_,out2,w)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
                 arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
               }
-            }
+            if( (in == InEps || in == outer.inAlpha.sigma) && (out == Out2Eps || out == that.outAlpha.sigma)) 
+              for(Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps);
+                  Arc(_,to2,_,out2,w2) <- that.edgesMatching(s._2,Out1Eps,out)) {
+                arcs += Arc(s,(to1,to2,NoEps),in1,out2,composeW(w,w2));
+              }
           case LeftEps=>
             if(out == Out2Eps || out == that.outAlpha.sigma)
               for( Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
