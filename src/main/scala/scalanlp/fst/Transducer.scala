@@ -665,59 +665,5 @@ object Transducer {
   case object LeftEps extends InboundEpsilon;
   case object RightEps extends InboundEpsilon;
 
-  /**
-  * LogExpectedWeight
-  */
-  case class LogExpectedWeight(sign: Boolean, prob: Double, score: Double) {
-    def value = if(sign) Math.exp(score-prob) else -Math.exp(score-prob);
-  }
-
-  object LogExpectedWeight {
-    def apply(p: Double, s: Double) = {
-      new LogExpectedWeight(s >= 0, p, if(s>= 0) s else -s);
-    }
-  }
-
-  /**
-  * Composes when the left hand side is in logspace. See Li and Eisner (2009) 
-  *First- and Second-Order Expectation Semirings 
-  *with Applications to Minimum-Risk Training on Translation, table 1 and 3.
-  *
-  */
-  def logSpaceExpectationCompose[S1,S2,In,Mid,Out](a: Transducer[Double,S1,In,Mid],
-                                                   b: Transducer[Double,S2,Mid,Out]) = {
-    val ring = new Semiring[LogExpectedWeight] {
-      import scalanlp.math.Semiring.LogSpace.logSum;
-      import scalanlp.math.Semiring.LogSpace.doubleIsLogSpace.{zero=>logZero,one=>logOne,closure=>logClosure};
-      // scores are in log log space
-      val one = LogExpectedWeight(logOne,b.ring.zero);
-      val zero = LogExpectedWeight(logZero,b.ring.zero);
-      def times(x: LogExpectedWeight, y: LogExpectedWeight) = {
-        // +- or -+ ==> negative
-        // -- or ++ ==> positive
-        LogExpectedWeight(x.sign == y.sign,x.prob + y.prob, logSum(x.prob + y.score, y.prob + x.score));
-      }
-      def plus(mx: LogExpectedWeight, my: LogExpectedWeight) = {
-        import Math._;
-        val prob = mx.score + my.score;
-        val x = if(mx.score > my.score) mx else my;
-        val y = if(mx.score > my.score) my else mx;
-        // copy the sign of the larger number:
-        val sign = x.sign;
-        val score = {
-          if(x.sign == y.sign)
-            x.score + java.lang.Math.log1p(exp(y.score - x.score));
-          else 
-            x.score + java.lang.Math.log1p(-exp(y.score - x.score));
-        }
-        LogExpectedWeight(sign,score,prob);
-      }
-      def closure(x: LogExpectedWeight) = {
-        val pc = logClosure(x.prob);
-        LogExpectedWeight(x.sign,pc,pc + pc + x.score);
-      }
-    }
-    a.compose(b,LogExpectedWeight(_:Double,_:Double))(ring);
-  }
 
 }
