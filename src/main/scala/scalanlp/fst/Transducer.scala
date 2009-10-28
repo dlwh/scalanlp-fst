@@ -487,9 +487,13 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
 
   def pushWeights(implicit r2: WLDSemiring[W]):Transducer[W,State,In,Out] = {
     import r2._;
+    require(r2.zero == ring.zero);
+    require(r2.one == ring.one);
 
     val rev = reverse;
+    println("rev" + rev);
     val costs = reverse.allPathDistances; // \sum_{state q in final} weight(path(p,q))
+    println("rev costs" + costs);
     val initWeights = initialStateWeights map { case (k,v) => (k,times(v,costs(k))) }
     val finalWeights = for( (s,w) <- rev.initialStateWeights;
       d = costs(s);
@@ -497,8 +501,11 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       yield (s,leftDivide(d,w));
 
     // re-reverse and reweight
-    val arcs = rev.allEdges map { case Arc(to,from,in,out,w) => 
-      Arc(from,to,in,out,leftDivide(costs(from),times(w,costs(to))))
+    val arcs = {
+      for(Arc(to,from,in,out,w) <- rev.allEdges;
+        d = costs(from);
+        if d != zero)
+        yield Arc(from,to,in,out,leftDivide(d,times(w,costs(to))));
     }
 
     Transducer.transducer(initWeights,finalWeights)(arcs:_*);
