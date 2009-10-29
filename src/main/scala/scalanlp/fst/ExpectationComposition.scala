@@ -33,11 +33,14 @@ object ExpectationComposition {
     private def signedAdd(mx: Double, sx: Boolean, my: Double, sy: Boolean) = {
       val x = if(mx > my) mx else my;
       val y = if(mx > my) my else mx;
+      // stupid infinity. This is kind of bad code, but I don't care. It carries
+      // its intent pretty well!
+      val `y - x` = if( x == y) 0.0 else y - x;
       val score = {
         if(sy == sx)
-          x + log(1 + exp(y - x));
+          x + log(1 + exp(`y - x`));
         else 
-          x + log(1 - exp(y - x));
+          x + log(1 - exp(`y - x`));
       }
       score
     }
