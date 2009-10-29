@@ -1,6 +1,7 @@
 package scalanlp.fst
 
 import scalanlp.math._;
+import scalanlp.util.Log._;
 import scala.collection.Traversable;
 import scala.collection.Seq;
 import scala.collection.{mutable=>muta}
@@ -450,6 +451,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       d(from) = 
         if(selfLoopMass == ring.zero) d(from)
         else ring.times(d(from),ring.closure(selfLoopMass));
+      globalLog.log(DEBUG)((from,d(from),selfLoopMass));
       
       for( (to,w) <- extraW) {
         //println( from + " " + (to,w));
@@ -491,9 +493,9 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     require(r2.one == ring.one);
 
     val rev = reverse;
-    println("rev" + rev);
+    globalLog.log(DEBUG)("rev" + rev);
     val costs = reverse.allPathDistances; // \sum_{state q in final} weight(path(p,q))
-    println("rev costs" + costs);
+    globalLog.log(DEBUG)("rev costs" + costs);
     val initWeights = initialStateWeights map { case (k,v) => (k,times(v,costs(k))) }
     val finalWeights = for( (s,w) <- rev.initialStateWeights;
       d = costs(s);
@@ -513,6 +515,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
 
   def minimize(implicit r2: WLDSemiring[W]): Transducer[W,State,In,Out] = {
     val pushed = this.pushWeights;
+    globalLog.log(DEBUG)("pushed"+pushed);
     val edgesByOrigin = pushed.allEdgesByOrigin;
 
     val equivalentStates = pushed.allStates.toSeq.groupBy{ state =>
