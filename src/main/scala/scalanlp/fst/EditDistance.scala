@@ -40,41 +40,38 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], log
   val epsilon = inAlpha.epsilon;
   val alphabetSeq = alphabet.toSeq;
 
-  override val allEdges:Seq[Arc] = {
-    val subs = for(a <- alphabetSeq;
-        b <- alphabetSeq)
-      yield Arc((),(),a,b,if(a != b) subCost else matchCost);
-    val dels = for(a <- alphabetSeq iterator)
-      yield Arc((),(),a,`epsilon`,insCost);
-    val dels2 = for(a <- alphabetSeq iterator)
-      yield Arc((),(),`epsilon`,a,insCost);
-
-    subs ++ dels ++ dels2;
-  }
+  override def allEdges:Seq[Arc] = edgesMatching((),inAlpha.sigma,outAlpha.sigma).toSeq;
 
   def edgesMatching(s: Unit, a: Char, b: Char) = {
     if(a == inAlpha.sigma && b == outAlpha.sigma) {
-      allEdges
+      val subs = for(a <- alphabet.iterator;
+          b <- alphabet.iterator)
+        yield Arc((),(),a,b, if(a != b) subCost else matchCost);
+      val dels = for(a <- alphabet.iterator)
+                   yield Arc((),(),a,outAlpha.epsilon, insCost);
+      val ins = for(a <- alphabet.iterator)
+                   yield Arc((),(),inAlpha.epsilon,a, insCost);
+      subs ++ dels ++ ins
     } else if(a == inAlpha.sigma) {
       if(b == outAlpha.epsilon) {
-        for(a <- alphabetSeq)
+        for(a <- alphabet.iterator)
           yield Arc((),(),a,b,insCost);
       } else {
-        (for(a <- alphabetSeq)
+        (for(a <- alphabet.iterator)
           yield Arc((),(),a,b,if(a != b) subCost else matchCost) ) ++
-        Seq(Arc((),(),inAlpha.epsilon,b,insCost))
+        Iterator.single(Arc((),(),inAlpha.epsilon,b,insCost))
       }
     } else if(b == outAlpha.sigma) {
       if(a == inAlpha.epsilon) {
-        for(b <- alphabetSeq)
+        for(b <- alphabet iterator)
           yield Arc((),(),a,b,insCost);
       } else {
-        ((for(b <- alphabetSeq)
-          yield Arc((),(),a,b,if(a != b) subCost else matchCost)) : Seq[Arc]) ++
-          Seq(Arc((),(),a,outAlpha.epsilon,insCost))
+        ((for(b <- alphabet iterator)
+          yield Arc((),(),a,b,if(a != b) subCost else matchCost)))  ++
+          Iterator.single(Arc((),(),a,outAlpha.epsilon,insCost))
       }
     } else if(a == b && b == inAlpha.epsilon) {
-      Seq.empty;
+      Iterator.empty;
     } else {
       val cost = {
         if(a == inAlpha.epsilon || b == inAlpha.epsilon)
@@ -83,7 +80,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], log
           subCost
         else matchCost;
       }
-      Seq(Arc((),(),a,b,cost));
+      Iterator.single(Arc((),(),a,b,cost));
     }
   }
 }

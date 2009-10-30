@@ -45,22 +45,22 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   */
   def finalWeight(s: State): W;
 
-  def edgesMatching(s: State, in: In, out: Out): Seq[Arc];
+  def edgesMatching(s: State, in: In, out: Out): Iterator[Arc];
   
   /**
   * Returns all Arcs leaving this node to some other node.
   */
-  final def edgesFrom(s: State):Seq[Arc] = edgesMatching(s,inAlpha.sigma,outAlpha.sigma);
+  final def edgesFrom(s: State):Iterator[Arc] = edgesMatching(s,inAlpha.sigma,outAlpha.sigma);
 
   /**
   * Returns all Arcs leaving this node to some other node with this input label.
   */
-  final def edgesWithInput(a: State, trans: In): Seq[Arc] = edgesMatching(a,trans,outAlpha.sigma)
+  final def edgesWithInput(a: State, trans: In): Iterator[Arc] = edgesMatching(a,trans,outAlpha.sigma)
 
   /**
   * Returns all Arcs leaving this node to some other node with this output label.
   */
-  final def edgesWithOutput(a: State, trans: Out): Seq[Arc] = edgesMatching(a,inAlpha.sigma,trans);
+  final def edgesWithOutput(a: State, trans: Out): Iterator[Arc] = edgesMatching(a,inAlpha.sigma,trans);
 
   /**
   * Returns all edges in the FST: will expand all the states.
@@ -151,7 +151,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     
     def finalWeight(s: (State,S)) = ring.times(outer.finalWeight(s._1),that.finalWeight(s._2));
 
-    override def edgesMatching(s: (State,S), in: In, out: Out2): Seq[Arc] = {
+    override def edgesMatching(s: (State,S), in: In, out: Out2): Iterator[Arc] = {
       for(Arc(_,to1,in1,out1,w1) <- outer.edgesMatching(s._1,in,outer.outAlpha.sigma);
           Arc(_,to2,_,out2,w2) <- that.edgesMatching(s._2,out1,out)) yield {
         Arc(s,(to1,to2),in1,out2,ring.times(w1,w2));
@@ -220,7 +220,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
                 arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
               }
         }
-        arcs;
+        arcs iterator;
       }
     }
   }
@@ -302,7 +302,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
         for(arc@Arc(_,to,_,_,_) <- edgesFrom(s)) {
           func(arc);
           if(!visited(to)){
-          queue += to; 
+            queue += to; 
           }
         }
         visited += s;
@@ -330,6 +330,8 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       }
       (seqArcs,newStateMap)
     }
+    
+    println("XXX States: "+ _nextIndex + " Arcs: " + arcs.length);
 
     val myFinalWeights = IntMap(stateToU.iterator.map { case (s,u) =>
       (u, outer.finalWeight(s));
@@ -379,7 +381,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
         Arc(map, collection.immutable.Map() ++ newState,label._1,label._2,w);
       } 
 
-      arcs.toSeq;
+      arcs
     }
 
     def finalWeight(map: Map[State,W]) = {
@@ -402,6 +404,12 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     cost;
   }
 
+  protected def makeMap[T](dflt: T): collection.mutable.Map[State,T] = {
+    new collection.mutable.HashMap[State,T] {
+      override def default(k: State) = dflt;
+    }
+  }
+
   /**
   * Implements Generic-Single-Source-Shortest-Distance described
   * in Mohri (2002), with extra support for doing closure operations
@@ -410,16 +418,9 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   * Returns State --&gt; distance to that state from the start
   */
   def allPathDistances:Map[State,W] = {
-    val d = new collection.mutable.HashMap[State,W] { 
-      override def default(k:State) = ring.zero;
-    };
-    val r = new collection.mutable.HashMap[State,W] { 
-      override def default(k:State) = ring.zero;
-    };
-
-    val extraW = new collection.mutable.HashMap[State,W] {
-      override def default(k:State) = ring.zero;
-    }
+    val d = makeMap[W](ring.zero);
+    val r = makeMap[W](ring.zero);
+    val extraW = makeMap[W](ring.zero);
 
     val S = new collection.mutable.Queue[State]();
     for( (s,w) <- initialStateWeights) {
@@ -573,11 +574,19 @@ object Transducer {
       val initialStateWeights = initialStates;
       def finalWeight(s: Int) = finalWeights.getOrElse(s,ring.zero);
       override val finalStateWeights = finalWeights;
+
+
+      override protected def makeMap[T](dflt: T): ArrayMap[T] = {
+        new ArrayMap[T] {
+          override def default(k: Int) = dflt;
+        }
+      }
+
       def edgesMatching(s: Int, in: In, out: Out) = {
         if(in == inAlpha.sigma && out == outAlpha.sigma) {
-          arcMap.getOrElse(s,Seq.empty)
+          arcMap.getOrElse(s,Seq.empty).iterator
         } else {
-          arcMap.getOrElse(s,Seq.empty) filter { arc =>
+          arcMap.getOrElse(s,Seq.empty).iterator filter { arc =>
             (in == inAlpha.sigma || in == arc.in) && (out == outAlpha.sigma || out == arc.out)
           };
         }
@@ -599,9 +608,9 @@ object Transducer {
       override val finalStateWeights = finalWeights;
       def edgesMatching(s: S, in: In, out: Out) = {
         if(in == inAlpha.sigma && out == outAlpha.sigma) {
-          arcMap.getOrElse(s,Seq.empty)
+          arcMap.getOrElse(s,Seq.empty) iterator
         } else {
-          arcMap.getOrElse(s,Seq.empty) filter { arc =>
+          arcMap.getOrElse(s,Seq.empty).iterator filter { arc =>
             (in == inAlpha.sigma || in == arc.in) && (out == outAlpha.sigma || out == arc.out)
           };
         }

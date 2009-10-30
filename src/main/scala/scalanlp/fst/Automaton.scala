@@ -19,10 +19,10 @@ abstract class Automaton[W,State,T](implicit ring: Semiring[W], alpha: Alphabet[
     if(in == out) edgesMatching(s,in) 
     else if(in == alpha.sigma) edgesMatching(s,out)
     else if(out == alpha.sigma) edgesMatching(s,in)
-    else Seq.empty;
+    else Iterator.empty;
   }
 
-  def edgesMatching(s: State, l: T):Seq[Arc] 
+  def edgesMatching(s: State, l: T):Iterator[Arc] 
   
   /**
   * Computes the weighted intersection of two automata.
@@ -39,7 +39,7 @@ abstract class Automaton[W,State,T](implicit ring: Semiring[W], alpha: Alphabet[
 	    (Right(k),v)
     };
     
-    def edgesMatching(s: Either[State,S], label: T):Seq[Arc] = s match {
+    def edgesMatching(s: Either[State,S], label: T):Iterator[Arc] = s match {
       case l@Left(os) => 
         for(Arc(_,to,label,_,weight) <- outer.edgesMatching(os,label))
           yield Arc(l,Left(to),label,label,weight);
@@ -101,12 +101,12 @@ object Automaton {
     val initialStateWeights = Map(0 -> sring.one);
     def finalWeight(s: Int) = if(s == x.length) w else sring.zero;
 
-    final val myEdges:Seq[Arc] = (for(s <- Array.range(0,x.length)) yield {
+    final val myEdges:Seq[Arc] = for(s <- Array.range(0,x.length)) yield {
       Arc(s,s+1,(x(s)),(x(s)),sring.one);
-    } ) toSeq
+    };
 
     def edgesMatching(s: Int, l: T) = {
-      if(s == x.length || (myEdges(s).in != l && l != alpha.sigma)) Seq.empty else Seq(myEdges(s));
+      if(s == x.length || (myEdges(s).in != l && l != alpha.sigma)) Iterator.empty else Iterator(myEdges(s));
     }
   }
 
@@ -121,11 +121,11 @@ object Automaton {
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
       def edgesMatching(s: S, l: T) = {
         if(l == inAlpha.sigma) {
-          arcMap.getOrElse(s,Seq.empty)
+          arcMap.getOrElse(s,Seq.empty).iterator
         } else {
           arcMap.getOrElse(s,Seq.empty) filter { arc =>
             (l == inAlpha.sigma || l == arc.in)
-          };
+          } iterator
         }
       };
     }

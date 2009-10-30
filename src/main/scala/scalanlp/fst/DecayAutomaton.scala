@@ -46,7 +46,9 @@ class DecayAutomaton( val expectedLength:Double, chars: Set[Char] )
   }
 
   def edgesMatching(s: Unit, a: Char) = {
-    Seq(Arc((),(),a,a,arcCost))
+    if(a == inAlpha.sigma)
+      allEdges.iterator
+    else Iterator.single(Arc((),(),a,a,arcCost))
   }
 }
 
