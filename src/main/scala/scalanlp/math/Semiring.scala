@@ -79,8 +79,8 @@ object Semiring {
       import Math._;
       if(a == NEG_INF_DOUBLE) b
       else if (b == NEG_INF_DOUBLE) a
-      else if(a < b) b + java.lang.Math.log1p(exp(a-b))
-        else a + java.lang.Math.log1p(exp(b-a));    
+      else if(a < b) b + java.lang.Math.log(1+exp(a-b))
+        else a + java.lang.Math.log(1+exp(b-a));    
     }
     implicit val doubleIsLogSpace:WLDSemiring[Double] = new WLDSemiring[Double] {
       def plus(t1: Double, t2: Double) = logSum(t1,t2);
