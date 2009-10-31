@@ -186,41 +186,61 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       def finalWeight(s: (State,S,InboundEpsilon)) = composeW(outer.finalWeight(s._1),that.finalWeight(s._2));
 
       override def edgesMatching(s: (State,S,InboundEpsilon), in: In, out: Out2) = {
-        val arcs = collection.mutable.ArrayBuffer[Arc]()
-        for(a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesMatching(s._1,in,outer.outAlpha.sigma);
-            if out1 != Out1Eps;
-            a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesMatching(s._2,out1,out);
-            w = composeW(w1,w2)) {
-          arcs += Arc(s,(to1,to2,NoEps),in1,out2,w);
+        val nonEpsArcs = (for {
+          a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesMatching(s._1,in,outer.outAlpha.sigma);
+          if out1 != Out1Eps
+        } yield {
+          // sum together all weights
+          val newArcWeights = that.makeMap[collection.mutable.Map[Out2,W2]]( new muta.HashMap[Out2,W2] {
+              override def default(o: Out2) = that.ring.zero
+            }
+          );
+          for(a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesMatching(s._2,out1,out)) {
+            val currentW = newArcWeights(to2)(out2);
+            newArcWeights(to2)(out2) = that.ring.plus(w2,currentW);
+          }
+          val newArcs = {
+            for((to2,chMap) <- newArcWeights.iterator;
+                (out2,w2) <- chMap.iterator)
+              yield {
+                Arc(s, (to1,to2,NoEps), in1,out2,composeW(w1,w2));
+              }
+          }
+          newArcs
+        }).flatten;
+
+        val epsArcs = {
+          val arcs = new ArrayBuffer[Arc];
+          s._3 match {
+            case NoEps =>
+              if(out == Out2Eps || out == that.outAlpha.sigma)
+                for( Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
+                  arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w,that.ring.one));
+                }
+              if(in == InEps || in == outer.inAlpha.sigma)
+                for( Arc(_,to,_,out2,w)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
+                  arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
+                }
+              if( (in == InEps || in == outer.inAlpha.sigma) && (out == Out2Eps || out == that.outAlpha.sigma)) 
+                for(Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps);
+                    Arc(_,to2,_,out2,w2) <- that.edgesMatching(s._2,Out1Eps,out)) {
+                  arcs += Arc(s,(to1,to2,NoEps),in1,out2,composeW(w,w2));
+                }
+            case LeftEps=>
+              if(out == Out2Eps || out == that.outAlpha.sigma)
+                for( Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
+                  arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w,that.ring.one));
+                }
+            case RightEps =>
+              if(in == InEps || in == outer.inAlpha.sigma)
+                for( Arc(_,to,_,out2,w)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
+                  arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
+                }
+          }
+          arcs iterator;
         }
 
-        s._3 match {
-          case NoEps =>
-            if(out == Out2Eps || out == that.outAlpha.sigma)
-              for( Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
-                arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w,that.ring.one));
-              }
-            if(in == InEps || in == outer.inAlpha.sigma)
-              for( Arc(_,to,_,out2,w)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
-                arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
-              }
-            if( (in == InEps || in == outer.inAlpha.sigma) && (out == Out2Eps || out == that.outAlpha.sigma)) 
-              for(Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps);
-                  Arc(_,to2,_,out2,w2) <- that.edgesMatching(s._2,Out1Eps,out)) {
-                arcs += Arc(s,(to1,to2,NoEps),in1,out2,composeW(w,w2));
-              }
-          case LeftEps=>
-            if(out == Out2Eps || out == that.outAlpha.sigma)
-              for( Arc(_,to1,in1,_,w)  <- outer.edgesMatching(s._1,in,Out1Eps) ) {
-                arcs += Arc(s,(to1,s._2,LeftEps),in1,Out2Eps,composeW(w,that.ring.one));
-              }
-          case RightEps =>
-            if(in == InEps || in == outer.inAlpha.sigma)
-              for( Arc(_,to,_,out2,w)  <- that.edgesMatching(s._2,Out1Eps,out) ) {
-                arcs += Arc(s,(s._1,to,RightEps),InEps,out2,composeW(outer.ring.one,w));
-              }
-        }
-        arcs iterator;
+        epsArcs ++ nonEpsArcs
       }
     }
   }
@@ -404,9 +424,9 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     cost;
   }
 
-  protected def makeMap[T](dflt: T): collection.mutable.Map[State,T] = {
+  protected def makeMap[T](dflt: =>T): collection.mutable.Map[State,T] = {
     new collection.mutable.HashMap[State,T] {
-      override def default(k: State) = dflt;
+      override def default(k: State) = getOrElseUpdate(k,dflt);
     }
   }
 
@@ -576,9 +596,9 @@ object Transducer {
       override val finalStateWeights = finalWeights;
 
 
-      override protected def makeMap[T](dflt: T): ArrayMap[T] = {
+      override protected def makeMap[T](dflt: => T): ArrayMap[T] = {
         new ArrayMap[T] {
-          override def default(k: Int) = dflt;
+          override def default(k: Int) = getOrElseUpdate(k,dflt);
         }
       }
 
