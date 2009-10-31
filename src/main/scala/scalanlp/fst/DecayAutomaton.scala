@@ -16,8 +16,8 @@ import scalanlp.math.Semiring.LogSpace._;
 *
 * @author dlwh
 */
-class DecayAutomaton( val expectedLength:Double, chars: Set[Char] ) 
-    extends Automaton[Double,Unit,Char]()(doubleIsLogSpace,implicitly[Alphabet[Char]]) {
+class DecayAutomaton( val expectedLength:Double, chars: Set[Char], rhoSize: Int = 0) 
+    extends Automaton[Double,Int,Char]()(doubleIsLogSpace,implicitly[Alphabet[Char]]) {
   import Transducer._;
   require( expectedLength > 0);
   // E[X] = p / (1-p)
@@ -27,28 +27,29 @@ class DecayAutomaton( val expectedLength:Double, chars: Set[Char] )
   override lazy val cost = doubleIsLogSpace.closure(mass);
 
   val arcCost = {
-    val n = chars.size
+    val n = chars.size + rhoSize;
     // we have n emissions
     // We want transitions to be markovian, so:
     //  c * n = exp(mass)
     mass - Math.log(n)
   }
 
-  val initialStateWeights = Map( () -> 0.0);
+  val initialStateWeights = Map( 0 -> 0.0);
 
-  def finalWeight(s: Unit) = 0.0;
-  val alphabetSeq = chars.toSeq;
+  def finalWeight(s: Int) = 0.0;
 
   override val allEdges:Seq[Arc] = {
-    val subs = for(a <- alphabetSeq)
-      yield Arc((),(),a,a,arcCost)
-    subs
+    val subs = for(a <- chars.toSeq)
+      yield Arc(0,0,a,a,arcCost)
+    subs ++ Iterator.single(Arc(0,0,inAlpha.rho,inAlpha.rho,Math.log(rhoSize) + arcCost))
   }
 
-  def edgesMatching(s: Unit, a: Char) = {
+  def edgesMatching(s: Int, a: Char) = {
     if(a == inAlpha.sigma)
       allEdges.iterator
-    else Iterator.single(Arc((),(),a,a,arcCost))
+    else if(a == inAlpha.rho)
+      Iterator.single(Arc(0,0,a,a,Math.log(rhoSize) + arcCost));
+    else Iterator.single(Arc(0,0,a,a,arcCost))
   }
 }
 
