@@ -459,9 +459,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       var selfLoopMass = ring.zero;
 
       // find all the self-loop map, save everything else
-      //println("?");
       for( a@Arc(_,to,_,_,w) <- edgesFrom(from)) {
-        //println(a);
         if(from == to) {
           selfLoopMass = ring.plus(selfLoopMass,w);
         } else {
