@@ -95,8 +95,7 @@ object Semiring {
       * t =&lt; log(1/(1-exp(t))) = -log(1-exp(t));
       */ 
       def closure(t: Double) = {
-        if(t >= 0) error("argument to closure must be negative, but got " + t);
-        else -Math.log(1 - Math.exp(t));
+        -Math.log(1 - Math.exp(t));
       }
     }
   }
