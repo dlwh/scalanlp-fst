@@ -4,20 +4,20 @@ import scalanlp.math.Semiring.LogSpace._;
 import scala.annotation.switch;
 
 /**
-* Levhenstein transducer over sum of alignments (not viterbi
-* alignment) with the given parameters, which must be less than 0.
-*
-* A match is assumed to be 0.0, though these will be rescaled to ensure
-* that the edit distance encodes a (log space) probability distribution, or at
-* least that conditioned on either the input or the output, there is a distribution. 
-* logDecay (&lt;=0.0) adds a preference for the length of the alignments.
-* That is, the scores will be shifted by some constant. rhoSize represents
-* phantom characters that are implicitly represented as a single other character (Alphabet.rho)
-*
-* @author dlwh
-*/
+ * Levhenstein transducer over sum of alignments (not viterbi
+ * alignment) with the given parameters, which must be less than 0.
+ *
+ * A match is assumed to be 0.0, though these will be rescaled to ensure
+ * that the edit distance encodes a (log space) probability distribution, or at
+ * least that conditioned on either the input or the output, there is a distribution.
+ * logDecay (&lt;=0.0) adds a preference for the length of the alignments.
+ * That is, the scores will be shifted by some constant. rhoSize represents
+ * phantom characters that are implicitly represented as a single other character (Alphabet.rho)
+ *
+ * @author dlwh
+ */
 class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rhoSize: Int = 0, logDecay: Double = 0.0)
-    extends Transducer[Double,Int,Char,Char]()(doubleIsLogSpace,implicitly[Alphabet[Char]],implicitly[Alphabet[Char]]) {
+        extends Transducer[Double,Int,Char,Char]()(doubleIsLogSpace,implicitly[Alphabet[Char]],implicitly[Alphabet[Char]]) {
   import Transducer._;
   require( subRatio < 0);
   require( insRatio < 0);
@@ -25,8 +25,8 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
   require( rhoSize >= 0);
 
   /**
-  * Costs for each kind of parameter.
-  */
+   * Costs for each kind of parameter.
+   */
   val (insCost,subCost,matchCost) = {
     import Math.{exp,log};
     val n = alphabet.size + rhoSize;
@@ -70,7 +70,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
   // only include Rho if we need it.
   private val alphaAndRho = if(rhoSize == 0) alphabet else alphabet + Rho;
   private val allChars = alphaAndRho + Eps;
-  
+
   val rhoSubMatchCost = ring.plus(rhoSubCost,rhoMatchCost);
 
   val initialStateWeights = Map( 0 -> 0.0);
@@ -121,7 +121,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
       case RhoEps => rhoInsCost
       case EpsRho => rhoInsCost
       case EpsEps => error("Shouldn't be here")
-      case _ => 
+      case _ =>
         if(a == Eps || b == Eps) {
           insCost
         } else if (a == Rho || b == Rho) {
