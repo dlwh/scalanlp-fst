@@ -412,6 +412,19 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     }
   }
 
+
+  /**
+  * Computes the total value of all paths through the transducer.
+  */
+  lazy val acyclicCost = {
+    val costs = allPathDistances;
+    var cost = ring.zero;
+    for( (s,w) <- costs) {
+      cost = ring.plus(cost,ring.times(w,finalWeight(s)));
+    }
+    cost;
+  }
+
   /**
   * Computes the total value of all paths through the transducer.
   */
