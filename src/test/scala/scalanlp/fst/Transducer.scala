@@ -51,9 +51,9 @@ class TransducerTest extends FunSuite with Checkers {
     assert(result === (t1 >> t2))
   }
 
-  test("cost of a no-arc system is correct") {
+  test("cost of a one-arc system is correct") {
     import Semiring.LogSpace._;
-    val fst = Transducer.transducer[Double,Int,Char,Char](Map(0->0.0),Map(0->0.0))();
+    val fst = Transducer.transducer[Double,Int,Char,Char](Map(0->0.0),Map(1->0.0))(Arc(0,1,'a','b',0.0));
     assert(fst.cost === 0.0);
   }
 

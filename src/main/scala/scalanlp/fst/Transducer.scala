@@ -416,10 +416,12 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   * Computes the total value of all paths through the transducer.
   */
   lazy val cost = {
-    val costs = allPathDistances;
+    val costs = allPairDistances;
     var cost = ring.zero;
-    for( (s,w) <- costs) {
-      cost = ring.plus(cost,ring.times(w,finalWeight(s)));
+    for( (from,initWeight) <- initialStateWeights;
+         (to,pathWeight) <- costs(from)) {
+      cost = ring.plus(cost,ring.times(initWeight,ring.times(pathWeight,finalWeight(to))));
+
     }
     cost;
   }
@@ -431,9 +433,56 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   }
 
   /**
+  * Implements Gen-All-Pairs described in Mohri (2002).
+  * Finds all pair-wise distances between all points in O(n^3),
+  * where n is the number of states. Works for any complete semiring.
+  */
+  def allPairDistances:Map[State,Map[State,W]] = {
+    val distances = makeMap(makeMap(ring.zero));
+    val allStates = makeMap[State](null.asInstanceOf[State]); // XXX
+    breadthFirstSearch { case Arc(from,to,_,_,w) =>
+      val current = distances(from)(to);
+      distances(from)(to) = ring.plus(current,w);
+      allStates(from) = from;
+      allStates(to) = to;
+    }
+    
+    for {
+      k <- allStates.keysIterator
+    } {
+      // cache some commonly used values
+      val dkk = distances(k)(k);
+      val dkkStar = ring.closure(dkk);
+
+      for {
+        i <- allStates.keysIterator if i != k;
+        j <- allStates.keysIterator if j != k
+      } {
+        val current = distances(i)(j);
+        val pathsThroughK = ring.times(distances(i)(k),ring.times(dkkStar,distances(k)(j)));
+        distances(i)(j) = ring.plus(current,pathsThroughK);
+      }
+
+      for { 
+        i <- allStates.keysIterator if i != k
+      } {
+        distances(k)(i) = ring.times(dkkStar,distances(k)(i));
+        distances(i)(k) = ring.times(distances(i)(k),dkkStar);
+      }
+      distances(k)(k) = dkkStar;
+    }
+
+    Map.empty ++ distances.map { case (from,map) => 
+      (from,Map.empty ++ map  withDefaultValue ring.zero)
+    } withDefaultValue (Map.empty.withDefaultValue(ring.zero)) 
+
+  }
+
+  /**
   * Implements Generic-Single-Source-Shortest-Distance described
   * in Mohri (2002), with extra support for doing closure operations
-  * on selfloops.
+  * on selfloops. Only works for acyclic graphs, k-closed semirings,
+  * or graphs that are acyclic except for selfloops.
   *
   * Returns State --&gt; distance to that state from the start
   */
