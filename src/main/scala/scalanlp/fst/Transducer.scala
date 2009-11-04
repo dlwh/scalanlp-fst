@@ -453,12 +453,11 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
       val from = S.head;
       S.dequeue();
       //println("State" + from);
-      val rFrom = r(from);
       r -= from;
       extraW.clear();
       var selfLoopMass = ring.zero;
 
-      // find all the self-loop map, save everything else
+      // find all the self-loop mass, save everything else
       for( a@Arc(_,to,_,_,w) <- edgesFrom(from)) {
         if(from == to) {
           selfLoopMass = ring.plus(selfLoopMass,w);
@@ -471,6 +470,9 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
         if(selfLoopMass == ring.zero) d(from)
         else ring.times(d(from),ring.closure(selfLoopMass));
       globalLog.log(DEBUG)((from,d(from),selfLoopMass));
+
+      r(from) = d(from);
+      val rFrom = r(from);
       
       for( (to,w) <- extraW) {
         //println( from + " " + (to,w));
