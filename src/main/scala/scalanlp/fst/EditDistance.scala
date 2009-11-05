@@ -23,17 +23,19 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
   require( insRatio < 0);
   require( rhoSize >= 0);
 
+  val totalChars = alphabet.size + rhoSize;
   /**
    * Costs for each kind of parameter.
    */
   val (insCost,subCost,matchCost) = {
+    val n = totalChars;
     import Math.{exp,log};
-    val n = alphabet.size + rhoSize;
-    // we want to make edges out be
+    // we want to make edges out be markovian.
     // for any input label (resp. output label), there is 1 match, n-1 subs, and and 1 deletion
-    //  c * ((n - 1 ) exp(sub) + 1 * exp(0) + 1 exp(del)) = 1.0
-    // log c + log ((n -1 ) exp(sub) + 1 * exp(0) + exp(del)) = 0.0
-    val logC = - log( (n-1) * exp(subRatio) + 1 + exp(insRatio))
+    // but we also have to accept an insertion of any kind, so there are n of those.
+    //  c * ((n - 1 ) exp(sub) + 1 * exp(0) + (n+1) exp(del)) = 1.0
+    // log c + log ((n -1 ) exp(sub) + 1 * exp(0) + (n+1) exp(del)) = 0.0
+    val logC = - log( (n-1) * exp(subRatio) + 1 + (n+1) * exp(insRatio))
     (insRatio + logC,subRatio + logC,logC)
   }
 
@@ -64,7 +66,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
 
   val initialStateWeights = Map( 0 -> 0.0);
 
-  def finalWeight(s: Int) = 0.0;
+  def finalWeight(s: Int) = Math.log(1 - Math.exp(Math.log(totalChars) + insCost));
 
   override def allEdges:Seq[Arc] = (edgesMatching(0,inAlpha.sigma,outAlpha.sigma)).toSeq;
 
