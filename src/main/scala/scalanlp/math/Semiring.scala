@@ -46,13 +46,15 @@ object Semiring {
     }
   }
   
-  implicit def fractionalIsDivSemiring[@specialized T:Fractional] = new WLDSemiring[T] {
-    private val ops = implicitly[Fractional[T]];
+  implicit val doubleIsDivSemiring = new DoubleSemi;
+  
+  class DoubleSemi extends WLDSemiring[Double] {
+    private val ops = implicitly[Fractional[Double]];
     import ops._;
-    def plus(t1: T, t2: T) = t1 + t2;
-    def times(t1: T, t2: T) = t1 * t2;
-    def leftDivide(t1: T, t2: T) = t2 / t1;
-    def closure(t: T) = error("Sorry, not implemented.");
+    def plus(t1: Double, t2: Double) = t1 + t2;
+    def times(t1: Double, t2: Double) = t1 * t2;
+    def leftDivide(t1: Double, t2: Double) = t2 / t1;
+    def closure(t: Double) = if(t >= 1) Math.POS_INF_DOUBLE else 1/(1-t);
     val one = ops.one;
     val zero = ops.zero;
   }
