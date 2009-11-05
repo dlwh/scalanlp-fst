@@ -602,10 +602,12 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   def minimize: Transducer[W,State,In,Out] = {
     val edgesByOrigin = this.allEdgesByOrigin;
 
+    // two state are equivalent if they have equivalent outgoing arcs *and* their final weight
+    // is the same.
     val equivalentStates = this.allStates.toSeq.groupBy{ state =>
       val myEdges = edgesByOrigin.getOrElse(state,Seq.empty).view;
       val edgesWithoutOrigin = Set() ++ myEdges.map { case Arc(_,to,in,out,w) => (to,in,out,w) };
-      edgesWithoutOrigin
+      (finalWeight(state),edgesWithoutOrigin)
     } map (_._2);
 
     val stateMap = (Map.empty ++ (
