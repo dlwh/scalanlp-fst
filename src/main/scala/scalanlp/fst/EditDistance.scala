@@ -16,12 +16,11 @@ import scala.annotation.switch;
  *
  * @author dlwh
  */
-class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rhoSize: Int = 0, logDecay: Double = 0.0)
+class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rhoSize: Int = 0)
         extends Transducer[Double,Int,Char,Char]()(doubleIsLogSpace,implicitly[Alphabet[Char]],implicitly[Alphabet[Char]]) {
   import Transducer._;
   require( subRatio < 0);
   require( insRatio < 0);
-  require( logDecay <= 0);
   require( rhoSize >= 0);
 
   /**
@@ -30,21 +29,11 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
   val (insCost,subCost,matchCost) = {
     import Math.{exp,log};
     val n = alphabet.size + rhoSize;
-    // we have n^2-n subs, n matches, and 2n dels == insertions.
-    // We want transitions to be markovian, so:
-    //  c * ((n^2 - n ) exp(sub) + n * exp(0) + 2n exp(del)) = decay
-    // log c + log ((n^2 - n ) exp(sub) + n * exp(0) + 2n exp(del)) = log(decay)
-    // log c + logSum( log( (|alpha| + rhoS)^2 - (|alpha + rhoS)) + sub,
-    //                 log(|alpha| + rhoS),
-    //                 log 2 + log (|alpha| + rhos) + del) = log(decay)
-    // log c + logSum ( log( |alpha|^2 - |alpha| ) + sub,
-    //                    log(2 alpha rho) + sub,
-    //                  log(rhoSize^2 - rhoSize) + sub
-    //                  log(|alpha|),
-    //                  log(rhoS),
-    //                  log 2 + log(|alpha|) + del,
-    //                  log 2 + log(rhoSize) + del ) = logDecay
-    val logC = logDecay - log( (n*n - n) * exp(subRatio) + n + 2 * n * exp(insRatio))
+    // we want to make edges out be
+    // for any input label (resp. output label), there is 1 match, n-1 subs, and and 1 deletion
+    //  c * ((n - 1 ) exp(sub) + 1 * exp(0) + 1 exp(del)) = 1.0
+    // log c + log ((n -1 ) exp(sub) + 1 * exp(0) + exp(del)) = 0.0
+    val logC = - log( (n-1) * exp(subRatio) + 1 + exp(insRatio))
     (insRatio + logC,subRatio + logC,logC)
   }
 
@@ -77,15 +66,20 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
 
   def finalWeight(s: Int) = 0.0;
 
-  override def allEdges:Seq[Arc] = edgesMatching(0,inAlpha.sigma,outAlpha.sigma).toSeq;
+  override def allEdges:Seq[Arc] = (edgesMatching(0,inAlpha.sigma,outAlpha.sigma)).toSeq;
 
   def edgesMatching(s: Int, a: Char, b: Char) = {
 
     if(a == Sigma && b == Sigma) {
-      for(a <- allChars.iterator;
-          b <- allChars.iterator;
-          if a != Eps || b != Eps)
-        yield Arc(0,0,a,b, costOf(a,b));
+      for {
+        a <- allChars.iterator;
+        b <- allChars.iterator;
+        if a != Eps || b != Eps
+        cost = costOf(a,b)
+        if cost != Math.NEG_INF_DOUBLE
+      } yield {
+        Arc(0,0,a,b, cost);
+      }
     } else if(a == Sigma) {
       if(b == Eps) {
         for(a <- alphaAndRho.iterator)
@@ -107,6 +101,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
     } else {
       Iterator.single(Arc(0,0,a,b,costOf(a,b)));
     }
+
   }
 
   private val RhoRho = (Rho << 2)|Rho;

@@ -26,13 +26,7 @@ class EditDistanceTest extends FunSuite with Checkers {
     val ed = new EditDistance(-3, -4, Set('a', 'b', 'c'));
     val allWeights = ed.edgesFrom(0).map(_.weight);
     val totalMass = allWeights.reduceLeft(logSum _);
-    assert(totalMass.abs < 1E-10, totalMass + " to far from zero!");
-  }
-
-  test("rho and nonRho are similar") {
-    val ed = new EditDistance(-3,-4,Set('a','b'),0,Math.log(.9));
-    val ed2 = new EditDistance(-3,-4,Set.empty,2,Math.log(.9));
-    assert( (ed.cost - ed2.cost) < 1E-6);
+    assert( (totalMass).abs < 1E-10, totalMass + " to far from zero!");
   }
 
   test("ed is markovian even in the presence of some rhos") {
@@ -62,7 +56,7 @@ class EditDistanceTest extends FunSuite with Checkers {
   }
 
 
-  test("substitutions only produces markovian transducer") {
+  test("matches only produces markovian transducer") {
     import scalanlp.math.Semiring.LogSpace._;
     val ed = new EditDistance(doubleIsLogSpace.zero, doubleIsLogSpace.zero, Set('a','b','c'));
     val abc = Automaton.constant("abc",0.0);
@@ -72,6 +66,12 @@ class EditDistanceTest extends FunSuite with Checkers {
     assert( (ed >> abc).cost === 0.0);
   }
 
+  test("matches and subs only produces markovian transducer") {
+    import scalanlp.math.Semiring.LogSpace._;
+    val ed = new EditDistance(-2.0, doubleIsLogSpace.zero, Set('a','b','c'));
+    val abc = Automaton.constant("abc",0.0);
+    assert( (ed >> abc).cost < 1E-6);
+  }
 
   test("ed with a 0 cost automaton gives a distribution") {
     import scalanlp.math.Semiring.LogSpace._;
