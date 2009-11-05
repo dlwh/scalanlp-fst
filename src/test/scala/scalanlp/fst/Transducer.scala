@@ -157,7 +157,7 @@ class TransducerTest extends FunSuite with Checkers {
       1 -> 3 ('e',eps,0),
       1 -> 3 ('f',eps,1)
     );
-    assert(minimized === fst.minimize(doubleIsTropical));
+    assert(minimized === fst.pushWeights(doubleIsTropical).minimize);
   }
 
 }

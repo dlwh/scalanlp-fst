@@ -596,16 +596,18 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     Transducer.transducer(initWeights,finalWeights)(arcs:_*);
   }
 
-  def minimize(implicit r2: WLDSemiring[W]): Transducer[W,State,In,Out] = {
-    val pushed = this.pushWeights;
-    globalLog.log(DEBUG)("pushed"+pushed);
-    val edgesByOrigin = pushed.allEdgesByOrigin;
+  /**
+  * Performs minimization of the autmaton.
+  */
+  def minimize: Transducer[W,State,In,Out] = {
+    val edgesByOrigin = this.allEdgesByOrigin;
 
-    val equivalentStates = pushed.allStates.toSeq.groupBy{ state =>
+    val equivalentStates = this.allStates.toSeq.groupBy{ state =>
       val myEdges = edgesByOrigin.getOrElse(state,Seq.empty).view;
       val edgesWithoutOrigin = Set() ++ myEdges.map { case Arc(_,to,in,out,w) => (to,in,out,w) };
       edgesWithoutOrigin
     } map (_._2);
+
     val stateMap = (Map.empty ++ (
       for(klass <- equivalentStates;
           val chosenOne = klass.head;
@@ -614,21 +616,17 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     ))
 
 
-    val initWeights = new muta.HashMap[State,W] {
-      override def default(k: State) = r2.zero;
-    }
-    for( (s,w) <- pushed.initialStateWeights) {
-      initWeights(stateMap(s)) = r2.plus(initWeights(stateMap(s)),w);
+    val initWeights = makeMap(ring.zero);
+    for( (s,w) <- this.initialStateWeights) {
+      initWeights(stateMap(s)) = ring.plus(initWeights(stateMap(s)),w);
     }
       
-    val finalWeights = new muta.HashMap[State,W] {
-      override def default(k: State) = r2.zero;
-    }
-    for( (s,w) <- pushed.finalStateWeights) {
-      finalWeights(stateMap(s)) = r2.plus(finalWeights(stateMap(s)),w);
+    val finalWeights = makeMap(ring.zero);
+    for( (s,w) <- this.finalStateWeights) {
+      finalWeights(stateMap(s)) = ring.plus(finalWeights(stateMap(s)),w);
     }
 
-    Transducer.transducer(Map.empty ++ initWeights,Map.empty ++ finalWeights)( (Set() ++ pushed.allEdges.map {
+    Transducer.transducer(Map.empty ++ initWeights,Map.empty ++ finalWeights)( (Set() ++ this.allEdges.map {
         case Arc(from,to,in,out,w) => Arc(stateMap(from),stateMap(to),in,out,w)
       }).toSeq :_*
     );
