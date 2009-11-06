@@ -28,11 +28,10 @@ class DecayAutomaton( val expectedLength:Double, chars: Set[Char], rhoSize: Int 
 
   val initialStateWeights = Map( 0 -> 0.0);
 
-  def finalWeight(s: Int) = if(s == 1) 0.0 else Math.NEG_INF_DOUBLE;
+  def finalWeight(s: Int) = stopProb;
 
   override lazy val allEdges:Seq[Arc] = edgesMatching(0,inAlpha.sigma).toSeq;
 
-  private val endingEdge = Arc(0,1,inAlpha.epsilon,inAlpha.epsilon,stopProb);
   private val rhoEdge = Arc(0,0,inAlpha.rho,inAlpha.rho,Math.log(rhoSize) + arcCost);
 
   def edgesMatching(s: Int, a: Char) = {
@@ -40,14 +39,13 @@ class DecayAutomaton( val expectedLength:Double, chars: Set[Char], rhoSize: Int 
       if(a == inAlpha.sigma) {
         val subs = for(a <- chars.iterator)
           yield Arc(0,0,a,a,arcCost)
-        if(rhoSize == 0) subs ++ Iterator.single(endingEdge);
-        else subs ++ Iterator(rhoEdge,endingEdge)
+        if(rhoSize == 0) subs
+        else subs ++ Iterator.single(rhoEdge)
       } else if(a == inAlpha.rho)
         Iterator.single(rhoEdge);
-      else if(a == inAlpha.epsilon)
-        Iterator.single(endingEdge);
-      else 
+      else if(a != inAlpha.epsilon)
         Iterator.single(Arc(0,0,a,a,arcCost))
+      else Iterator.empty;
     } else {
       Iterator.empty;
     }
