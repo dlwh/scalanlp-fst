@@ -415,8 +415,9 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
 
   /**
   * Computes the total value of all paths through the transducer.
+  * Assume the graph has no loops other than self loops.
   */
-  lazy val acyclicCost = {
+  lazy val cost = {
     val costs = allPathDistances;
     var cost = ring.zero;
     for( (s,w) <- costs) {
@@ -428,7 +429,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   /**
   * Computes the total value of all paths through the transducer.
   */
-  lazy val cost = {
+  lazy val cyclicCost = {
     val costs = allPairDistances;
     var cost = ring.zero;
     for( (from,initWeight) <- initialStateWeights;
