@@ -629,8 +629,8 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     }
       
     val finalWeights = makeMap(ring.zero);
-    for( (s,w) <- this.finalStateWeights) {
-      finalWeights(stateMap(s)) = ring.plus(finalWeights(stateMap(s)),w);
+    for( s <- stateMap.valuesIterator) {
+      finalWeights(s) = finalWeight(s);
     }
 
     Transducer.transducer(Map.empty ++ initWeights,Map.empty ++ finalWeights)( (Set() ++ this.allEdges.map {
