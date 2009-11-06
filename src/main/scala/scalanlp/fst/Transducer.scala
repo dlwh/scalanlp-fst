@@ -500,9 +500,11 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
   * Returns State --&gt; distance to that state from the start
   */
   def allPathDistances:Map[State,W] = {
-    val d = makeMap[W](ring.zero);
-    val r = makeMap[W](ring.zero);
-    val extraW = makeMap[W](ring.zero);
+    import ring._
+    val d = makeMap[W](zero);
+    val r = makeMap[W](zero);
+    val extraW = makeMap[W](zero);
+    val selfLoops = makeMap[W](zero);
 
     val S = new collection.mutable.Queue[State]();
     for( (s,w) <- initialStateWeights) {
@@ -514,41 +516,43 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     while(!S.isEmpty) {
       val from = S.head;
       S.dequeue();
-      //println("State" + from);
-      r -= from;
       extraW.clear();
-      var selfLoopMass = ring.zero;
+      var selfLoopMass = zero;
 
       // find all the self-loop mass, save everything else
       for( a@Arc(_,to,_,_,w) <- edgesFrom(from)) {
         if(from == to) {
-          selfLoopMass = ring.plus(selfLoopMass,w);
+          selfLoopMass = plus(selfLoopMass,w);
         } else {
-          extraW(to) = ring.plus(extraW(to),w);
+          extraW(to) = plus(extraW(to),w);
         }
       }
       // give myself all my selfloops
-      d(from) = 
-        if(selfLoopMass == ring.zero) d(from)
-        else ring.times(d(from),ring.closure(selfLoopMass));
-      globalLog.log(DEBUG)((from,d(from),selfLoopMass));
+      r(from) = times(r(from),closure(selfLoopMass));
+      globalLog.log(DEBUG)((from,r(from),selfLoopMass));
 
-      r(from) = d(from);
+      selfLoops(from) = closure(selfLoopMass);
+
       val rFrom = r(from);
+      r -= from;
       
       for( (to,w) <- extraW) {
         //println( from + " " + (to,w));
         val dt = d(to);
-        val wRFrom = ring.times(rFrom,w);
-        val dt_p_wRFrom = ring.plus(dt,wRFrom);
-        if(!ring.closeTo(dt,dt_p_wRFrom)) {
-          r(to) = ring.plus(r(to),wRFrom);
+        val wRFrom = times(rFrom,w);
+        val dt_p_wRFrom = plus(dt,wRFrom);
+        if(!closeTo(dt,dt_p_wRFrom)) {
+          r(to) = plus(r(to),wRFrom);
           d(to) = dt_p_wRFrom;
           if(!S.contains(to)) {
             S += to;
           }
         }
       }
+    }
+
+    for(  (s,mass) <- selfLoops) {
+      d(s) = times(d(s),mass);
     }
 
     Map.empty ++ d;
@@ -577,7 +581,7 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
 
     val rev = reverse;
     globalLog.log(DEBUG)("rev" + rev);
-    val costs = reverse.allPathDistances; // \sum_{state q in final} weight(path(p,q))
+    val costs = rev.allPathDistances; // \sum_{state q in final} weight(path(p,q))
     globalLog.log(DEBUG)("rev costs" + costs);
     val initWeights = initialStateWeights map { case (k,v) => (k,times(v,costs(k))) }
     val finalWeights = for( (s,w) <- rev.initialStateWeights;
