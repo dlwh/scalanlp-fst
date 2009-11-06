@@ -24,7 +24,7 @@ class EditDistanceTest extends FunSuite with Checkers {
     import scalanlp.math.Semiring.LogSpace._;
     val ed = new EditDistance(-3, -4, Set('a','b','c'));
     val abc = Automaton.constant("abc",0.0);
-    assert( ((ed >> abc).cost - (abc >> ed).cost).abs < 1E-6);
+    assert( ((ed >> abc).cost - (abc >> ed).cost).abs < 1E-6, (ed >> abc).cost + " " + (abc >> ed).cost);
   }
 
 
@@ -32,21 +32,21 @@ class EditDistanceTest extends FunSuite with Checkers {
     import scalanlp.math.Semiring.LogSpace._;
     val ed = new EditDistance(doubleIsLogSpace.zero, doubleIsLogSpace.zero, Set('a','b','c'));
     val abc = Automaton.constant("abc",0.0);
-    assert( (ed >> abc).cost.abs < 1E-6);
+    assert( (ed >> abc).cost.abs < 1E-6,ed >> abc cost);
   }
 
   test("matches and subs only produces markovian transducer") {
     import scalanlp.math.Semiring.LogSpace._;
     val ed = new EditDistance(-2.0, doubleIsLogSpace.zero, Set('a','b','c'));
     val abc = Automaton.constant("abc",0.0);
-    assert( (ed >> abc).cost.abs < 1E-6);
+    assert( (ed >> abc).cost.abs < 1E-6, (ed >> abc) cost);
   }
 
   test("ed with a 0 cost automaton gives a distribution") {
     import scalanlp.math.Semiring.LogSpace._;
     val ed = new EditDistance(-3, -4, Set('a','b','c'));
     val abc = Automaton.constant("abc",0.0);
-    assert( (ed >> abc).cost.abs < 1E-6);
+    assert( (ed >> abc).cost.abs < 1E-6, ed >> abc cost);
     assert( (abc >> ed).cost.abs < 1E-6);
   }
 
