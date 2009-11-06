@@ -37,9 +37,9 @@ object Semiring {
       def times(t1: Double, t2: Double) = t1 * t2;
       def leftDivide(t1: Double, t2: Double) = t2 / t1;
       def closure(t: Double) = {
-        if(t < 1 && t > 0) 1 / (1-t);
-        else if(t == 0) 0.0
-        else error("Closure arg must be in [0,1), not "  +t);
+        if(t < 1 && t >= 0) 1 / (1-t);
+        else if(t < 0) error("Closure arg must be in [0,1), not "  +t);
+        else Math.POS_INF_DOUBLE;
       }
       val one = 1.0;
       val zero = 0.0;
@@ -67,7 +67,7 @@ object Semiring {
       def plus(t1: Double, t2: Double) = t1 min t2;
       def leftDivide(t1: Double, t2: Double) = t2 - t1;
       def times(t1: Double, t2: Double) = t1 + t2;
-      def closure(t: Double) = if(t >= 0) t else Math.NEG_INF_DOUBLE;
+      def closure(t: Double) = if(t >= 0.0) 0.0 else Math.NEG_INF_DOUBLE;
       val one = 0.0;
       val zero = Math.POS_INF_DOUBLE;
     }
