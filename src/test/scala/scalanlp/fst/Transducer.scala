@@ -133,7 +133,7 @@ class TransducerTest extends FunSuite with Checkers {
     assert(pushed === fst.pushWeights(semiring));
   }
 
-  test("Mohri hwa fig12d weight pushing") {
+  test("Mohri hwa fig12d minimization") {
     import Semiring.Tropical._;
     val dsl = new DSL[Int,Double,Char,Char]();
     import dsl._;
@@ -148,14 +148,14 @@ class TransducerTest extends FunSuite with Checkers {
       2 -> 3 ('e',eps,4),
       2 -> 3 ('f',eps,5)
     );
-    val minimized = transducer(Map(0->0.0),Map(3->0.0))(
+    val minimized = transducer(Map(0->0.0),Map(2->0.0))(
       0 -> 1 ('a',eps,0),
       0 -> 1 ('b',eps,1),
       0 -> 1 ('c',eps,5),
       0 -> 1 ('d',eps,4),
       0 -> 1 ('e',eps,5),
-      1 -> 3 ('e',eps,0),
-      1 -> 3 ('f',eps,1)
+      1 -> 2 ('e',eps,0),
+      1 -> 2 ('f',eps,1)
     );
     assert(minimized === fst.pushWeights(doubleIsTropical).minimize);
   }
@@ -163,6 +163,12 @@ class TransducerTest extends FunSuite with Checkers {
   test("shrink basic example") {
     val a = Transducer.transducer(Map(0->1.0),Map(1->1.0))(Arc(0,1,'c','c',3),Arc(0,1,'c','c',5));
     assert(a.shrink.edgesFrom(0).toSeq.size === 1)
+  }
+
+  test("minimize works") {
+    val a = Automaton.constant("hello",1.0);
+    val minned = a | a minimize;
+    assert(a.allStates.size === 6);
   }
 
 }

@@ -161,7 +161,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   /**
   * collapses edges, minimizes and relabels
   */
-  def shrink = collapseEdges.minimize.relabel;
+  def shrink = collapseEdges.minimize;
 
   /**
   * Creates a new Transducer that collapses
@@ -624,42 +624,85 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Performs minimization of the autmaton.
+  * Performs minimization of the autmaton. This will only minimize deterministic
+  * automata, but for NFAs it does the "right thing" for idempotent semirings,
+  * and unambiguous automata. XXX can we deal with ambiguity?
+  *
+  * This is the labeled generalization of Ullman's 1967 algorithm to weighted
+  * automata.
   */
-  def minimize: Transducer[W,State,In,Out] = {
+  def minimize: Transducer[W,Int,In,Out] = {
     val edgesByOrigin = this.allEdgesByOrigin;
 
-    // two state are equivalent if they have equivalent outgoing arcs *and* their final weight
-    // is the same.
-    val equivalentStates = this.allStates.toSeq.groupBy{ state =>
+    // initialpartition:
+    // two state are equivalent if they have equivalent outgoing arc
+    // labels *and* their final weight is the same.
+    val initialPartitions = this.allStates.groupBy{ state =>
       val myEdges = edgesByOrigin.getOrElse(state,Seq.empty).view;
-      val edgesWithoutOrigin = Set() ++ myEdges.map { case Arc(_,to,in,out,w) => (to,in,out,w) };
-      (finalWeight(state),edgesWithoutOrigin)
+      val edgesWithoutStates = Set() ++ myEdges.map { case Arc(_,_,in,out,w) => (in,out,w) };
+      (finalWeight(state),edgesWithoutStates)
     } map (_._2);
+    val partitions = new ArrayBuffer[Set[State]];
+    partitions ++= initialPartitions;
 
-    val stateMap = (Map.empty ++ (
-      for(klass <- equivalentStates;
-          val chosenOne = klass.head;
-          s <- klass)
-        yield (s,chosenOne)
-    ))
+    val partitionOf = makeMap(-1);
+    for( (partition,index) <- partitions.zipWithIndex;
+        state <- partition) {
+      partitionOf(state) = index;
+    }
+
+    var changed = true;
+    while(changed) {
+      changed = false;
+      for( (partition,index) <- partitions.zipWithIndex) {
+        // try regrouping these edges by their follow sets
+        val newPartitions = partition.groupBy { state =>
+          val myEdges = edgesByOrigin.getOrElse(state,Seq.empty).view;
+          val edgesWithoutStates = Set() ++ myEdges.map { case Arc(_,to,in,out,w) =>
+            (partitionOf(to),in,out,w) 
+          };
+          edgesWithoutStates
+        }
+
+        // if it changed, move the partitions
+        if(newPartitions.size > 1) {
+          changed = true;
+          // leave on partition where it is.
+          val iter = newPartitions.iterator;
+          partitions(index) = iter.next._2;
+
+          // update other partitions to end of array
+          for( (_,p) <- iter) {
+            val newIndex = partitions.size;
+            partitions += p;
+            for(s <- p) {
+              partitionOf(s) = newIndex;
+            }
+          }
+        }
+
+      }
+    }
 
 
-    val initWeights = makeMap(ring.zero);
+    val initWeights = new ArrayMap[W] {
+      override def defValue = ring.zero;
+    };
     for( (s,w) <- this.initialStateWeights) {
-      initWeights(stateMap(s)) = ring.plus(initWeights(stateMap(s)),w);
+      initWeights(partitionOf(s)) = ring.plus(initWeights(partitionOf(s)),w);
     }
       
-    val finalWeights = makeMap(ring.zero);
-    for( s <- stateMap.valuesIterator) {
-      finalWeights(s) = finalWeight(s);
+    val finalWeights = new ArrayMap[W] {
+      override def defValue = ring.zero;
+    };
+    for( s <- partitionOf.keysIterator) {
+      finalWeights(partitionOf(s)) = finalWeight(s);
     }
 
-    Transducer.transducer(Map.empty ++ initWeights,Map.empty ++ finalWeights)( (Set() ++ this.allEdges.map {
-        case Arc(from,to,in,out,w) => Arc(stateMap(from),stateMap(to),in,out,w)
+    Transducer.intTransducer(Map.empty ++ initWeights,Map.empty ++ finalWeights)( (Set() ++ this.allEdges.map {
+        case Arc(from,to,in,out,w) => Arc(partitionOf(from),partitionOf(to),in,out,w)
       }).toSeq :_*
     );
-          
   }
 }
 
@@ -785,6 +828,5 @@ object Transducer {
   case object NoEps extends InboundEpsilon;
   case object LeftEps extends InboundEpsilon;
   case object RightEps extends InboundEpsilon;
-
 
 }
