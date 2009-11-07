@@ -160,4 +160,9 @@ class TransducerTest extends FunSuite with Checkers {
     assert(minimized === fst.pushWeights(doubleIsTropical).minimize);
   }
 
+  test("shrink basic example") {
+    val a = Transducer.transducer(Map(0->1.0),Map(1->1.0))(Arc(0,1,'c','c',3),Arc(0,1,'c','c',5));
+    assert(a.shrink.edgesFrom(0).toSeq.size === 1)
+  }
+
 }

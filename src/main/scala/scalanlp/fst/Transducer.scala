@@ -83,7 +83,6 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   */
   def finalStateWeights = Map.empty ++ allStates.map { s => (s,finalWeight(s)) }
 
-
   /**
   * Returns a transducer where each arc's input and output are swapped.
   */
@@ -160,6 +159,39 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
+  * collapses edges, minimizes and relabels
+  */
+  def shrink = collapseEdges.minimize.relabel;
+
+  /**
+  * Creates a new Transducer that collapses
+  */
+  def collapseEdges:Transducer[W,State,In,Out] = new Transducer[W,State,In,Out]()(ring,inAlpha,outAlpha) {
+
+    override val initialStateWeights = outer.initialStateWeights;
+    def finalWeight(s: State) = outer.finalWeight(s);
+    protected override def makeMap[T](default: =>T) = outer.makeMap(default);
+
+    def edgesMatching(s: State, in: In, out: Out) = {
+      // group edges by their follow, input and output arcs
+      // i.e. everything except their weight.
+      val matchingEdges = outer.edgesMatching(s,in,out).toSeq.groupBy { case Arc(from,to,in,out,w) =>
+        (to,in,out);
+      }
+
+      // collapse all the weights
+      val collapsedArcs = for {
+        ( (to,in,out), arcs ) <- matchingEdges.iterator
+      } yield {
+        val totalWeight = arcs.iterator.map(_.weight).reduceLeft(ring.plus(_,_));
+        Arc(s,to,in,out,totalWeight);
+      }
+
+      collapsedArcs;
+    }
+  }
+
+  /**
   * Simple composition in the general epsilon-ful case.
   */
   def >>[S,Out2](that: Transducer[W,S,Out,Out2]) = compose[S,Out2,W,W](that,implicitly[Semiring[W]].times(_,_));
@@ -186,29 +218,15 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       def finalWeight(s: (State,S,InboundEpsilon)) = composeW(outer.finalWeight(s._1),that.finalWeight(s._2));
 
       override def edgesMatching(s: (State,S,InboundEpsilon), in: In, out: Out2) = {
-        val nonEpsArcs = (for {
+        val nonEpsArcs = for {
           a1 @ Arc(from1,to1,in1,out1,w1) <- outer.edgesMatching(s._1,in,outer.outAlpha.sigma);
           if out1 != Out1Eps
+          a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesMatching(s._2,out1,out)
         } yield {
-          // sum together all weights
-          val newArcWeights = that.makeMap[collection.mutable.Map[Out2,W2]]( new muta.HashMap[Out2,W2] {
-              override def default(o: Out2) = that.ring.zero
-            }
-          );
-          for(a2 @ Arc(from2,to2,in2,out2,w2) <- that.edgesMatching(s._2,out1,out)) {
-            val currentW = newArcWeights(to2)(out2);
-            newArcWeights(to2)(out2) = that.ring.plus(w2,currentW);
-          }
-          val newArcs = {
-            for((to2,chMap) <- newArcWeights.iterator;
-                (out2,w2) <- chMap.iterator)
-              yield {
-                Arc(s, (to1,to2,NoEps), in1,out2,composeW(w1,w2));
-              }
-          }
-          newArcs
-        }).flatten;
+          Arc(s, (to1,to2,NoEps), in1,out2,composeW(w1,w2));
+        }
 
+        // todo XXX: make this lazy.
         val epsArcs = {
           val arcs = new ArrayBuffer[Arc];
           s._3 match {
