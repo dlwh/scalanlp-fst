@@ -252,16 +252,20 @@ abstract class Transducer[W,State,In,Out](implicit protected final val ring: Sem
     def escape(s: String) = s.replaceAll("\"","\\\"");
     val inEps = inAlpha.epsilon;
     val inSig = inAlpha.sigma;
+    val inRho = inAlpha.rho;
     def transformIn(c: In) = c match {
       case `inEps` => "&epsilon;"
       case `inSig` => "&sigma;"
+      case `inRho` => "&rho;"
       case x => x;
     }
     val outEps = outAlpha.epsilon;
     val outSig = outAlpha.sigma;
+    val outRho = outAlpha.rho;
     def transformOut(c: Out) = c match {
       case `outEps` => "&epsilon;"
       case `outSig` => "&sigma;"
+      case `outRho` => "&rho;"
       case x => x;
     }
     val sb = new StringBuilder;

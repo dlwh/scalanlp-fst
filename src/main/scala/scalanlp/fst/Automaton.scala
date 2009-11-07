@@ -66,9 +66,11 @@ abstract class Automaton[W,State,T](implicit ring: Semiring[W], alpha: Alphabet[
 
     val Eps = alpha.epsilon;
     val Sig = alpha.sigma;
+    val Rho = alpha.rho;
     def transform(c: T) = c match {
       case Eps => "&epsilon;"
       case Sig => "&sigma;"
+      case Rho => "&rho;"
       case x => x;
     }
 
