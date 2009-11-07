@@ -29,9 +29,9 @@ import scalanlp.collection.mutable.ArrayMap;
 * @author dlwh
 *
 */
-abstract class Transducer[W,State,In,Out](implicit protected final val ring: Semiring[W],
-                                          protected final val inAlpha: Alphabet[In],
-                                          protected final val outAlpha: Alphabet[Out]) { outer =>
+abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
+                                          final val inAlpha: Alphabet[In],
+                                          final val outAlpha: Alphabet[Out]) { outer =>
   import Transducer._;
 
   type Arc = scalanlp.fst.Arc[W,State,In,Out];
