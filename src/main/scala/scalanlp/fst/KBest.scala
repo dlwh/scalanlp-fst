@@ -34,7 +34,7 @@ object KBest {
 
         for( Arc(_,to,ch,_,w) <- auto.edgesFrom(state)) {
           val newDeriv = if(ch == auto.inAlpha.epsilon) rev else ch :: rev;
-          pq += Derivation(ch :: rev,to,times(weight,w),false);
+          pq += Derivation(newDeriv,to,times(weight,w),false);
         }
       }
     }
