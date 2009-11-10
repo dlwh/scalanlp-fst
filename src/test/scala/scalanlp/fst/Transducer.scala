@@ -165,10 +165,34 @@ class TransducerTest extends FunSuite with Checkers {
     assert(a.shrink.edgesFrom(0).toSeq.size === 1)
   }
 
-  test("minimize works") {
+  test("minimize works on a simple string") {
     val a = Automaton.constant("hello",1.0);
     val minned = a | a minimize;
     assert(a.allStates.size === 6);
+  }
+
+  test("relabel doesn't screw up cost") {
+    import Semiring.LogSpace._;
+    val a = Automaton.constant("aa",0.0);
+    val ed = new EditDistance(-3,-3,Set('a','b'));
+    val pushed = (a >> ed).pushWeights(doubleIsLogSpace);
+    val pC = pushed.cost;
+    val prC = pushed.relabel.cost;
+    assert( (pC - prC).abs < 1E-6, pC + " " + prC);
+  }
+
+  test("minimize is reasonably consistent") {
+    import Semiring.LogSpace._;
+    val words = List("cu","ko");
+    val auto = words.map(w => Automaton.constant(w,0.0) );
+    val ed = new EditDistance(-3,-4,Set.empty ++ words.iterator.flatMap(_.iterator));
+
+    val eds = auto.map(a => (ed >> a).inputProjection);
+    val joined = (eds(0) & eds(1)).relabel
+    val shrunk = joined.minimize;
+    val shrinkCost = shrunk.cost
+    val cost = joined.cost
+    assert( (shrinkCost - cost).abs < 1E-6, shrinkCost +" vs " + cost);
   }
 
 }
