@@ -141,7 +141,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   * Epsilon-free composition. If you have epsilons, this will almost certainly generate incorrect results.
   * Basically, we take the cartesian product over states.
   */ 
-  def >!>[S,Out2](that: Transducer[W,S,Out,Out2]):Transducer[W,(State,S),In,Out2] = new Transducer[W,(State,S),In,Out2] {
+  def >!>[S,Out2](that: Transducer[W,S,Out,Out2]):Transducer[W,(State,S),In,Out2] = new Transducer[W,(State,S),In,Out2]()(ring,inAlpha,that.outAlpha) {
     val initialStateWeights = for {
       (k1,w1) <- outer.initialStateWeights;
       (k2,w2) <-  that.initialStateWeights
@@ -530,7 +530,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     val selfLoops = makeMap[W](zero);
 
     val S = new collection.mutable.Queue[State]();
-    for( (s,w) <- initialStateWeights) {
+    for( (s,w) <- initialStateWeights if w != zero) {
       d(s) = w;
       r(s) = w;
       S += s;
@@ -559,12 +559,11 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       val rFrom = r(from);
       r -= from;
       
-      for( (to,w) <- extraW) {
-        //println( from + " " + (to,w));
+      for( (to,w) <- extraW if w != ring.zero) {
         val dt = d(to);
         val wRFrom = times(rFrom,w);
         val dt_p_wRFrom = plus(dt,wRFrom);
-        if(!closeTo(dt,dt_p_wRFrom)) {
+        if(dt != dt_p_wRFrom) {
           r(to) = plus(r(to),wRFrom);
           d(to) = dt_p_wRFrom;
           if(!S.contains(to)) {
@@ -574,9 +573,10 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       }
     }
 
-    for(  (s,mass) <- selfLoops) {
+    for(  (s,mass) <- selfLoops if mass != zero) {
       d(s) = times(d(s),mass);
     }
+
 
     Map.empty ++ d;
   }
