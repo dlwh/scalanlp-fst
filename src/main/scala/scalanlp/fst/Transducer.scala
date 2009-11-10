@@ -170,7 +170,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
 
     override val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
-    protected override def makeMap[T](default: =>T) = outer.makeMap(default);
+    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
 
     def edgesMatching(s: State, in: In, out: Out) = {
       // group edges by their follow, input and output arcs
@@ -462,7 +462,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     cost;
   }
 
-  protected def makeMap[T](dflt: =>T): collection.mutable.Map[State,T] = {
+  protected[fst] def makeMap[T](dflt: =>T): collection.mutable.Map[State,T] = {
     new collection.mutable.HashMap[State,T] {
       override def default(k: State) = getOrElseUpdate(k,dflt);
     }
@@ -625,11 +625,11 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
 
   /**
   * Performs minimization of the autmaton. This will only minimize deterministic
-  * automata, but for NFAs it does the "right thing" for idempotent semirings,
-  * and unambiguous automata. XXX can we deal with ambiguity?
+  * automata, but for NFAs it does the "right thing", handling ambiguous transitions
+  * in a reasonable manner.
   *
   * This is the labeled generalization of Ullman's 1967 algorithm to weighted
-  * automata.
+  * automata with extra support for NFAs.
   */
   def minimize: Transducer[W,Int,In,Out] = {
     val edgesByOrigin = this.allEdgesByOrigin;
@@ -763,7 +763,7 @@ object Transducer {
       def finalWeight(s: Int) = finalWeights.getOrElse(s,ring.zero);
       override val finalStateWeights = finalWeights withDefaultValue(ring.zero);
 
-      override protected def makeMap[T](dflt: => T): ArrayMap[T] = {
+      override protected[fst] def makeMap[T](dflt: => T): ArrayMap[T] = {
         new ArrayMap[T] {
           override def default(k: Int) = {
             val result = dflt;
