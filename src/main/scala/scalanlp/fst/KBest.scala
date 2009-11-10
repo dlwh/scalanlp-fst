@@ -1,8 +1,6 @@
 package scalanlp.fst;
 
-import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
-import scala.util.control.Breaks._;
 
 import scalanlp.math._;
 
