@@ -634,75 +634,113 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   def minimize: Transducer[W,Int,In,Out] = {
     val edgesByOrigin = this.allEdgesByOrigin;
 
+    import scala.collection.mutable.HashMap;
+    def aggregateArcs(arcs : Seq[Arc], destMapper: State=>Int) = {
+      val edgeMap = new HashMap[(Int,In,Out),W] {
+        override def default(i: (Int,In,Out)) = ring.zero;
+      }
+      for( Arc(_,to,in,out,w) <- arcs) {
+        edgeMap( (destMapper(to),in,out)) = ring.plus(edgeMap(destMapper(to),in,out),w);
+      }
+      edgeMap
+    }
+
+    type EquivalenceInfo = (W,HashMap[(Int,In,Out),W]);
+
     // initialpartition:
     // two state are equivalent if they have equivalent outgoing arc
     // labels *and* their final weight is the same.
     val initialPartitions = this.allStates.groupBy{ state =>
-      val myEdges = edgesByOrigin.getOrElse(state,Seq.empty).view;
-      val edgesWithoutStates = Set() ++ myEdges.map { case Arc(_,_,in,out,w) => (in,out,w) };
+      val myEdges = edgesByOrigin.getOrElse(state,Seq.empty);
+      val edgesWithoutStates = aggregateArcs(myEdges,_ => 0);
       (finalWeight(state),edgesWithoutStates)
-    } map (_._2);
-    val partitions = new ArrayBuffer[Set[State]];
+    };
+    val partitions = new ArrayBuffer[(EquivalenceInfo,Set[State])];
     partitions ++= initialPartitions;
 
-    val partitionOf = makeMap(-1);
+    val partitionOf:scala.collection.mutable.Map[State,Int] = makeMap(-1);
     for( (partition,index) <- partitions.zipWithIndex;
-        state <- partition) {
+        state <- partition._2) {
       partitionOf(state) = index;
     }
 
     var changed = true;
     while(changed) {
       changed = false;
-      for( (partition,index) <- partitions.zipWithIndex) {
+      for( ((oldEquiv,partition),index) <- partitions.zipWithIndex) {
         // try regrouping these edges by their follow sets
         val newPartitions = partition.groupBy { state =>
           val myEdges = edgesByOrigin.getOrElse(state,Seq.empty).view;
-          val edgesWithoutStates = Set() ++ myEdges.map { case Arc(_,to,in,out,w) =>
-            (partitionOf(to),in,out,w) 
-          };
-          edgesWithoutStates
+          val edgesWithoutStates = aggregateArcs(myEdges,partitionOf );
+          (finalWeight(state),edgesWithoutStates);
         }
 
         // if it changed, move the partitions
         if(newPartitions.size > 1) {
+          //println("split" + index + partition + newPartitions);
           changed = true;
-          // leave on partition where it is.
+          // leave one partition where it is.
           val iter = newPartitions.iterator;
-          partitions(index) = iter.next._2;
+          partitions(index) = iter.next;
 
           // update other partitions to end of array
-          for( (_,p) <- iter) {
+          for( pair@(equiv,p) <- iter) {
             val newIndex = partitions.size;
-            partitions += p;
+            partitions += pair;
+            //println(partitions,newIndex);
             for(s <- p) {
               partitionOf(s) = newIndex;
             }
           }
+        } else {
+          // in case any of the other partitions split, update
+          // this will always execute on the last run.
+          partitions(index) = newPartitions.iterator.next;
         }
-
       }
     }
+
+    //println(partitions.zipWithIndex);
+
+    /* post condition check:
+    for{ 
+      ((equivInfo,partition),index) <- partitions.zipWithIndex
+      s <- partition
+      _ = assert(equivInfo._1 == finalWeight(s));
+      stuff@((toPart,in,out),w) <- equivInfo._2
+    } {
+      var mass = ring.zero;
+      for( Arc(_,to,_,_,myW) <- edgesMatching(s,in,out)) {
+        if(partitions(toPart)._2.contains(to))
+          mass = ring.plus(mass,myW);
+      }
+      assert(mass == w,(s,stuff,mass,w).toString);
+    }
+    */
 
 
     val initWeights = new ArrayMap[W] {
       override def defValue = ring.zero;
     };
+    val newFinalWeights = new ArrayMap[W] {
+      override def defValue = ring.zero;
+    };
+    type NewArc = scalanlp.fst.Arc[W,Int,In,Out];
+    val arcs = new ArrayBuffer[NewArc];
+
     for( (s,w) <- this.initialStateWeights) {
       initWeights(partitionOf(s)) = ring.plus(initWeights(partitionOf(s)),w);
     }
-      
-    val finalWeights = new ArrayMap[W] {
-      override def defValue = ring.zero;
-    };
-    for( s <- partitionOf.keysIterator) {
-      finalWeights(partitionOf(s)) = finalWeight(s);
+    for( ((equivInfo,partition),index) <- partitions.zipWithIndex) {
+      newFinalWeights(index) = equivInfo._1;
+      for( ( (to,in,out),w) <- equivInfo._2) {
+        arcs += new NewArc(index,to,in,out,w);
+      }
     }
-
-    Transducer.intTransducer(Map.empty ++ initWeights,Map.empty ++ finalWeights)( (Set() ++ this.allEdges.map {
-        case Arc(from,to,in,out,w) => Arc(partitionOf(from),partitionOf(to),in,out,w)
-      }).toSeq :_*
-    );
+      
+    val imInitWeights = Map.empty ++ initWeights withDefaultValue(ring.zero);
+    val imFinalWeights = Map.empty ++ newFinalWeights withDefaultValue(ring.zero);
+    intTransducer(imInitWeights,imFinalWeights)(arcs:_*);
   }
 }
 
@@ -711,26 +749,27 @@ object Transducer {
   * Creates a transducer with the given initial states, final states, and arcs.
   */
   def intTransducer[W:Semiring,In:Alphabet,Out:Alphabet](initialStates: Map[Int,W], finalWeights: Map[Int,W])(arcs: Arc[W,Int,In,Out]*): Transducer[W,Int,In,Out] = {
-    val arcMap = {
-      val map = new ArrayMap[ArrayBuffer[Arc[W,Int,In,Out]]] {
-        override def default(i: Int) = getOrElseUpdate(i,new ArrayBuffer[Arc[W,Int,In,Out]]);
-      }
-      for(a <- arcs) {
-        map(a.from) += a;
-      }
-      map
-    }
+    
+    val arcMap =  arcs.groupBy(_.from);
 
+    val map = new ArrayMap[Seq[Arc[W,Int,In,Out]]] {
+      override def defValue = Seq.empty;
+    }
+    map ++= arcMap;
+    
     new Transducer[W,Int,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
-      override def allEdgesByOrigin = arcMap;
+      override def allEdgesByOrigin = map;
       val initialStateWeights = initialStates;
       def finalWeight(s: Int) = finalWeights.getOrElse(s,ring.zero);
-      override val finalStateWeights = finalWeights;
-
+      override val finalStateWeights = finalWeights withDefaultValue(ring.zero);
 
       override protected def makeMap[T](dflt: => T): ArrayMap[T] = {
         new ArrayMap[T] {
-          override def default(k: Int) = getOrElseUpdate(k,dflt);
+          override def default(k: Int) = {
+            val result = dflt;
+            update(k,dflt);
+            result;
+          }
         }
       }
 
