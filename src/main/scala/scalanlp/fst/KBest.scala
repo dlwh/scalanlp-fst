@@ -6,35 +6,23 @@ import scala.collection.mutable.ArrayBuffer;
 import scalanlp.math._;
 
 object KBest {
-  def extract[W:Ordering,State,T](auto: Automaton[W,State,T]):Iterator[(Seq[T],W)] = {
-    case class Derivation(str: ArrayBuffer[T], state: State, weight: W, atFinal: Boolean);
-    implicit val orderDeriv = Ordering[W].on[Derivation](_.weight);
+  case class Derivation[W,State,T](str: ArrayBuffer[T], state: State, weight: W,  heuristic: W, atFinal: Boolean);
+  implicit def orderDeriv[W:Ordering,State,T] = Ordering[W].on[Derivation[W,State,T]](_.heuristic);
 
-    val derivations = new Iterator[Derivation] {
+  def extract[W:Ordering,State,T](auto: Automaton[W,State,T]):Iterator[(Seq[T],W)] = {
+    val heuristics = auto.reverse.allPathDistances;
+
+    val pq = initialPQ(auto,heuristics);
+
+    val derivations = new Iterator[Derivation[W,State,T]] {
       import auto.ring._;
-      val pq = new PriorityQueue[Derivation];
-      for( (state,w) <- auto.initialStateWeights) {
-        pq += Derivation(ArrayBuffer.empty[T],state,w,false);
-      }
 
       def hasNext:Boolean = {
         !pq.isEmpty
       }
 
       def next = {
-        val deriv@Derivation(str,state,weight,atFinal) = pq.dequeue;
-        if(!atFinal) {
-          val finalWeight = auto.finalWeight(state);
-          if(finalWeight != zero) {
-            pq += Derivation(str,state,times(weight,finalWeight),true);
-          }
-
-          for( Arc(_,to,ch,_,w) <- auto.edgesFrom(state)) {
-            val newDeriv = if(ch == auto.inAlpha.epsilon) str else (str.clone() += ch);
-            pq += Derivation(newDeriv,to,times(weight,w),false);
-          }
-        }
-        deriv;
+        relax(auto,pq,heuristics);
       }
     }
 
@@ -48,39 +36,51 @@ object KBest {
     import auto.ring._;
     val heuristics = auto.reverse.allPathDistances;
 
-    case class Derivation(str: ArrayBuffer[T], state: State, weight: W, heuristic: W, atFinal: Boolean);
-    implicit val orderDeriv = Ordering[W].on[Derivation](_.heuristic);
+    val pq = initialPQ(auto,heuristics);
     val kbest = new ArrayBuffer[(Seq[T],W)];
-
-
-    val pq = new PriorityQueue[Derivation];
-    for( (state,w) <- auto.initialStateWeights) {
-      pq += Derivation(ArrayBuffer.empty,state,w,times(w,heuristics(state)),false);
-    }
 
     while(!pq.isEmpty && kbest.length < num) {
       //println(pq.size);
-      val deriv@Derivation(str,state,weight,_,atFinal) = pq.dequeue;
-      if(!atFinal) {
-        val finalWeight = auto.finalWeight(state);
-        if(finalWeight != zero) {
-          val finalScore = times(weight,finalWeight);
-          pq += Derivation(str,state,finalScore,finalScore,true);
-        }
-
-        for( Arc(_,to,ch,_,w) <- auto.edgesFrom(state)) {
-          val newDeriv = if(ch == auto.inAlpha.epsilon) str else (str.clone() += ch)
-          val newWeight = times(weight,w);
-          val newHeuristic = times(newWeight,heuristics(to));
-          pq += Derivation(newDeriv,to,newWeight,newHeuristic,false);
-        }
-      } else {
-        //println("emit");
+      val deriv = relax(auto,pq,heuristics);
+      if(deriv.atFinal) {
         kbest += ((deriv.str,deriv.weight));
       }
     }
 
     kbest
+  }
+
+  private def initialPQ[W:Ordering,State,T](auto: Automaton[W,State,T],heuristics: Map[State,W]) = {
+    import auto.ring._;
+    val pq = new PriorityQueue[Derivation[W,State,T]];
+    for( (state,w) <- auto.initialStateWeights) {
+      pq += Derivation(ArrayBuffer.empty,state,w,times(w,heuristics(state)),false);
+    }
+
+    pq
+
+  }
+
+  // Pops the top derivation off and adds any descendents to the queue, returns that derivation
+  private def relax[W,S,T](auto: Automaton[W,S,T], pq: PriorityQueue[Derivation[W,S,T]], heuristics: Map[S,W]) = {
+    import auto.ring._;
+    val deriv@Derivation(str,state,weight,_,atFinal) = pq.dequeue;
+    if(!atFinal) {
+      val finalWeight = auto.finalWeight(state);
+      if(finalWeight != zero) {
+        val finalScore = times(weight,finalWeight);
+        pq += Derivation(str,state,finalScore,finalScore,true);
+      }
+
+      for( Arc(_,to,ch,_,w) <- auto.edgesFrom(state)) {
+        val newDeriv = if(ch == auto.inAlpha.epsilon) str else (str.clone() += ch)
+          val newWeight = times(weight,w);
+        val newHeuristic = times(newWeight,heuristics(to));
+        pq += Derivation(newDeriv,to,newWeight,newHeuristic,false);
+      }
+    } 
+
+    deriv;
   }
 }
 
