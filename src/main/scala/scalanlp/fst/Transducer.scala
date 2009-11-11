@@ -92,6 +92,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     def edgesMatching(s: State, out: Out, in: In) = outer.edgesMatching(s,in,out).map {
       case Arc(from,to,in,out,w) => Arc(from,to,out,in,w);
     }
+    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
   }
 
   /**
@@ -103,6 +104,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     def edgesMatching(a: State, trans: In) = outer.edgesMatching(a,trans, outer.outAlpha.sigma).map { 
       case Arc(from,to,in,out,w) => Arc(from,to,in,in,w)
     }
+    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
   }
 
   /**
@@ -114,6 +116,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     def edgesMatching(a: State, trans: Out) = outer.edgesMatching(a, outer.inAlpha.sigma, trans).map { 
       case Arc(from,to,in,out,w) => Arc(from,to,out,out,w)
     }
+    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
   }
 
   /**
@@ -123,6 +126,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,ring.times(f,v)) }
     def finalWeight(s: State) = outer.finalWeight(s);
     def edgesMatching(s: State, in:In, out: Out) = outer.edgesMatching(s,in,out);
+    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
   }
 
 
@@ -135,6 +139,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     def edgesMatching(s: State, in: In, out: Out) = outer.edgesMatching(s,in,out) map {
       case Arc(from,to,in,out,w) => Arc(from,to,in,out,f(w));
     }
+    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
   }
 
   /**
