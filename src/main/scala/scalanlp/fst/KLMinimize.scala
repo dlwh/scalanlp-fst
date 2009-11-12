@@ -127,39 +127,54 @@ object KLMinimize {
   }
 
   def computeKLDivergence[In,Out](p1: EquivalenceInfo[In,Out], p2: EquivalenceInfo[In,Out]) = {
-    val extraMass1 = p1.arcs.valuesIterator.toSeq.min/10;
-    val extraMass2 = p2.arcs.valuesIterator.toSeq.min/10;
-    val p1Total = logSum(p1.arcs.valuesIterator.toSeq);
-    val p2Total = logSum(p2.arcs.valuesIterator.toSeq);
+    // how much smoothing
+    val extraMass1 = try { p1.arcs.valuesIterator.toSeq.min/10 } catch { case _ => Math.log(1E-4) }
+    val extraMass2 = try { p2.arcs.valuesIterator.toSeq.min/10 } catch { case _ => Math.log(1E-4) };
+
+    // how much total mass is there
+    val p1Total = logSum(p1.finalWeight +: p1.arcs.valuesIterator.toSeq);
+    val p2Total = logSum(p2.finalWeight +: p2.arcs.valuesIterator.toSeq);
+
+    // smoothed total Mass
     val p1SmoothedTotal = logSum(logSum(p1.arcs.valuesIterator.toSeq),log(p1.arcs.size) +extraMass1);
     val p2SmoothedTotal = logSum(logSum(p2.arcs.valuesIterator.toSeq),log(p2.arcs.size)  + extraMass2);
 
-    def lp1Smooth(w1: Double) = {
+    def logProb1Smooth(w1: Double) = {
       logSum(w1,extraMass1) - p1SmoothedTotal;
     }
-    def lp2Smooth(w2: Double) = {
+    def logProb2Smooth(w2: Double) = {
       logSum(w2,extraMass2) - p2SmoothedTotal;
     }
-    def lp1(w1: Double) = {
+    def logProb1(w1: Double) = {
       w1 - p1Total;
     }
-    def lp2(w2: Double) = {
+    def logProb2(w2: Double) = {
       w2 - p2Total
     }
-    var kl = 0.0;
-    var smoothedKL = 0.0;
+
+    def logRatio(w1:Double, w2: Double) = {
+      logProb1(w1) - logProb2(w2);
+    }
+
+    def logRatioSmooth(w1:Double, w2: Double) = {
+      logProb1Smooth(w1) - logProb2Smooth(w2);
+    }
+
+    var kl = Math.exp(logProb1(p1.finalWeight)) * logRatio(p1.finalWeight,p2.finalWeight);
+    var smoothedKL = Math.exp(logProb1Smooth(p1.finalWeight)) * logRatioSmooth(p1.finalWeight,p2.finalWeight);
     for( (tuple,w1) <- p1.arcs;
       w2 = p2.arcs.getOrElse(tuple,-1.0/0.0)
     ) {
-      kl += Math.exp(lp1(w1)) * (lp1(w1) - lp2(w2));
-      smoothedKL += Math.exp(lp1Smooth(w1)) * (lp1Smooth(w1) - lp2Smooth(w2));
+      kl += Math.exp(logProb1(w1)) * (logProb1(w1) - logProb2(w2));
+      smoothedKL += Math.exp(logProb1Smooth(w1)) * (logProb1Smooth(w1) - logProb2Smooth(w2));
     }
 
+    println("LLL" + kl);
     (kl,smoothedKL);
   }
 
 
-  val ARBITRARY_CUTOFF = 1.0/0.0;
+  val ARBITRARY_CUTOFF = 3.0;
 
   def klMerge[State,In,Out](partitions: Seq[(EquivalenceInfo[In,Out],Set[State])]) = {
     val newPartitions = new ArrayBuffer[(EquivalenceInfo[In,Out],Set[State])];
@@ -177,7 +192,7 @@ object KLMinimize {
       }
 
       // either keep this partition or merge it with the other one.
-      if(score.isInfinite) {
+      if(score == ARBITRARY_CUTOFF) {
         newPartitions += part1;
       } else {
         val current = newPartitions(bestPartition);
