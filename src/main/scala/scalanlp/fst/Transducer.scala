@@ -269,6 +269,23 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
+  * Prints out a graph in DOT format showing only connectivity
+  */
+  def toConnectivityDot = {
+    def escape(s: String) = s.replaceAll("\"","\\\"");
+    val sb = new StringBuilder;
+    sb ++= "digraph C {\n";
+    
+    val connected = allEdges.map(a => (a.from,a.to)).toSet
+    for((s,to) <- connected) {
+	    sb ++= "    \"" + escape(s.toString) + "\"->\"" + escape(to.toString) +"\"\n";
+	  }
+    
+    sb ++= "}";
+    sb.toString;
+  }
+
+  /**
   * Prints out a graph in DOT format. Useful for visualization and inspection.
   */
   override def toString = {
@@ -557,7 +574,6 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       }
       // give myself all my selfloops
       r(from) = times(r(from),closure(selfLoopMass));
-      globalLog.log(DEBUG)((from,r(from),selfLoopMass));
 
       selfLoops(from) = closure(selfLoopMass);
 
