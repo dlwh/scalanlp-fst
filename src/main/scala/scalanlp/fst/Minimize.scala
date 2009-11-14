@@ -1,6 +1,7 @@
 package scalanlp.fst;
 
 import scala.collection.mutable.HashMap;
+import scala.collection.mutable.OpenHashMap;
 import scala.collection.mutable.ArrayBuffer;
 import scalanlp.collection.mutable.ArrayMap;
 
@@ -10,7 +11,7 @@ object Minimizer {
   // two states are potentially equivalent if they have the same follow set (nextStates)
   // and are equivalent if their final states are similar, and their individual
   // arcs have similar weights.
-  case class EquivalenceInfo[W,In,Out](val finalWeight: W, val arcs: HashMap[(Int,In,Out),W]);
+  case class EquivalenceInfo[W,In,Out](val finalWeight: W, val arcs: OpenHashMap[(Int,In,Out),W]);
 
   type Partition[W,State,In,Out] = (EquivalenceInfo[W,In,Out],Set[State]);
 
@@ -45,7 +46,7 @@ object Minimizer {
     def minimize = {
       // initialpartition:
       val partitions = new ArrayBuffer[Partition[W,State,In,Out]];
-      partitions ++= partition(trans.allStates,_ => 0);
+      partitions ++= partition(Set.empty ++ edgesByOrigin.keysIterator,_ => 0);
 
       val partitionOf:scala.collection.mutable.Map[State,Int] = trans.makeMap(-1);
       for( (partition,index) <- partitions.zipWithIndex;
@@ -139,7 +140,7 @@ object Minimizer {
     }
 
     private def aggregateArcs(arcs : Seq[Arc[W,State,In,Out]], destMapper: State=>Int) = {
-      val edgeMap = new HashMap[(Int,In,Out),W] {
+      val edgeMap = new OpenHashMap[(Int,In,Out),W](arcs.length * 2) {
         override def default(i: (Int,In,Out)) = ring.zero;
       }
       for( Arc(_,to,in,out,w) <- arcs) {

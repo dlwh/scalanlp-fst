@@ -547,17 +547,26 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     val selfLoops = makeMap[W](zero);
 
     val S = new collection.mutable.Queue[State]();
+    val visited = makeMap(0);
+    val enqueued = makeMap(false);
     for( (s,w) <- initialStateWeights if w != zero) {
       d(s) = w;
       r(s) = w;
       S += s;
+      enqueued(s) = true;
     }
 
     while(!S.isEmpty) {
       val from = S.head;
       S.dequeue();
+      enqueued(from) = false;
+
       extraW.clear();
       var selfLoopMass = zero;
+      if(visited(from) > 2) {
+        //globalLog(WARN)("Already visited state " + from + "! Cycle?!");
+      }
+      visited(from) += 1;
 
       // find all the self-loop mass, save everything else
       for( a@Arc(_,to,_,_,w) <- edgesFrom(from)) {
@@ -575,15 +584,16 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       val rFrom = r(from);
       r -= from;
       
-      for( (to,w) <- extraW if w != ring.zero) {
+      for( (to,w) <- extraW if w != zero) {
         val dt = d(to);
         val wRFrom = times(rFrom,w);
         val dt_p_wRFrom = plus(dt,wRFrom);
-        if(dt != dt_p_wRFrom) {
+        if( !closeTo(dt,dt_p_wRFrom) ) {
           r(to) = plus(r(to),wRFrom);
           d(to) = dt_p_wRFrom;
-          if(!S.contains(to)) {
+          if(!enqueued(to)) {
             S += to;
+            enqueued(to) = true
           }
         }
       }
@@ -687,7 +697,11 @@ object Transducer {
   /**
   * Creates a transducer with the given initial states, final states, and arcs.
   */
-  def transducer[W:Semiring,S,In:Alphabet,Out:Alphabet](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,In,Out]*): Transducer[W,S,In,Out] = {
+  def transducer
+      [W:Semiring,S,In:Alphabet,Out:Alphabet]
+      (initialStates: Map[S,W], finalWeights: Map[S,W])
+      (arcs: Arc[W,S,In,Out]*)
+      : Transducer[W,S,In,Out] = {
     val arcMap = arcs.groupBy(_.from);
     new Transducer[W,S,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
       override def allEdgesByOrigin = arcMap;

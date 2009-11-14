@@ -90,7 +90,7 @@ object Semiring {
       def times(t1: Double, t2: Double) = t1 + t2;
       val one = 0.0;
       val zero = Math.NEG_INF_DOUBLE;
-      override def closeTo(x: Double, y: Double) = Math.abs( (x-y)/x)  < 1E-6;
+      override def closeTo(x: Double, y: Double) = Math.abs( (x-y)/x)  < 1E-8;
       /**
       * p =&gt; 1/(1-p)
       * becomes
