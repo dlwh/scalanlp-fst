@@ -3,8 +3,6 @@ package scalanlp.fst;
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.FunSuite
 import org.scalatest.prop._;
-import org.scalacheck.Prop._;
-import org.scalacheck.Arbitrary._;
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.Before
@@ -18,7 +16,7 @@ import scala.collection.mutable.PriorityQueue;
 
 
 @RunWith(classOf[JUnitRunner])
-class DecayAutomatonTest extends FunSuite with Checkers {
+class DecayAutomatonTest extends FunSuite {
   import Transducer._;
   test("da has cost 0") {
     import scalanlp.math.Semiring.LogSpace._;

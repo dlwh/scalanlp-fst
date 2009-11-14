@@ -2,9 +2,6 @@ package scalanlp.fst;
 
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.FunSuite
-import org.scalatest.prop._;
-import org.scalacheck.Prop._;
-import org.scalacheck.Arbitrary._;
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.Before
@@ -17,7 +14,7 @@ import scala.collection.mutable.PriorityQueue;
 
 
 @RunWith(classOf[JUnitRunner])
-class MinimizeTest extends FunSuite with Checkers {
+class MinimizeTest extends FunSuite {
   import Transducer._;
 
   test("Mohri hwa fig12d minimization") {
