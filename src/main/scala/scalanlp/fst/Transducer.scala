@@ -74,7 +74,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   /**
   * Retyrns a map from states to all edges in the FST. Will expand all states.
   */
-  def allEdgesByOrigin = allEdges.groupBy(_.from);
+  def allEdgesByOrigin = allEdges.groupBy(_.from)
 
   def allStates = Set() ++ initialStateWeights.keysIterator ++ allEdges.iterator.map(_.to);
 
@@ -212,7 +212,9 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       val initialStateWeights: Map[(State,S,InboundEpsilon),W3] = for {
         (k1,w1) <- outer.initialStateWeights;
         (k2,w2) <-  that.initialStateWeights
-      } yield ((k1,k2,NoEps:InboundEpsilon),composeW(w1,w2));
+        w = composeW(w1,w2)
+        if w != sr.zero
+      } yield ((k1,k2,NoEps:InboundEpsilon),w);
       
       
       def finalWeight(s: (State,S,InboundEpsilon)) = composeW(outer.finalWeight(s._1),that.finalWeight(s._2));
