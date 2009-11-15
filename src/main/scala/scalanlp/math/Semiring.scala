@@ -77,13 +77,7 @@ object Semiring {
    * Provides access to the logspace algebra. The implicit is segregated because it conflicts with numericIsSemiring
    */
   object LogSpace {
-    def logSum(a : Double, b : Double) = {
-      import Math._;
-      if(a == NEG_INF_DOUBLE) b
-      else if (b == NEG_INF_DOUBLE) a
-      else if(a < b) b + java.lang.Math.log(1+exp(a-b))
-        else a + java.lang.Math.log(1+exp(b-a));    
-    }
+    import scalanlp.math.Numerics._;
     implicit val doubleIsLogSpace:WLDSemiring[Double] = new WLDSemiring[Double] {
       def plus(t1: Double, t2: Double) = logSum(t1,t2);
       def leftDivide(t1: Double, t2: Double) = t2 - t1;

@@ -19,7 +19,7 @@ object LogExpectedWeight {
 
 object ExpectationComposition {
   implicit val logExpectedWeightIsSemiring:Semiring[LogExpectedWeight] = new Semiring[LogExpectedWeight] {
-    import scalanlp.math.Semiring.LogSpace.logSum;
+    import scalanlp.math.Numerics.logSum;
     import scalanlp.math.Semiring.LogSpace.doubleIsLogSpace.{zero=>logZero,one=>logOne,closure=>logClosure};
     // scores are in log log space
     val one = LogExpectedWeight(logOne,logZero);
