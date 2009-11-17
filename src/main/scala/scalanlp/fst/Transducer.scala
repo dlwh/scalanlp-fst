@@ -453,30 +453,64 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     }
   }
 
-
   /**
-  * Computes the total value of all paths through the transducer.
-  * Assume the graph has no loops other than self loops.
+  * True iff the graph contains a non self-loop cycle
   */
-  lazy val cost = {
-    val costs = allPathDistances;
-    var cost = ring.zero;
-    for( (s,w) <- costs) {
-      cost = ring.plus(cost,ring.times(w,finalWeight(s)));
+  lazy val isCyclic = {
+    val WHITE = 0
+    val GREY = 1
+    val BLACK = 2
+    val visited = makeMap(WHITE);
+    var cyclic = false;
+    import scala.util.control.Breaks._;
+
+
+    def visit(p: State) {
+      assert(visited(p) != GREY);
+      visited(p) = GREY;
+      for ( Arc(_,q,_,_,_) <- edgesFrom(p) if q != p ) {
+        if(visited(q) == GREY) {
+          cyclic = true;
+          break;
+        } else if(visited(q) == WHITE) {
+          visit(q);
+        }
+      }
+      visited(p) = BLACK;
     }
-    cost;
+          
+
+    breakable {
+      for {
+        p <- initialStateWeights.keysIterator;
+        if visited(p) == WHITE
+      } {
+        visit(p);
+      }
+    }
+
+    cyclic;
   }
 
+
   /**
   * Computes the total value of all paths through the transducer.
+  * Automatically selects the algorithm based on cyclicity
   */
-  lazy val cyclicCost = {
+  lazy val cost = if(isCyclic) {
     val costs = allPairDistances;
     var cost = ring.zero;
     for( (from,initWeight) <- initialStateWeights;
          (to,pathWeight) <- costs(from)) {
       cost = ring.plus(cost,ring.times(initWeight,ring.times(pathWeight,finalWeight(to))));
 
+    }
+    cost;
+  } else {
+    val costs = allPathDistances;
+    var cost = ring.zero;
+    for( (s,w) <- costs) {
+      cost = ring.plus(cost,ring.times(w,finalWeight(s)));
     }
     cost;
   }
@@ -493,11 +527,12 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   * where n is the number of states. Works for any complete semiring.
   */
   def allPairDistances:Map[State,Map[State,W]] = {
-    val distances = makeMap(makeMap(ring.zero));
+    import ring._;
+    val distances = makeMap(makeMap(zero));
     val allStates = makeMap[State](null.asInstanceOf[State]); // XXX
     breadthFirstSearch { case Arc(from,to,_,_,w) =>
       val current = distances(from)(to);
-      distances(from)(to) = ring.plus(current,w);
+      distances(from)(to) = plus(current,w);
       allStates(from) = from;
       allStates(to) = to;
     }
@@ -507,29 +542,33 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     } {
       // cache some commonly used values
       val dkk = distances(k)(k);
-      val dkkStar = ring.closure(dkk);
+      val dkkStar = closure(dkk);
 
       for {
-        i <- allStates.keysIterator if i != k;
-        j <- allStates.keysIterator if j != k
+        (j,dkj) <- distances(k).iterator
+        if j != k && dkj != zero
+        i <- allStates.keysIterator
+        if i != k
+        dik = distances(i)(k)
+        if dik != zero
       } {
         val current = distances(i)(j);
-        val pathsThroughK = ring.times(distances(i)(k),ring.times(dkkStar,distances(k)(j)));
-        distances(i)(j) = ring.plus(current,pathsThroughK);
+        val pathsThroughK = times(dik,times(dkkStar,dkj));
+        distances(i)(j) = plus(current,pathsThroughK);
       }
 
       for { 
         i <- allStates.keysIterator if i != k
       } {
-        distances(k)(i) = ring.times(dkkStar,distances(k)(i));
-        distances(i)(k) = ring.times(distances(i)(k),dkkStar);
+        distances(k)(i) = times(dkkStar,distances(k)(i));
+        distances(i)(k) = times(distances(i)(k),dkkStar);
       }
       distances(k)(k) = dkkStar;
     }
 
     Map.empty ++ distances.map { case (from,map) => 
-      (from,Map.empty ++ map  withDefaultValue ring.zero)
-    } withDefaultValue (Map.empty.withDefaultValue(ring.zero)) 
+      (from,Map.empty ++ map  withDefaultValue zero)
+    } withDefaultValue (Map.empty.withDefaultValue(zero)) 
 
   }
 
