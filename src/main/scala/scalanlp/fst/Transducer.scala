@@ -350,7 +350,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   
-  protected final def breadthFirstSearch(func: Arc=>Unit) = {
+  protected[fst] final def breadthFirstSearch(func: Arc=>Unit) = {
     val visited = collection.mutable.Set[State]();
     val queue = new collection.mutable.Queue[State]();
     for(s <- initialStateWeights.keysIterator) {
@@ -498,7 +498,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   * Automatically selects the algorithm based on cyclicity
   */
   lazy val cost = if(isCyclic) {
-    val costs = allPairDistances;
+    val costs = Distance.allPairDistances(this);
     var cost = ring.zero;
     for( (from,initWeight) <- initialStateWeights;
          (to,pathWeight) <- costs(from)) {
@@ -507,7 +507,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     }
     cost;
   } else {
-    val costs = allPathDistances;
+    val costs = Distance.allPathDistances(this);
     var cost = ring.zero;
     for( (s,w) <- costs) {
       cost = ring.plus(cost,ring.times(w,finalWeight(s)));
@@ -519,131 +519,6 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     new collection.mutable.HashMap[State,T] {
       override def default(k: State) = getOrElseUpdate(k,dflt);
     }
-  }
-
-  /**
-  * Implements Gen-All-Pairs described in Mohri (2002).
-  * Finds all pair-wise distances between all points in O(n^3),
-  * where n is the number of states. Works for any complete semiring.
-  */
-  def allPairDistances:Map[State,Map[State,W]] = {
-    import ring._;
-    val distances = makeMap(makeMap(zero));
-    val allStates = makeMap[State](null.asInstanceOf[State]); // XXX
-    breadthFirstSearch { case Arc(from,to,_,_,w) =>
-      val current = distances(from)(to);
-      distances(from)(to) = plus(current,w);
-      allStates(from) = from;
-      allStates(to) = to;
-    }
-    
-    for {
-      k <- allStates.keysIterator
-    } {
-      // cache some commonly used values
-      val dkk = distances(k)(k);
-      val dkkStar = closure(dkk);
-
-      for {
-        (j,dkj) <- distances(k).iterator
-        if j != k && dkj != zero
-        i <- allStates.keysIterator
-        if i != k
-        dik = distances(i)(k)
-        if dik != zero
-      } {
-        val current = distances(i)(j);
-        val pathsThroughK = times(dik,times(dkkStar,dkj));
-        distances(i)(j) = plus(current,pathsThroughK);
-      }
-
-      for (i <- allStates.keysIterator if i != k) {
-        distances(k)(i) = times(dkkStar,distances(k)(i));
-        distances(i)(k) = times(distances(i)(k),dkkStar);
-      }
-      distances(k)(k) = dkkStar;
-    }
-
-    Map.empty ++ distances.map { case (from,map) => 
-      (from,Map.empty ++ map  withDefaultValue zero)
-    } withDefaultValue (Map.empty.withDefaultValue(zero)) 
-
-  }
-
-  /**
-  * Implements Generic-Single-Source-Shortest-Distance described
-  * in Mohri (2002), with extra support for doing closure operations
-  * on selfloops. Only works for acyclic graphs, k-closed semirings,
-  * or graphs that are acyclic except for selfloops.
-  *
-  * Returns State --&gt; distance to that state from the start
-  */
-  def allPathDistances:Map[State,W] = {
-    import ring._
-    val d = makeMap[W](zero);
-    val r = makeMap[W](zero);
-    val extraW = makeMap[W](zero);
-    val selfLoops = makeMap[W](zero);
-
-    val S = new collection.mutable.Queue[State]();
-    val visited = makeMap(0);
-    val enqueued = makeMap(false);
-    for( (s,w) <- initialStateWeights if w != zero) {
-      d(s) = w;
-      r(s) = w;
-      S += s;
-      enqueued(s) = true;
-    }
-
-    while(!S.isEmpty) {
-      val from = S.head;
-      S.dequeue();
-      enqueued(from) = false;
-
-      extraW.clear();
-      var selfLoopMass = zero;
-      if(visited(from) > 2) {
-        //globalLog(WARN)("Already visited state " + from + "! Cycle?!");
-      }
-      visited(from) += 1;
-
-      // find all the self-loop mass, save everything else
-      for( a@Arc(_,to,_,_,w) <- edgesFrom(from)) {
-        if(from == to) {
-          selfLoopMass = plus(selfLoopMass,w);
-        } else {
-          extraW(to) = plus(extraW(to),w);
-        }
-      }
-      // give myself all my selfloops
-      r(from) = times(r(from),closure(selfLoopMass));
-
-      selfLoops(from) = closure(selfLoopMass);
-
-      val rFrom = r(from);
-      r -= from;
-      
-      for( (to,w) <- extraW if w != zero) {
-        val dt = d(to);
-        val wRFrom = times(rFrom,w);
-        val dt_p_wRFrom = plus(dt,wRFrom);
-        if( !closeTo(dt,dt_p_wRFrom) ) {
-          r(to) = plus(r(to),wRFrom);
-          d(to) = dt_p_wRFrom;
-          if(!enqueued(to)) {
-            S += to;
-            enqueued(to) = true
-          }
-        }
-      }
-    }
-
-    for(  (s,mass) <- selfLoops if mass != zero) {
-      d(s) = times(d(s),mass);
-    }
-
-
-    Map.empty ++ d;
   }
 
   def reverse: Transducer[W,State,In,Out] = {
@@ -669,7 +544,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
 
     val rev = reverse;
     globalLog.log(DEBUG)("rev" + rev);
-    val costs = rev.allPathDistances; // \sum_{state q in final} weight(path(p,q))
+    val costs = Distance.allPathDistances(rev); // \sum_{state q in final} weight(path(p,q))
     globalLog.log(DEBUG)("rev costs" + costs);
     val initWeights = initialStateWeights map { case (k,v) => (k,times(v,costs(k))) }
     val finalWeights = for( (s,w) <- rev.initialStateWeights;

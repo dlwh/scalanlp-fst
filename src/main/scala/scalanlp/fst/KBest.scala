@@ -5,12 +5,15 @@ import scala.collection.mutable.ArrayBuffer;
 
 import scalanlp.math._;
 
-object KBest {
+trait KBest {
   case class Derivation[W,State,T](str: ArrayBuffer[T], state: State, weight: W,  heuristic: W, atFinal: Boolean);
   implicit def orderDeriv[W:Ordering,State,T] = Ordering[W].on[Derivation[W,State,T]](_.heuristic);
 
+  protected def computeHeuristics[W:Semiring,State,T](auto: Automaton[W,State,T]): (State=>W);
+
   def extract[W:Ordering,State,T](auto: Automaton[W,State,T]):Iterator[(Seq[T],W)] = {
-    val heuristics = auto.reverse.allPathDistances;
+    import auto.ring; // XXX
+    val heuristics = computeHeuristics(auto)(auto.ring);
 
     val pq = initialPQ(auto,heuristics);
 
@@ -34,7 +37,7 @@ object KBest {
 
   def extractList[W:Ordering,State,T](auto: Automaton[W,State,T], num: Int):Seq[(Seq[T],W)] = {
     import auto.ring._;
-    val heuristics = auto.reverse.allPathDistances;
+    val heuristics = computeHeuristics(auto)(auto.ring);
 
     val pq = initialPQ(auto,heuristics);
     val kbest = new ArrayBuffer[(Seq[T],W)];
@@ -50,7 +53,7 @@ object KBest {
     kbest
   }
 
-  private def initialPQ[W:Ordering,State,T](auto: Automaton[W,State,T],heuristics: Map[State,W]) = {
+  private def initialPQ[W:Ordering,State,T](auto: Automaton[W,State,T],heuristics: State=>W) = {
     import auto.ring._;
     val pq = new PriorityQueue[Derivation[W,State,T]];
     for( (state,w) <- auto.initialStateWeights) {
@@ -62,7 +65,7 @@ object KBest {
   }
 
   // Pops the top derivation off and adds any descendents to the queue, returns that derivation
-  private def relax[W,S,T](auto: Automaton[W,S,T], pq: PriorityQueue[Derivation[W,S,T]], heuristics: Map[S,W]) = {
+  private def relax[W,S,T](auto: Automaton[W,S,T], pq: PriorityQueue[Derivation[W,S,T]], heuristics: S=>W) = {
     import auto.ring._;
     val deriv@Derivation(str,state,weight,_,atFinal) = pq.dequeue;
     if(!atFinal) {
@@ -84,3 +87,15 @@ object KBest {
   }
 }
 
+object KBest extends KBest {
+
+  override protected def computeHeuristics[W:Semiring,State,T](auto: Automaton[W,State,T]) = {
+    Distance.allPathDistances(auto.reverse);
+  }
+}
+
+object UniformCostKBest extends KBest {
+  override protected def computeHeuristics[W:Semiring,State,T](auto: Automaton[W,State,T]) = {
+    { (s: State) => implicitly[Semiring[W]].zero }
+  }
+}
