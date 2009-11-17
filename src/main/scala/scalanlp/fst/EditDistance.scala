@@ -70,8 +70,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
 
   override def allEdges:Seq[Arc] = (edgesMatching(0,inAlpha.sigma,outAlpha.sigma)).toSeq;
 
-  def edgesMatching(s: Int, a: Char, b: Char) = {
-
+  def edgesMatching(s: Int, a: Char, b: Char) = if(s != 0) Iterator.empty else {
     if(a == Sigma && b == Sigma) {
       for {
         a <- allChars.iterator;
