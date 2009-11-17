@@ -557,9 +557,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
         distances(i)(j) = plus(current,pathsThroughK);
       }
 
-      for { 
-        i <- allStates.keysIterator if i != k
-      } {
+      for (i <- allStates.keysIterator if i != k) {
         distances(k)(i) = times(dkkStar,distances(k)(i));
         distances(i)(k) = times(distances(i)(k),dkkStar);
       }
