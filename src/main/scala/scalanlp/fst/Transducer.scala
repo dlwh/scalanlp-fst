@@ -351,7 +351,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
 
   
   protected[fst] final def breadthFirstSearch(func: Arc=>Unit) = {
-    val visited = collection.mutable.Set[State]();
+    val visited = makeMap(false);
     val queue = new collection.mutable.Queue[State]();
     for(s <- initialStateWeights.keysIterator) {
       queue += s;
@@ -366,7 +366,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
             queue += to; 
           }
         }
-        visited += s;
+        visited(s) = true;
       }
     }
   }
@@ -392,8 +392,6 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       (seqArcs,newStateMap)
     }
     
-    println("XXX States: "+ _nextIndex + " Arcs: " + arcs.length);
-
     val myFinalWeights = IntMap(stateToU.iterator.map { case (s,u) =>
       (u, outer.finalWeight(s));
     }.toSeq:_*);
@@ -497,7 +495,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   * Computes the total value of all paths through the transducer.
   * Automatically selects the algorithm based on cyclicity
   */
-  lazy val cost = if(isCyclic) {
+  lazy val cost = if(false) { //if(isCyclic) {
     val costs = Distance.allPairDistances(this);
     var cost = ring.zero;
     for( (from,initWeight) <- initialStateWeights;
@@ -507,7 +505,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     }
     cost;
   } else {
-    val costs = Distance.allPathDistances(this);
+    val costs = Distance.singleSourceShortestDistances(this);
     var cost = ring.zero;
     for( (s,w) <- costs) {
       cost = ring.plus(cost,ring.times(w,finalWeight(s)));

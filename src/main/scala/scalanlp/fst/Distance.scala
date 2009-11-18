@@ -122,7 +122,7 @@ object Distance {
       allStates(from) = from;
       allStates(to) = to;
     }
-    
+
     for {
       k <- allStates.keysIterator
     } {

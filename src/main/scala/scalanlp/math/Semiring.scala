@@ -91,7 +91,9 @@ object Semiring {
       * t =&lt; log(1/(1-exp(t))) = -log(1-exp(t));
       */ 
       def closure(t: Double) = {
-        -Math.log(1 - Math.exp(t));
+        val t_* = -Math.log(1 - Math.exp(t));
+        assert(!t_*.isNaN,t + " gives NaN!");
+        t_*
       }
     }
   }
