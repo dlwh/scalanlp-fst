@@ -74,7 +74,11 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   /**
   * Retyrns a map from states to all edges in the FST. Will expand all states.
   */
-  def allEdgesByOrigin = allEdges.groupBy(_.from)
+  def allEdgesByOrigin = {
+    val m = allEdges.groupBy(_.from) 
+    val statesWithoutEdges = for( (s,_) <- finalStateWeights if !m.contains(s)) yield (s,Seq.empty);
+    m ++ statesWithoutEdges;
+  }
 
   def allStates = Set() ++ initialStateWeights.keysIterator ++ allEdges.iterator.map(_.to);
 
@@ -575,6 +579,9 @@ object Transducer {
       override def defValue = Seq.empty;
     }
     map ++= arcMap;
+    for( (s,_) <- finalWeights.iterator if !map.contains(s)) {
+      map(s) = Seq.empty;
+    }
     
     new Transducer[W,Int,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
       override def allEdgesByOrigin = map;
@@ -614,17 +621,16 @@ object Transducer {
       (initialStates: Map[S,W], finalWeights: Map[S,W])
       (arcs: Arc[W,S,In,Out]*)
       : Transducer[W,S,In,Out] = {
-    val arcMap = arcs.groupBy(_.from);
     new Transducer[W,S,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
-      override def allEdgesByOrigin = arcMap;
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
       override val finalStateWeights = finalWeights;
+      override val allEdgesByOrigin = super.allEdgesByOrigin;
       def edgesMatching(s: S, in: In, out: Out) = {
         if(in == inAlpha.sigma && out == outAlpha.sigma) {
-          arcMap.getOrElse(s,Seq.empty) iterator
+          allEdgesByOrigin.getOrElse(s,Seq.empty) iterator
         } else {
-          arcMap.getOrElse(s,Seq.empty).iterator filter { arc =>
+          allEdgesByOrigin.getOrElse(s,Seq.empty).iterator filter { arc =>
             (in == inAlpha.sigma || in == arc.in) && (out == outAlpha.sigma || out == arc.out)
           };
         }
