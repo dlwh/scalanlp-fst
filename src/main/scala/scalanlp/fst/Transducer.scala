@@ -137,11 +137,11 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   /**
   * Transforms the weights but otherwise returns the same automata.
   */
-  def reweight[W2:Semiring](f: W=>W2): Transducer[W2,State,In,Out] = new Transducer[W2,State,In,Out]()(implicitly[Semiring[W2]], inAlpha, outAlpha) {
-    val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,f(v))}
-    def finalWeight(s: State) = f(outer.finalWeight(s));
+  def reweight[W2:Semiring](f: Arc=>W2, initReweight: W=>W2): Transducer[W2,State,In,Out] = new Transducer[W2,State,In,Out]()(implicitly[Semiring[W2]], inAlpha, outAlpha) {
+    val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,initReweight(v))}
+    def finalWeight(s: State) = initReweight(outer.finalWeight(s));
     def edgesMatching(s: State, in: In, out: Out) = outer.edgesMatching(s,in,out) map {
-      case Arc(from,to,in,out,w) => Arc(from,to,in,out,f(w));
+      case a@Arc(from,to,in,out,w) => Arc(from,to,in,out,f(a));
     }
     protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
   }

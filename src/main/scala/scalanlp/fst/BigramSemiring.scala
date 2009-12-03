@@ -3,16 +3,15 @@ package scalanlp.fst;
 import scalanlp.math._;
 import Numerics.logSum;
 import scalala.Scalala._;
+import scala.collection.mutable._;
 import scalanlp.counters.LogCounters._;
 
 object BigramSemiring {
   case class Elem(counts: LogDoubleCounter[Seq[Char]], totalProb: Double, active: LogDoubleCounter[Char]) {
-    println("yields" + this)
   }
 
   implicit val ring: Semiring[Elem] = new Semiring[Elem] {
     def plus(x: Elem, y: Elem) = {
-      println(x + " + " + y);
       val newProb = logSum(x.totalProb,y.totalProb);
       val newCounts = x.counts.copy;
       for( (k,v) <- y.counts) {
@@ -28,7 +27,6 @@ object BigramSemiring {
     }
 
     def times(x: Elem, y: Elem) = {
-      println(x + " * " + y);
       val newProb = x.totalProb + y.totalProb;
       val newCounts = (x.counts + y.totalProb).value;
       for( (k,v) <- y.counts) {
@@ -37,7 +35,7 @@ object BigramSemiring {
 
       for((xc,xprob) <- x.active; 
           (yc,yprob) <- y.active) {
-        val s = Seq(xc,yc)
+        val s = ArrayBuffer(xc,yc)
         newCounts(s) = logSum(newCounts(s),xprob + yprob); 
       }
            
@@ -52,13 +50,12 @@ object BigramSemiring {
     }
 
     def closure(x: Elem) = {
-      println(x + "*");
       import Semiring.LogSpace.doubleIsLogSpace.{closure=>logClosure};
       val p_* = logClosure(x.totalProb);
       val newCounts = x.counts.copy;
       for((x1,p1) <- x.active;
           (x2,p2) <- x.active) {
-        val s = Seq(x1,x2)
+        val s = ArrayBuffer(x1,x2)
         newCounts(s) = logSum(newCounts(s),p1+p2);
       }
       
@@ -72,7 +69,7 @@ object BigramSemiring {
   def promote[S](a: Arc[Double,S,Char,Char]) = {
     assert(a.in == a.out);
     val counts = LogDoubleCounter[Seq[Char]]();
-    counts(Seq(a.in)) = 0.0;
+    counts(ArrayBuffer(a.in)) = 0.0;
     val active = LogDoubleCounter[Char]();
     active(a.in) = a.weight;
     Elem(counts,a.weight,active);
