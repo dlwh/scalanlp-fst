@@ -39,8 +39,9 @@ object Semiring {
       def closure(t: Double) = {
         if(t < 1 && t >= 0) 1 / (1-t);
         else if(t < 0) error("Closure arg must be in [0,1), not "  +t);
-        else Math.POS_INF_DOUBLE;
+        else Double.PositiveInfinity;
       }
+      override def closeTo(x: Double, y: Double) = Math.abs( (x-y)/x)  < 1E-8;
       val one = 1.0;
       val zero = 0.0;
     }
@@ -49,14 +50,12 @@ object Semiring {
   implicit val doubleIsDivSemiring = new DoubleSemi;
   
   class DoubleSemi extends WLDSemiring[Double] {
-    private val ops = implicitly[Fractional[Double]];
-    import ops._;
     def plus(t1: Double, t2: Double) = t1 + t2;
     def times(t1: Double, t2: Double) = t1 * t2;
     def leftDivide(t1: Double, t2: Double) = t2 / t1;
-    def closure(t: Double) = if(t >= 1) Math.POS_INF_DOUBLE else 1/(1-t);
-    val one = ops.one;
-    val zero = ops.zero;
+    def closure(t: Double) = if(t >= 1) Double.PositiveInfinity else 1/(1-t);
+    val one = 1.0
+    val zero = 0.0;
   }
 
   /**
@@ -67,9 +66,9 @@ object Semiring {
       def plus(t1: Double, t2: Double) = t1 min t2;
       def leftDivide(t1: Double, t2: Double) = t2 - t1;
       def times(t1: Double, t2: Double) = t1 + t2;
-      def closure(t: Double) = if(t >= 0.0) 0.0 else Math.NEG_INF_DOUBLE;
+      def closure(t: Double) = if(t >= 0.0) 0.0 else Double.NegativeInfinity;
       val one = 0.0;
-      val zero = Math.POS_INF_DOUBLE;
+      val zero = Double.PositiveInfinity;
     }
   }
   
@@ -83,7 +82,7 @@ object Semiring {
       def leftDivide(t1: Double, t2: Double) = t2 - t1;
       def times(t1: Double, t2: Double) = t1 + t2;
       val one = 0.0;
-      val zero = Math.NEG_INF_DOUBLE;
+      val zero = Double.NegativeInfinity;
       override def closeTo(x: Double, y: Double) = Math.abs( (x-y)/x)  < 1E-8;
       /**
       * p =&gt; 1/(1-p)

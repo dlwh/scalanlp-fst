@@ -28,6 +28,21 @@ class BigramSemiringTest extends FunSuite {
     assert(plus(zero,one) === one)
   }
 
+  test("zero* == 1") {
+    assert(closure(zero) == one);
+  }
+
+  test("simple* works") {
+    import Math.log;
+    val w = promoteOnlyWeight(log(1/2.));
+    val cl = closure(w);
+    assert(cl.totalProb == log(2.0));
+    assert(cl.active('#') == log(2.0));
+    // closure * (1/2 * 1/2) * closure again
+    assert(cl.counts('#','#') === 0.0);
+  }
+
+
   test("constant automaton") {
     import Automaton._;
     import Semiring.LogSpace.doubleIsLogSpace;
@@ -35,15 +50,15 @@ class BigramSemiringTest extends FunSuite {
     val auto = constant("Hello",0.0).reweight(promote[Int] _ , promoteOnlyWeight _);
     val counts = auto.cost.counts;
 
-    assert( counts(ArrayBuffer('#', 'H')) === 0.0);
-    assert( counts(ArrayBuffer('H', 'e')) === 0.0);
-    assert( counts(ArrayBuffer('l', 'l')) === 0.0);
-    assert( counts(ArrayBuffer('l', 'o')) === 0.0);
-    assert( counts(ArrayBuffer('o', '#')) === 0.0);
-    assert( counts(ArrayBuffer('o')) === 0.0);
-    assert((counts(ArrayBuffer('l')) - 0.6931471805599453).abs < 1E-6, counts(ArrayBuffer('l')));
-    assert( counts(ArrayBuffer('e')) === 0.0);
-    assert( counts(ArrayBuffer('H')) === 0.0);
+    assert( counts('#', 'H') === 0.0);
+    assert( counts('H', 'e') === 0.0);
+    assert( counts('l', 'l') === 0.0);
+    assert( counts('l', 'o') === 0.0);
+    assert( counts('o', '#') === 0.0);
+    assert( counts('o').logTotal === 0.0);
+    assert( (counts('l').logTotal - 0.6931471805599453).abs < 1E-6, counts('l'));
+    assert( counts('e').logTotal === 0.0);
+    assert( counts('H').logTotal === 0.0);
   }
 
   test("split automaton") {
@@ -57,14 +72,14 @@ class BigramSemiringTest extends FunSuite {
     val auto = Minimizer.minimize(auto1|auto2).reweight(promote[Int] _ , promoteOnlyWeight _);
     val counts = auto.cost.counts;
 
-    assert( counts(ArrayBuffer('#', 'H')) === logSum(0.0,0.0));
-    assert( counts(ArrayBuffer('#', '#')) === Double.NegativeInfinity);
-    assert( counts(ArrayBuffer('H', 'e')) === logSum(0.0,0.0));
-    assert( counts(ArrayBuffer('l', 'l')) === 0.0);
-    assert( counts(ArrayBuffer('m', 'o')) === 0.0);
-    assert( counts(ArrayBuffer('o')) === logSum(0.0,0.0));
-    assert((counts(ArrayBuffer('l')) - 0.6931471805599453).abs < 1E-6, counts(ArrayBuffer('l')));
-    assert( counts(ArrayBuffer('H')) === logSum(0.0,0.0));
+    assert( counts('#', 'H') === logSum(0.0,0.0));
+    assert( counts('#', '#') === Double.NegativeInfinity);
+    assert( counts('H', 'e') === logSum(0.0,0.0));
+    assert( counts('l', 'l') === 0.0);
+    assert( counts('m', 'o') === 0.0);
+    assert( counts('o').logTotal === logSum(0.0,0.0));
+    assert((counts('l').logTotal - 0.6931471805599453).abs < 1E-6, counts('l'));
+    assert( counts('H').logTotal === logSum(0.0,0.0));
   }
 
   

@@ -60,7 +60,7 @@ object ExpectationComposition {
     }
     def plus(x: LogExpectedWeight, y: LogExpectedWeight) = {
       import Math._;
-      val prob = x.prob + y.prob;
+      val prob = logSum(x.prob,y.prob);
       val score = signedAdd(x.score,x.sign,y.score,y.sign);
       val sign  = signOfAdd(x.score,x.sign,y.score,y.sign);
       assert(!score.isNaN,"summing" + x + y);
