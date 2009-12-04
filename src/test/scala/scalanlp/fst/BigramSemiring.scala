@@ -29,7 +29,7 @@ class BigramSemiringTest extends FunSuite {
   }
 
   test("zero* == 1") {
-    assert(closure(zero) == one);
+    assert(closure(zero) === one);
   }
 
   test("simple* works") {
@@ -37,7 +37,6 @@ class BigramSemiringTest extends FunSuite {
     val w = promoteOnlyWeight(log(1/2.));
     val cl = closure(w);
     assert(cl.totalProb == log(2.0));
-    assert(cl.active('#') == log(2.0));
     // closure * (1/2 * 1/2) * closure again
     assert(cl.counts('#','#') === 0.0);
   }
