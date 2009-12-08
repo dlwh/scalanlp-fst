@@ -38,7 +38,7 @@ class TrigramSemiringTest extends FunSuite {
     val cl = closure(w);
     assert(cl.totalProb == log(2.0));
     // closure * (1/2 * 1/2) * closure again
-    assert(cl.counts(Unigram('#'),'#') === 0.0);
+    assert(cl.counts(beginningUnigram,encode('#','#')) === 0.0);
   }
 
 
@@ -49,18 +49,18 @@ class TrigramSemiringTest extends FunSuite {
     val auto = constant("Hello",0.0).reweight(promote[Int] _ , promoteOnlyWeight _);
     val counts = auto.cost.counts;
 
-    assert( counts(Unigram('#'), 'H') === 0.0);
-    assert( counts(Unigram('H'), 'e') === 0.0);
-    assert( counts(Unigram('l'), 'l') === 0.0);
-    assert( counts(Unigram('l'), 'o') === 0.0);
-    assert( counts(Unigram('o'), '#') === 0.0);
+    assert( counts(Unigram('#'), encodeOne('H')) === 0.0);
+    assert( counts(Unigram('H'), encodeOne('e')) === 0.0);
+    assert( counts(Unigram('l'), encodeOne('l')) === 0.0);
+    assert( counts(Unigram('l'), encodeOne('o')) === 0.0);
+    assert( counts(Unigram('o'), encodeOne('#')) === 0.0);
     assert( counts(Unigram('o')).logTotal === 0.0);
     assert( (counts(Unigram('l')).logTotal - 0.6931471805599453).abs < 1E-6, counts(Unigram('l')));
     assert( counts(Unigram('e')).logTotal === 0.0);
     assert( counts(Unigram('H')).logTotal === 0.0);
-    assert( counts(Bigram('#','H'), 'e') === 0.0);
-    assert( counts(Bigram('H','e'), 'l') === 0.0);
-    assert( counts(Bigram('l','o'), '#') === 0.0);
+    assert( counts(Bigram('#','H'), encodeOne('e')) === 0.0);
+    assert( counts(Bigram('H','e'), encodeOne('l')) === 0.0);
+    assert( counts(Bigram('l','o'), encodeOne('#')) === 0.0);
   }
 
   test("split automaton") {
@@ -74,17 +74,17 @@ class TrigramSemiringTest extends FunSuite {
     val auto = Minimizer.minimize(auto1|auto2).reweight(promote[Int] _ , promoteOnlyWeight _);
     val counts = auto.cost.counts;
 
-    assert( counts(Unigram('#'), 'H') === logSum(0.0,0.0));
-    assert( counts(Unigram('#'), '#') === Double.NegativeInfinity);
-    assert( counts(Unigram('H'), 'e') === logSum(0.0,0.0));
-    assert( counts(Unigram('l'), 'l') === 0.0);
-    assert( counts(Unigram('m'), 'o') === 0.0);
+    assert( counts(Unigram('#'), encodeOne('H')) === logSum(0.0,0.0));
+    assert( counts(Unigram('#'), encodeOne('#')) === Double.NegativeInfinity);
+    assert( counts(Unigram('H'), encodeOne('e')) === logSum(0.0,0.0));
+    assert( counts(Unigram('l'), encodeOne('l')) === 0.0);
+    assert( counts(Unigram('m'), encodeOne('o')) === 0.0);
     assert( counts(Unigram('o')).logTotal === logSum(0.0,0.0));
     assert((counts(Unigram('l')).logTotal - 0.6931471805599453).abs < 1E-6, counts(Unigram('l')));
     assert( counts(Unigram('H')).logTotal === logSum(0.0,0.0));
-    assert( counts(Bigram('#','H'), 'e') === logSum(0.0,0.0));
-    assert( counts(Bigram('H','e'), 'l') === 0.0);
-    assert( counts(Bigram('l','o'), '#') === 0.0);
+    assert( counts(Bigram('#','H'), encodeOne('e')) === logSum(0.0,0.0));
+    assert( counts(Bigram('H','e'), encodeOne('l')) === 0.0);
+    assert( counts(Bigram('l','o'), encodeOne('#')) === 0.0);
   }
 
   
