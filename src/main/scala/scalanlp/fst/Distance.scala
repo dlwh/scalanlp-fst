@@ -33,14 +33,15 @@ object Distance {
   * for acyclic graphs, k-closed semirings, or grahs that are acyclic except
   * for self-loops
   */
-  def singleSourceShortestDistances[W:Semiring,State,In,Out](fst: Transducer[W,State,In,Out]) = {
+  def singleSourceShortestDistances[W:Semiring,State,In,Out](fst: Transducer[W,State,In,Out]):Map[State,W] = {
     val ring = implicitly[Semiring[W]];
     import ring._;
+
+    val (distances,allStates) = neighborDistances(fst);
     import fst._;
 
     val d = makeMap[W](zero);
     val r = makeMap[W](zero);
-    val extraW = makeMap[W](zero);
     val selfLoops = makeMap[W](zero);
 
     val S = new collection.mutable.Queue[State]();
@@ -58,30 +59,23 @@ object Distance {
       S.dequeue();
       enqueued(from) = false;
 
-      extraW.clear();
-      var selfLoopMass = zero;
       if(visited(from) > 2) {
-        //globalLog(WARN)("Already visited state " + from + "! Cycle?!");
+        import scalanlp.util.Log._;
+        globalLog(WARN)("Already visited state " + from + "! Cycle?!");
       }
       visited(from) += 1;
 
-      // find all the self-loop mass, save everything else
-      for( a@Arc(_,to,_,_,w) <- edgesFrom(from)) {
-        if(from == to) {
-          selfLoopMass = plus(selfLoopMass,w);
-        } else {
-          extraW(to) = plus(extraW(to),w);
-        }
+      if(visited(from) == 1) {
+        selfLoops(from) = closure(distances(from)(from));
       }
-      // give myself all my selfloops
-      r(from) = times(r(from),closure(selfLoopMass));
+      val dkk_star = selfLoops(from);
 
-      selfLoops(from) = closure(selfLoopMass);
+      r(from) = times(r(from),dkk_star);
 
       val rFrom = r(from);
       r -= from;
       
-      for( (to,w) <- extraW if w != zero) {
+      for( (to,w) <- distances(from) if w != zero && from != to) {
         val dt = d(to);
         val wRFrom = times(rFrom,w);
         val dt_p_wRFrom = plus(dt,wRFrom);
@@ -104,16 +98,15 @@ object Distance {
     Map.empty ++ d;
   }
 
-  /**
-  * Implements Gen-All-Pairs described in Mohri (2002).
-  * Finds all pair-wise distances between all points in O(n^3),
-  * where n is the number of states. Works for any complete semiring.
+  /*
+  * Returns the distances between individual pairs of states using
+  * only one hop
   */
-  def allPairDistances[W:Semiring,State,In,Out](fst: Transducer[W,State,In,Out]) = {
+  private def neighborDistances[W:Semiring,State,In,Out](fst: Transducer[W,State,In,Out]) = {
     val ring = implicitly[Semiring[W]];
     import ring._;
-
     import fst._;
+
     val distances = makeMap(makeMap(zero));
     val allStates = makeMap[State](null.asInstanceOf[State]); // XXX
     breadthFirstSearch { case Arc(from,to,_,_,w) =>
@@ -122,6 +115,21 @@ object Distance {
       allStates(from) = from;
       allStates(to) = to;
     }
+    (distances,allStates)
+  }
+
+  /**
+  * Implements Gen-All-Pairs described in Mohri (2002).
+  * Finds all pair-wise distances between all points in O(n^3),
+  * where n is the number of states. Works for any complete semiring.
+  */
+  def allPairDistances[W:Semiring,State,In,Out](fst: Transducer[W,State,In,Out]) = {
+    val ring = implicitly[Semiring[W]];
+    import ring._;
+    val (distances,allStates) = neighborDistances(fst);
+
+    import fst._;
+   
 
     for {
       k <- allStates.keysIterator
