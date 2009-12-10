@@ -38,7 +38,7 @@ class TrigramSemiringTest extends FunSuite {
     val cl = closure(w);
     assert(cl.totalProb == log(2.0));
     // closure * (1/2 * 1/2) * closure again
-    assert(cl.counts(beginningUnigram,encode('#','#')) === 0.0);
+    assert(cl.decode.apply(beginningUnigram,encode('#','#')) === 0.0);
   }
 
 
@@ -47,7 +47,9 @@ class TrigramSemiringTest extends FunSuite {
     import Semiring.LogSpace.doubleIsLogSpace;
 
     val auto = constant("Hello",0.0).reweight(promote[Int] _ , promoteOnlyWeight _);
-    val counts = auto.cost.counts;
+    val cost = auto.cost;
+    val counts = cost.decode;
+
 
     assert( counts(Unigram('#'), encodeOne('H')) === 0.0);
     assert( counts(Unigram('H'), encodeOne('e')) === 0.0);
@@ -72,7 +74,7 @@ class TrigramSemiringTest extends FunSuite {
     val auto1 = constant("Hello",0.0);
     val auto2 = constant("Hemmo",0.0)
     val auto = Minimizer.minimize(auto1|auto2).reweight(promote[Int] _ , promoteOnlyWeight _);
-    val counts = auto.cost.counts;
+    val counts = auto.cost.decode;
 
     assert( counts(Unigram('#'), encodeOne('H')) === logSum(0.0,0.0));
     assert( counts(Unigram('#'), encodeOne('#')) === Double.NegativeInfinity);
