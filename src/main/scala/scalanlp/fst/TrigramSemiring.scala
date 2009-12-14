@@ -10,35 +10,42 @@ import scalanlp.counters.LogCounters._;
 
 import scalanlp.util.Index;
 
-object TrigramSemiring {
-
-  type EncodedChars = Int
-  def encode(ch1: Char, ch2: Char) = ((ch1.toInt << 16)|(ch2)):EncodedChars
-  def encodeOne(ch: Char) = encode(ch,ch);
-  def decode(cc: EncodedChars) = ((cc >> 16).toChar,(cc & 0XFFFF).toChar);
-
-  def decodeCounts(ctr: LogDoubleCounter[EncodedChars]) = {
-    val result = LogDoubleCounter[(Char,Char)]();
-    for( (cc,v) <- ctr) {
-      result(decode(cc)) = v;
-    }
-    result
-  }
+/**
+* 
+* @param acceptableChars : only learn bigram histories that contain (only) these chars
+*/
+class TrigramSemiring(acceptableChars: Set[(Char,Char)]) {
+  import TrigramSemiring._;
 
   val charIndex = Index[EncodedChars]();
   val gramIndex = Index[Gram]();
+  for {
+    (a,b) <- acceptableChars;
+    enc = encode(a,b);
+    ug = Unigram(enc)
+  } {
+    gramIndex(ug);
+  }
+  val maxAcceptableGram = gramIndex.size;
 
-  def mkGramCharMap = new ArrayMap[SparseVector] {
+  def isAcceptableHistoryGram(gI: Int) = gI < maxAcceptableGram;
+
+  private def mkGramCharMap = new ArrayMap[SparseVector] {
     override def default(k: Int) = getOrElseUpdate(k,mkSparseVector);
   }
 
-  def mkSparseVector = {
+  private def mkSparseVector = {
     val r = new SparseVector(Int.MaxValue);
     r.default = Double.NegativeInfinity;
     r
   }
 
-  case class Elem(counts: ArrayMap[SparseVector], totalProb: Double, active: SparseVector) {
+  case class Elem(leftFrontier: SparseVector, 
+                  counts: ArrayMap[SparseVector],
+                  length0Score: Double,
+                  length1Chars: SparseVector,
+                  totalProb: Double,
+                  rightFrontier: SparseVector) {
     def decode = {
       val result = LogPairedDoubleCounter[Gram,EncodedChars]();
       for {
@@ -53,45 +60,9 @@ object TrigramSemiring {
     }
   }
 
-  sealed abstract class Gram {
-    def length : Int
-
-    def join(g: Gram) = (this,g) match {
-      case (_,b: Bigram) => Seq(b)
-      case (_:Bigram,b: Unigram) => Seq.empty
-      case (a:Unigram,b: Unigram) => Seq(Bigram(a._1,b._1),b);
-      case (_,Noncegram) => Seq(this)
-      case (Noncegram,_) => Seq(g);
-    }
-  }
-
-  case class Bigram(_1: EncodedChars, _2:EncodedChars) extends Gram {
-    def length = 2;
-    override def hashCode = _1 * 37 + _2;
-  }
-  case class Unigram(_1: EncodedChars) extends Gram {
-    def length = 1;
-    override def hashCode = _1;
-  }
-  case object Noncegram extends Gram {
-    def length = 0;
-    override def hashCode = 0;
-  }
-
-  // for Automata, we can pass in just chars
-  object Bigram {
-    def apply(ch1: Char, ch2: Char) = new Bigram(encodeOne(ch1),encodeOne(ch2));
-  } 
-
-  // for Automata, we can pass in just chars
-  object Unigram {
-    def apply(ch1: Char) = new Unigram(encodeOne(ch1));
-  } 
-
-  val beginningUnigram = Unigram(encode('#','#'));
-  val beginningBigram = Bigram(encode('#','#'),encode('#','#'));
   val beginningUnigramId = gramIndex(beginningUnigram)
   val beginningBigramId = gramIndex(beginningBigram)
+  val NonceId = gramIndex(Noncegram);
 
   private val epsilon = Alphabet.zeroEpsCharBet.epsilon;
 
@@ -133,11 +104,16 @@ object TrigramSemiring {
       }
       logAddInPlace2D(newCounts,y.counts)
 
-      val newActive = x.active.copy;
-      logAddInPlace(newActive,y.active);
+      val leftFrontier = x.leftFrontier.copy;
+      logAddInPlace(leftFrontier,y.leftFrontier);
+      val rightFrontier = x.rightFrontier.copy;
+      logAddInPlace(rightFrontier,y.rightFrontier);
+      val length1Chars = x.length1Chars.copy;
+      logAddInPlace(length1Chars,y.length1Chars);
 
+      val length0Score = logSum(x.length0Score,y.length0Score);
 
-      val r = Elem(newCounts, newProb, newActive);
+      val r = Elem(leftFrontier, newCounts, length0Score, length1Chars, newProb, rightFrontier);
       r
     }
 
@@ -150,12 +126,21 @@ object TrigramSemiring {
       logAddInPlace2D(newCounts,x.counts,y.totalProb);
       logAddInPlace2D(newCounts,y.counts,x.totalProb);
 
+/*
       for( (yc,yprob) <- y.active.activeElements) {
         gramIndex.get(yc) match {
           case gr@Unigram(ch) =>
             val chI = charIndex(ch);
+
             for( (xc,xprob) <- x.active.activeElements) {
               newCounts(xc)(chI) = logSum(newCounts(xc)(chI),xprob + yprob); 
+              xc match {
+                case NonceId =>
+                  active(yc) = logSum(active(yc),xprob + yprob);
+                case gramIndex(Unigram(chX)) =>
+                  if (isAcceptableHistoryGram(xc) && isAcceptableHistoryGram(yc)) {
+                  }
+              }
               for(suffix <- gramIndex.get(xc) join gr) {
                 active(gramIndex(suffix)) = logSum(active(gramIndex(suffix)),xprob + yprob);
               }
@@ -169,9 +154,13 @@ object TrigramSemiring {
 
       val r = Elem(newCounts,newProb,active);
       r
+      */
+      // TODO
+      x
     }
 
     def closure(x: Elem) = {
+    /*
       import Semiring.LogSpace.doubleIsLogSpace.{closure=>logClosure};
       val p_* = logClosure(x.totalProb);
       val newCounts = mkGramCharMap;
@@ -192,16 +181,17 @@ object TrigramSemiring {
           newActive(gramIndex(suffix)) = logSum(newActive(gramIndex(suffix)),p1 + p2);
         }
       }
-      newActive(gramIndex(Noncegram)) = logSum(newActive(gramIndex(Noncegram)),2 * p_*);
+      newActive(NonceId) = logSum(newActive(NonceId),2 * p_*);
       val newCounts2 = mkGramCharMap;
       logAddInPlace2D(newCounts2,newCounts,2 * p_*);
 
       Elem(newCounts2, p_*, newActive);
+      */
+      x
     }
 
-    val one = Elem(mkGramCharMap,0.0,mkSparseVector);
-    one.active(gramIndex(Noncegram)) = 0.0;
-    val zero = Elem(mkGramCharMap,-1.0/0.0,mkSparseVector);
+    val one = Elem(mkSparseVector,mkGramCharMap,0.0,mkSparseVector,0.0,mkSparseVector);
+    val zero = Elem(mkSparseVector,mkGramCharMap,-1.0/0.0,mkSparseVector,-1.0/0.0,mkSparseVector);
   }
 
   def promote[S](a: Arc[Double,S,Char,Char]) = {
@@ -210,10 +200,13 @@ object TrigramSemiring {
     if(a.in != epsilon || a.out != epsilon) {
       val id = gramIndex(Unigram(encode(a.in,a.out)));
       active(id) = a.weight;
+    } 
+    val nonceScore = if(a.in != epsilon || a.out != epsilon) {
+      Double.NegativeInfinity;
     } else {
-      active(gramIndex(Noncegram)) = a.weight;
+      a.weight;
     }
-    Elem(counts,a.weight,active);
+    Elem(active,counts,nonceScore,active,a.weight,active);
   }
 
   def promoteOnlyWeight(w: Double) = {
@@ -221,7 +214,55 @@ object TrigramSemiring {
     val active = mkSparseVector;
     active(beginningUnigramId) = w;
     active(beginningBigramId) = w;
-    Elem(counts,w,active);
+    val l1active = mkSparseVector;
+    l1active(beginningUnigramId) = w;
+    Elem(active,counts,Double.NegativeInfinity,l1active,w,active);
   }
 
+}
+
+object TrigramSemiring {
+  type EncodedChars = Int
+
+  def encode(ch1: Char, ch2: Char) = ((ch1.toInt << 16)|(ch2)):EncodedChars
+  def encodeOne(ch: Char) = encode(ch,ch);
+  def decode(cc: EncodedChars) = ((cc >> 16).toChar,(cc & 0XFFFF).toChar);
+
+  sealed abstract class Gram {
+    def length : Int
+
+    def join(g: Gram) = (this,g) match {
+      case (_,b: Bigram) => Seq(b)
+      case (_:Bigram,b: Unigram) => Seq.empty
+      case (a:Unigram,b: Unigram) => Seq(Bigram(a._1,b._1),b);
+      case (_,Noncegram) => Seq(this)
+      case (Noncegram,_) => Seq(g);
+    }
+  }
+
+  case class Bigram(_1: EncodedChars, _2:EncodedChars) extends Gram {
+    def length = 2;
+    override def hashCode = _1 * 37 + _2;
+  }
+  case class Unigram(_1: EncodedChars) extends Gram {
+    def length = 1;
+    override def hashCode = _1;
+  }
+  case object Noncegram extends Gram {
+    def length = 0;
+    override def hashCode = 0;
+  }
+
+  // for Automata, we can pass in just chars
+  object Bigram {
+    def apply(ch1: Char, ch2: Char) = new Bigram(encodeOne(ch1),encodeOne(ch2));
+  } 
+
+  // for Automata, we can pass in just chars
+  object Unigram {
+    def apply(ch1: Char) = new Unigram(encodeOne(ch1));
+  } 
+
+  val beginningUnigram = Unigram(encode('#','#'));
+  val beginningBigram = Bigram(encode('#','#'),encode('#','#'));
 }

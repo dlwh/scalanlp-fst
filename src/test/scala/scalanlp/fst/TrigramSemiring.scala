@@ -12,12 +12,40 @@ import scala.collection.Traversable;
 import scala.collection.Seq;
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
+import org.scalacheck._;
+
+object TrigramSetup {
+  val validChars = Seq('a','b','c','d');
+  val validPairs = validChars zip validChars;
+  val tgring = new TrigramSemiring(Set.empty ++ validPairs);
+}
+import TrigramSetup._;
+import tgring._;
 
 
 @RunWith(classOf[JUnitRunner])
-class TrigramSemiringTest extends FunSuite {
-  import TrigramSemiring._;
+class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
+
   import ring._;
+  import Arbitrary.arbitrary;
+
+  def makeRing = tgring.ring;
+
+  def simpleWeight = for {
+    ch <- Gen.elements(validPairs:_*);
+    w <- arbitrary[Double];
+    if !w.isNaN
+  } yield promote(Arc(0,0,ch._1,ch._2,w));
+
+  def compositeWeight = for {
+    w1 <- simpleWeight;
+    w2 <- simpleWeight;
+    bool <- arbitrary[Boolean]
+  } yield if(bool) times(w1,w2) else plus(w1,w2);
+
+  def arb: Arbitrary[Elem] = Arbitrary(Gen.oneOf(compositeWeight,simpleWeight));
+
+  /*
   test("bg zero + zero == zero") {
     assert(plus(zero,zero) === zero)
   }
@@ -49,7 +77,6 @@ class TrigramSemiringTest extends FunSuite {
     val auto = constant("Hello",0.0).reweight(promote[Int] _ , promoteOnlyWeight _);
     val cost = auto.cost;
     val counts = cost.decode;
-
 
     assert( counts(Unigram('#'), encodeOne('H')) === 0.0);
     assert( counts(Unigram('H'), encodeOne('e')) === 0.0);
@@ -88,6 +115,7 @@ class TrigramSemiringTest extends FunSuite {
     assert( counts(Bigram('H','e'), encodeOne('l')) === 0.0);
     assert( counts(Bigram('l','o'), encodeOne('#')) === 0.0);
   }
+  */
 
   
 }
