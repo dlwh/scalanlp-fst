@@ -65,6 +65,11 @@
       <version>1.0.1-for-scala-2.8.0.Beta1-RC1-SNAPSHOT</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+    	<groupId>org.scala-tools.testing</groupId>
+    	<artifactId>scalacheck_2.8.0.Beta1-RC2</artifactId>
+    	<version>1.7-SNAPSHOT</version>
+    </dependency>
   </dependencies>
 
   <build>

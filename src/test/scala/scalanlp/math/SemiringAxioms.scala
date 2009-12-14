@@ -1,0 +1,83 @@
+package scalanlp.math
+
+import org.scalatest.junit.JUnitRunner
+import org.scalatest.FunSuite
+import org.scalatest.prop._;
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.Before
+
+
+import scala.collection.Traversable;
+import scala.collection.Seq;
+import scala.collection.mutable.ArrayBuffer;
+import scala.collection.mutable.PriorityQueue;
+
+import org.scalacheck._;
+
+trait SemiringAxioms[W] extends FunSuite with Checkers {
+  def makeRing: Semiring[W];
+  implicit def arb: Arbitrary[W];
+  
+  val ring = makeRing;
+  import ring._;
+  
+  test("zero is the additive identity") {
+    check( (w: W) => plus(zero,w) == w && plus(w,zero) == w );
+  }
+  
+  test("addition commutes") {
+    check( (a: W, b: W) => closeTo(plus(a,b),plus(b,a)));
+  }
+  
+  test("addition associates") {
+    check( (a: W, b: W, c: W) => closeTo(plus(plus(a,b),c),plus(a,plus(b,c))));
+  }
+  
+  test("multiplication associates") {
+    check( (a: W, b: W, c: W) => closeTo(times(times(a,b),c),times(a,times(b,c))));
+  }
+  
+  test("multiplication has identity 1") {
+    check( (a: W) => times(a,one) == a && times(one,a) == a);
+  }
+  
+  test("multiplication has annihilator 0") {
+    check( (a: W) => times(a,zero) == zero && times(zero,a) == zero);
+  }
+  
+  test("multiplication distributes over addition") {
+    check( (a: W, b: W, c: W) => closeTo(times(a,plus(b,c)),plus(times(a,b),times(a,c))));
+    check( (a: W, b: W, c: W) => closeTo(times(plus(b,c),a),plus(times(b,a),times(c,a))));
+  }
+  
+  test("zero* == 1") {
+    assert(closure(zero) === one);
+  }
+  
+}
+
+@RunWith(classOf[JUnitRunner])
+class BooleanSemiringTest extends SemiringAxioms[Boolean] {
+  def arb = Arbitrary.arbBool;
+  def makeRing = Semiring.booleanSemiring;   
+}
+
+@RunWith(classOf[JUnitRunner])
+class ProbabilitySemiringTest extends SemiringAxioms[Double] {
+  def arb = Arbitrary.arbDouble;
+  def makeRing = Semiring.Probability.semiring;   
+}
+
+
+@RunWith(classOf[JUnitRunner])
+class TropicalSemiringTest extends SemiringAxioms[Double] {
+  def arb = Arbitrary.arbDouble;
+  def makeRing = Semiring.Tropical.doubleIsTropical;
+}
+
+@RunWith(classOf[JUnitRunner])
+class LogSpaceSemiringTest extends SemiringAxioms[Double] {
+  def arb = Arbitrary.arbDouble;
+  def makeRing = Semiring.LogSpace.doubleIsLogSpace;
+}

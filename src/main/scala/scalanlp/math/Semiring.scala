@@ -25,7 +25,7 @@ object Semiring {
   implicit val booleanSemiring = new Semiring[Boolean] {
     def plus(t1: Boolean, t2: Boolean) = t1 || t2;
     def times(t1:Boolean, t2: Boolean) = t1 && t2;
-    def closure(t: Boolean) = t;
+    def closure(t: Boolean) = true;
     val one = true;
     val zero = false;
   }
@@ -36,12 +36,18 @@ object Semiring {
       def plus(t1: Double, t2: Double) = t1 + t2;
       def times(t1: Double, t2: Double) = t1 * t2;
       def leftDivide(t1: Double, t2: Double) = t2 / t1;
+
+      override def closeTo(x: Double, y: Double) = {
+        if(x == 0 && y == 0) true
+        else if(x == 0) Math.abs(y)  < 1E-10;
+        else Math.abs( (x-y)/x)  < 1E-8;
+      }
+
       def closure(t: Double) = {
         if(t < 1 && t >= 0) 1 / (1-t);
         else if(t < 0) error("Closure arg must be in [0,1), not "  +t);
         else Double.PositiveInfinity;
       }
-      override def closeTo(x: Double, y: Double) = Math.abs( (x-y)/x)  < 1E-8;
       val one = 1.0;
       val zero = 0.0;
     }
@@ -66,6 +72,11 @@ object Semiring {
       def plus(t1: Double, t2: Double) = t1 min t2;
       def leftDivide(t1: Double, t2: Double) = t2 - t1;
       def times(t1: Double, t2: Double) = t1 + t2;
+      override def closeTo(x: Double, y: Double) = {
+        if(x == 0 && y == 0) true
+        else if(x == 0) Math.abs(y)  < 1E-10;
+        else Math.abs( (x-y)/x)  < 1E-8;
+      }
       def closure(t: Double) = if(t >= 0.0) 0.0 else Double.NegativeInfinity;
       val one = 0.0;
       val zero = Double.PositiveInfinity;
@@ -83,7 +94,11 @@ object Semiring {
       def times(t1: Double, t2: Double) = t1 + t2;
       val one = 0.0;
       val zero = Double.NegativeInfinity;
-      override def closeTo(x: Double, y: Double) = Math.abs( (x-y)/x)  < 1E-8;
+      override def closeTo(x: Double, y: Double) = {
+        if(x == 0 && y == 0) true
+        else if(x == 0) Math.abs(y)  < 1E-10;
+        else Math.abs( (x-y)/x)  < 1E-8;
+      }
       /**
       * p =&gt; 1/(1-p)
       * becomes
