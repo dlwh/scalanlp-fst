@@ -22,13 +22,20 @@ class BigramSemiringTest extends FunSuite with SemiringAxioms[BigramSemiring.Ele
 
   import Arbitrary.arbitrary;
   def makeRing = BigramSemiring.ring;
-  def arb = Arbitrary {
-    for {
-      ch <- Gen.alphaChar;
-      w <- arbitrary[Double];
-      if !w.isNaN
-    } yield promote(Arc(0,0,ch,ch,w));
-  };
+
+  def simpleWeight = for {
+    ch <- Gen.alphaChar;
+    w <- arbitrary[Double];
+    if !w.isNaN
+  } yield promote(Arc(0,0,ch,ch,w));
+
+  def compositeWeight = for {
+    w1 <- (simpleWeight);
+    w2 <- (simpleWeight);
+    bool <- arbitrary[Boolean]
+  } yield if(bool) times(w1,w2) else plus(w1,w2);
+
+  def arb: Arbitrary[Elem] = Arbitrary(Gen.oneOf(compositeWeight,simpleWeight));
 
   test("simple* works") {
     import Math.log;

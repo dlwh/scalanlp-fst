@@ -7,7 +7,11 @@ import scala.collection.mutable.ArrayBuffer;
 import scalanlp.counters.LogCounters._;
 
 object BigramSemiring {
-  case class Elem(counts: LogPairedDoubleCounter[Char,Char], totalProb: Double, emptyActive: Double, active: LogDoubleCounter[Char]) {
+  case class Elem(leftFrontier: LogDoubleCounter[Char],
+                  counts: LogPairedDoubleCounter[Char,Char],
+                  totalProb: Double,
+                  emptyActive: Double,
+                  rightFrontier: LogDoubleCounter[Char]) {
   }
 
   val epsilon = Alphabet.zeroEpsCharBet.epsilon;
@@ -16,8 +20,21 @@ object BigramSemiring {
 
     override def closeTo(x: Elem, y: Elem) = {
       import Semiring.LogSpace.doubleIsLogSpace;
+      
       (doubleIsLogSpace.closeTo(x.totalProb, y.totalProb) &&
-      x.counts.forall { case (k,v) => doubleIsLogSpace.closeTo(v,y.counts(k))})
+      doubleIsLogSpace.closeTo(x.emptyActive, y.emptyActive) &&
+      x.counts.forall { case (k,v) => doubleIsLogSpace.closeTo(v,y.counts(k))} &&
+      x.leftFrontier.forall { case (k,v) => doubleIsLogSpace.closeTo(v,y.leftFrontier(k))} &&
+      x.rightFrontier.forall { case (k,v) => doubleIsLogSpace.closeTo(v,y.rightFrontier(k))} &&
+      true )
+    }
+
+    def logAdd(a: LogDoubleCounter[Char], b: LogDoubleCounter[Char]) = {
+      val newActive = a.copy;
+      for( (k,v) <- b) {
+        newActive(k) = logSum(newActive(k),v);
+      }
+      newActive
     }
 
     def plus(x: Elem, y: Elem) = {
@@ -27,12 +44,11 @@ object BigramSemiring {
         newCounts(k) = logSum(newCounts(k),v);
       }
 
-      val newActive = x.active.copy;
-      for( (k,v) <- y.active) {
-        newActive(k) = logSum(newActive(k),v);
-      }
+      val rightFrontier = logAdd(x.rightFrontier,y.rightFrontier);
+      val leftFrontier = logAdd(x.leftFrontier,y.leftFrontier);
+      val emptyActive = logSum(x.emptyActive,y.emptyActive);
 
-      Elem(newCounts, newProb, logSum(x.emptyActive,y.emptyActive), newActive);
+      Elem(leftFrontier, newCounts, newProb, emptyActive, rightFrontier);
     }
 
     def times(x: Elem, y: Elem) = {
@@ -42,27 +58,41 @@ object BigramSemiring {
         newCounts(k1,k2) = logSum(newCounts(k1,k2),v + x.totalProb);
       }
 
-      for((xc,xprob) <- x.active; 
-          (yc,yprob) <- y.active) {
+      for((xc,xprob) <- x.rightFrontier; 
+          (yc,yprob) <- y.leftFrontier) {
         newCounts(xc,yc) = logSum(newCounts(xc,yc),xprob + yprob); 
       }
            
-      val active = if(y.active.size != 0) {
-        val r = (y.active + x.totalProb).value
+      val rightFrontier = if(y.rightFrontier.size != 0) {
+        val r = (y.rightFrontier + x.totalProb).value
 
         if(y.emptyActive != Double.NegativeInfinity) {
-          for( (xc,xprob) <- x.active) {
+          for( (xc,xprob) <- x.rightFrontier) {
             r(xc) = logSum(r(xc),xprob + y.emptyActive);
           }
         }
 
         r;
       } else {
-        (x.active + y.totalProb).value;
+        (x.rightFrontier + y.totalProb).value;
+      }
+
+      val leftFrontier = if(x.leftFrontier.size != 0) {
+        val r = (x.leftFrontier + y.totalProb).value
+
+        if(x.emptyActive != Double.NegativeInfinity) {
+          for( (xc,xprob) <- y.leftFrontier) {
+            r(xc) = logSum(r(xc),xprob + y.emptyActive);
+          }
+        }
+
+        r;
+      } else {
+        (y.leftFrontier + x.totalProb).value;
       }
       
 
-      val r = Elem(newCounts,newProb,y.emptyActive + x.emptyActive,active);
+      val r = Elem(leftFrontier,newCounts,newProb,y.emptyActive + x.emptyActive,rightFrontier);
       r
     }
 
@@ -71,17 +101,18 @@ object BigramSemiring {
       val p_* = logClosure(x.totalProb);
       val newCounts = x.counts.copy;
 
-      for((x1,p1) <- x.active;
-          (x2,p2) <- x.active) {
+      for((x1,p1) <- x.rightFrontier;
+          (x2,p2) <- x.leftFrontier) {
         newCounts(x1,x2) = logSum(newCounts(x1,x2),p1+p2);
       }
-      val newActive = (x.active + (p_* - x.totalProb)).value;
+      val leftFrontier = (x.leftFrontier + (p_* - x.totalProb)).value;
+      val rightFrontier = (x.rightFrontier + (p_* - x.totalProb)).value;
       
-      Elem(newCounts + (2 * p_*) value, p_*, 2 * p_*, newActive);
+      Elem(leftFrontier, newCounts + (2 * p_*) value, p_*, 2 * p_*, rightFrontier);
     }
 
-    val one = Elem(LogPairedDoubleCounter[Char,Char](),0.0,0.0,LogDoubleCounter());
-    val zero = Elem(LogPairedDoubleCounter[Char,Char](),-1.0/0.0,-1.0/0.0,LogDoubleCounter());
+    val one = Elem(LogDoubleCounter(), LogPairedDoubleCounter[Char,Char](),0.0,0.0,LogDoubleCounter());
+    val zero = Elem(LogDoubleCounter(), LogPairedDoubleCounter[Char,Char](),-1.0/0.0,-1.0/0.0,LogDoubleCounter());
   }
 
   def promote[S](a: Arc[Double,S,Char,Char]) = {
@@ -91,14 +122,14 @@ object BigramSemiring {
     if(a.in != epsilon)
       active(a.in) = a.weight;
     val emptyScore = if(a.in == epsilon) a.weight else Double.NegativeInfinity;
-    Elem(counts,a.weight,emptyScore,active);
+    Elem(active, counts,a.weight,emptyScore,active);
   }
 
   def promoteOnlyWeight(w: Double) = {
     val counts = LogPairedDoubleCounter[Char,Char]();
     val active = LogDoubleCounter[Char]();
     active('#') = w;
-    Elem(counts,w,Double.NegativeInfinity,active);
+    Elem(active, counts,w,Double.NegativeInfinity,active);
   }
 
 }

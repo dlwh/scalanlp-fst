@@ -38,7 +38,7 @@ object Semiring {
       def leftDivide(t1: Double, t2: Double) = t2 / t1;
 
       override def closeTo(x: Double, y: Double) = {
-        if(x == 0 && y == 0) true
+        if(x == y) true
         else if(x == 0) Math.abs(y)  < 1E-10;
         else Math.abs( (x-y)/x)  < 1E-8;
       }
@@ -73,7 +73,7 @@ object Semiring {
       def leftDivide(t1: Double, t2: Double) = t2 - t1;
       def times(t1: Double, t2: Double) = t1 + t2;
       override def closeTo(x: Double, y: Double) = {
-        if(x == 0 && y == 0) true
+        if(x == y) true
         else if(x == 0) Math.abs(y)  < 1E-10;
         else Math.abs( (x-y)/x)  < 1E-8;
       }
@@ -95,7 +95,7 @@ object Semiring {
       val one = 0.0;
       val zero = Double.NegativeInfinity;
       override def closeTo(x: Double, y: Double) = {
-        if(x == 0 && y == 0) true
+        if(x == y) true
         else if(x == 0) Math.abs(y)  < 1E-10;
         else Math.abs( (x-y)/x)  < 1E-8;
       }

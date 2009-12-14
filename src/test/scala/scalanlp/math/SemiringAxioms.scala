@@ -21,9 +21,15 @@ trait SemiringAxioms[W] extends FunSuite with Checkers {
   
   val ring = makeRing;
   import ring._;
-  
+
+  def traceEq(w1: W, w2: W) = if(closeTo(w1,w2)) true else {
+    println("No EQ! 1 :" + w1 + "\n 2: " + w2);
+    false
+  }
+
   test("zero is the additive identity") {
-    check( (w: W) => plus(zero,w) == w && plus(w,zero) == w );
+    check( (w: W) => traceEq(plus(zero,w),w));
+    check( (w: W) => traceEq(plus(w,zero),w));
   }
   
   test("addition commutes") {
@@ -39,11 +45,13 @@ trait SemiringAxioms[W] extends FunSuite with Checkers {
   }
   
   test("multiplication has identity 1") {
-    check( (a: W) => times(a,one) == a && times(one,a) == a);
+    check( (w: W) => traceEq(times(one,w),w));
+    check( (w: W) => traceEq(times(w,one),w));
   }
   
   test("multiplication has annihilator 0") {
-    check( (a: W) => times(a,zero) == zero && times(zero,a) == zero);
+    check( (w: W) => traceEq(times(zero,w),zero));
+    check( (w: W) => traceEq(times(w,zero),zero));
   }
   
   test("multiplication distributes over addition") {

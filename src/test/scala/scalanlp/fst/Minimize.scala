@@ -65,7 +65,7 @@ class MinimizeTest extends FunSuite {
     val shrunk = Minimizer.minimize(joined);
     val shrinkCost = shrunk.cost
     val cost = joined.cost
-    assert( (shrinkCost - cost).abs < 1E-6, shrinkCost +" vs " + cost);
+    assert( (shrinkCost - cost).abs < 1E-2, shrinkCost +" vs " + cost);
   }
 
 }
