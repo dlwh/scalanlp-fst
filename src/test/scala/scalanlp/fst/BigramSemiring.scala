@@ -12,25 +12,23 @@ import scala.collection.Traversable;
 import scala.collection.Seq;
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
+import org.scalacheck._;
 
 
 @RunWith(classOf[JUnitRunner])
-class BigramSemiringTest extends FunSuite {
+class BigramSemiringTest extends FunSuite with SemiringAxioms[BigramSemiring.Elem] {
   import BigramSemiring._;
-  import ring._;
-  test("bg zero + zero == zero") {
-    assert(plus(zero,zero) === zero)
-  }
-  test("bg one + zero == one") {
-    assert(plus(one,zero) === one)
-  }
-  test("bg zero + one == one") {
-    assert(plus(zero,one) === one)
-  }
+  import BigramSemiring.ring._;
 
-  test("zero* == 1") {
-    assert(closure(zero) === one);
-  }
+  import Arbitrary.arbitrary;
+  def makeRing = BigramSemiring.ring;
+  def arb = Arbitrary {
+    for {
+      ch <- Gen.alphaChar;
+      w <- arbitrary[Double];
+      if !w.isNaN
+    } yield promote(Arc(0,0,ch,ch,w));
+  };
 
   test("simple* works") {
     import Math.log;
