@@ -4,6 +4,7 @@ import scalanlp.math._;
 import Numerics.logSum;
 import scalala.Scalala._;
 import scalala.tensor.sparse._;
+import scalala.tensor.sparse._;
 import scala.collection.mutable.ArrayBuffer;
 import scalanlp.collection.mutable.ArrayMap;
 import scalanlp.counters.LogCounters._;
@@ -18,17 +19,13 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)]) {
   import TrigramSemiring._;
 
   val charIndex = Index[EncodedChars]();
-  val gramIndex = Index[Gram]();
-  for {
-    (a,b) <- acceptableChars;
-    enc = encode(a,b);
-    ug = Unigram(enc)
-  } {
-    gramIndex(ug);
+  val gramIndex = Index[Bigram]();
+  for( (a,b) <- acceptableChars) {
+    charIndex(encode(a,b));
   }
-  val maxAcceptableGram = gramIndex.size;
+  val maxAcceptableGram = charIndex.size;
 
-  def isAcceptableHistoryGram(gI: Int) = gI < maxAcceptableGram;
+  def isAcceptableHistoryChar(gI: Int) = gI < maxAcceptableGram;
 
   private def mkGramCharMap = new ArrayMap[SparseVector] {
     override def default(k: Int) = getOrElseUpdate(k,mkSparseVector);
@@ -40,14 +37,17 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)]) {
     r
   }
 
-  case class Elem(leftFrontier: SparseVector, 
+  // Yuck.
+  case class Elem(leftUnigrams: SparseVector, 
+                  leftBigrams: SparseVector,
                   counts: ArrayMap[SparseVector],
                   length0Score: Double,
                   length1Chars: SparseVector,
                   totalProb: Double,
-                  rightFrontier: SparseVector) {
+                  rightUnigrams: SparseVector,
+                  rightBigrams: SparseVector) {
     def decode = {
-      val result = LogPairedDoubleCounter[Gram,EncodedChars]();
+      val result = LogPairedDoubleCounter[Bigram,EncodedChars]();
       for {
         (xcI,row) <- counts.iterator
         xc = gramIndex.get(xcI);
@@ -60,28 +60,36 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)]) {
     }
   }
 
-  val beginningUnigramId = gramIndex(beginningUnigram)
+  val beginningUnigramId = charIndex(beginningUnigram)
   val beginningBigramId = gramIndex(beginningBigram)
-  val NonceId = gramIndex(Noncegram);
 
   private val epsilon = Alphabet.zeroEpsCharBet.epsilon;
 
   private def logAddInPlace2D(to: ArrayMap[SparseVector], from: ArrayMap[SparseVector], scale: Double=0.0) {
-    for( (k,row) <- from) {
-      val old = to(k);
-      if(old.activeDomain.size == 0) {
-        old := row + scale;
-      } else {
-        logAddInPlace(old,row,scale);
+    if(scale != Double.NegativeInfinity) {
+      for( (k,row) <- from) {
+        val old = to(k);
+        if(old.activeDomain.size == 0) {
+          old := row + scale;
+        } else {
+          logAddInPlace(old,row,scale);
+        }
       }
     }
   }
 
+  private def logAdd(to: SparseVector, from: SparseVector, scale: Double=0.0) = {
+    val ret = to.copy;
+    logAddInPlace(ret,from,scale);
+    ret;
+  }
+
 
   private def logAddInPlace(to: SparseVector, from: SparseVector, scale: Double=0.0) {
-    for( (k,v) <- from.activeElements) {
-      to(k) = logSum(to(k),v+scale);
-    }
+    if(scale != Double.NegativeInfinity)
+      for( (k,v) <- from.activeElements) {
+        to(k) = logSum(to(k),v+scale);
+      }
   }
 
   implicit val ring: Semiring[Elem] = new Semiring[Elem] {
@@ -104,16 +112,15 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)]) {
       }
       logAddInPlace2D(newCounts,y.counts)
 
-      val leftFrontier = x.leftFrontier.copy;
-      logAddInPlace(leftFrontier,y.leftFrontier);
-      val rightFrontier = x.rightFrontier.copy;
-      logAddInPlace(rightFrontier,y.rightFrontier);
-      val length1Chars = x.length1Chars.copy;
-      logAddInPlace(length1Chars,y.length1Chars);
+      val leftUnigrams = logAdd(x.leftUnigrams,y.leftUnigrams);
+      val leftBigrams = logAdd(x.leftBigrams,y.leftBigrams);
+      val rightUnigrams = logAdd(x.rightUnigrams,y.rightUnigrams);
+      val rightBigrams = logAdd(x.rightBigrams,y.rightBigrams);
 
+      val length1Chars = logAdd(x.length1Chars,y.length1Chars);
       val length0Score = logSum(x.length0Score,y.length0Score);
 
-      val r = Elem(leftFrontier, newCounts, length0Score, length1Chars, newProb, rightFrontier);
+      val r = Elem(leftUnigrams, leftBigrams, newCounts, length0Score, length1Chars, newProb, rightUnigrams, rightBigrams);
       r
     }
 
@@ -126,143 +133,198 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)]) {
       logAddInPlace2D(newCounts,x.counts,y.totalProb);
       logAddInPlace2D(newCounts,y.counts,x.totalProb);
 
-/*
-      for( (yc,yprob) <- y.active.activeElements) {
-        gramIndex.get(yc) match {
-          case gr@Unigram(ch) =>
-            val chI = charIndex(ch);
-
-            for( (xc,xprob) <- x.active.activeElements) {
-              newCounts(xc)(chI) = logSum(newCounts(xc)(chI),xprob + yprob); 
-              xc match {
-                case NonceId =>
-                  active(yc) = logSum(active(yc),xprob + yprob);
-                case gramIndex(Unigram(chX)) =>
-                  if (isAcceptableHistoryGram(xc) && isAcceptableHistoryGram(yc)) {
-                  }
-              }
-              for(suffix <- gramIndex.get(xc) join gr) {
-                active(gramIndex(suffix)) = logSum(active(gramIndex(suffix)),xprob + yprob);
-              }
-            }
-          case Noncegram =>
-            logAddInPlace(active,x.active,yprob);
-          case ycb: Bigram =>
-            active(yc) = logSum(active(yc),x.totalProb + yprob);
-        }
+      // XX Y --> ZZZ (trigram)
+      for( (yc,yprob) <- y.leftUnigrams.activeElements;
+           (xc,xprob) <- x.rightBigrams.activeElements) {
+        newCounts(xc)(yc) = logSum(newCounts(xc)(yc), yprob + xprob);
       }
 
-      val r = Elem(newCounts,newProb,active);
+      // X YY --> ZZZ (trigram)
+      for( (yc,yprob) <- y.leftBigrams.activeElements;
+           (xc,xprob) <- x.rightUnigrams.activeElements) {
+        val Bigram(y1,y2) = gramIndex.get(yc);
+        val newBG = gramIndex(Bigram(charIndex.get(xc),y1))
+        val encodedY2 = charIndex(y2);
+        newCounts(newBG)(encodedY2) = logSum(newCounts(newBG)(encodedY2), yprob + xprob);
+      }
+
+      // New active set is:
+      // sum of all ways to traverse x with length 1 + traverse y with length 0
+      // sum of all ways to traverse y with length 1 + traverse x with length 0
+      val activeChars = (x.length1Chars + y.length0Score).value;
+      logAddInPlace(activeChars,y.length1Chars,x.length0Score);
+
+      // frontier:
+      // the left unigram frontier consists of x's old left frontier, plus y's left frontier + x's empty score
+      val leftUnigrams = logAdd(x.leftUnigrams,y.leftUnigrams,x.length0Score);
+      // the right unigram frontier consists of y's old right frontier, plus x's right frontier + y's empty score
+      val rightUnigrams = logAdd(y.rightUnigrams,x.rightUnigrams,y.length0Score);
+
+      // analagously for bigrams, except we create new bigrams based on active sets
+      val leftBigrams = logAdd(x.leftBigrams,y.leftBigrams,x.length0Score);
+      val rightBigrams = logAdd(y.rightBigrams,x.rightBigrams,y.length0Score);
+
+      for( (yc,yprob) <- y.length1Chars.activeElements;
+           (xc,xprob) <- x.rightUnigrams.activeElements) {
+        val newBG = gramIndex(Bigram(charIndex.get(xc),charIndex.get(yc)));
+        rightBigrams(newBG) = logSum(leftBigrams(newBG),xprob + yprob);
+      }
+
+      for {
+        (xc,xprob) <- x.length1Chars.activeElements;
+        (yc,yprob) <- y.leftUnigrams.activeElements
+        if isAcceptableHistoryChar(yc)
+      } {
+        val newBG = gramIndex(Bigram(charIndex.get(xc),charIndex.get(yc)));
+        leftBigrams(newBG) = logSum(rightBigrams(newBG),xprob + yprob);
+      }
+
+      val length0Score = x.length0Score + y.length0Score;
+
+      val r = Elem(leftUnigrams, leftBigrams,
+                   newCounts,length0Score, activeChars,
+                   newProb, 
+                   rightUnigrams, rightBigrams);
       r
-      */
-      // TODO
-      x
     }
 
     def closure(x: Elem) = {
-    /*
       import Semiring.LogSpace.doubleIsLogSpace.{closure=>logClosure};
       val p_* = logClosure(x.totalProb);
+
+      // This is really confusing. For starters, we keep all our old counts
       val newCounts = mkGramCharMap;
       logAddInPlace2D(newCounts,x.counts)
-
-      val newActive = mkSparseVector;
-      for((x1,p1) <- x.active.activeElements;
-          x1ctr = newCounts(x1);
-          (x2,p2) <- x.active.activeElements) { 
-        gramIndex.get(x2) match {
-          case xx@Unigram(ch) => 
-            val chI = charIndex(ch);
-            x1ctr(chI) = logSum(x1ctr(chI),p1+p2);
-          case _ => 
-        }
-
-        for(suffix <- gramIndex.get(x1) join gramIndex.get(x2)) {
-          newActive(gramIndex(suffix)) = logSum(newActive(gramIndex(suffix)),p1 + p2);
-        }
+      // We now need to create a new trigram for each
+      // right unigram <length 1 unigram> <left unigram>
+      for( (mid,midscore) <- x.length1Chars.activeElements;
+           (beg,begscore) <- x.rightUnigrams.activeElements;
+           (end,endscore) <- x.leftUnigrams.activeElements) {
+        val newBG = gramIndex(Bigram(charIndex.get(beg),charIndex.get(mid)));
+        newCounts(newBG)(end) = logSum(newCounts(newBG)(end),begscore + midscore + endscore);
       }
-      newActive(NonceId) = logSum(newActive(NonceId),2 * p_*);
+      // now we need a trigram for each right bigram and left unigram
+      for( (xc,xprob) <- x.rightBigrams.activeElements;
+          (yc,yprob) <- x.leftUnigrams.activeElements) {
+        newCounts(xc)(yc) = logSum(newCounts(xc)(yc), yprob + xprob);
+      }
+
+      // now we need a trigram for each right unigram and left bigram
+      for( (yc,yprob) <- x.leftBigrams.activeElements;
+           (xc,xprob) <- x.rightUnigrams.activeElements) {
+        val Bigram(y1,y2) = gramIndex.get(yc);
+        val newBG = gramIndex(Bigram(charIndex.get(xc),y1))
+        val encodedY2 = charIndex(y2);
+        newCounts(newBG)(encodedY2) = logSum(newCounts(newBG)(encodedY2), yprob + xprob);
+      }
+      // Now we need to scale by 2 * p_*
       val newCounts2 = mkGramCharMap;
       logAddInPlace2D(newCounts2,newCounts,2 * p_*);
 
-      Elem(newCounts2, p_*, newActive);
-      */
-      x
+
+      // length0 score is the some of all paths only on epsilon
+      val length0score = logClosure(x.length0Score);
+
+      // the length1 chars are the same set, but scaled by the new length0score
+      // (length1 is the weight of paths that contain only 1 real character
+      val length1 = (x.length1Chars + length0score).value;
+
+      // now the frontier sets. basically, this is the same as for multiplication
+      // except we scale by all that paths leading through (i.e. the closure)
+
+      // the left unigram frontier consists of x's old left frontier scaled by p_*
+      val leftUnigrams = x.leftUnigrams + p_*;
+      // the right unigram frontier consists of x's old right frontier scaled by p_*
+      val rightUnigrams = x.rightUnigrams + p_*;
+
+      // analagously for bigrams, except we create new bigrams based on active sets
+      val leftBigrams = x.leftBigrams + p_*
+      val rightBigrams = x.rightBigrams + p_*;
+
+      for( (yc,yprob) <- length1.activeElements;
+           (xc,xprob) <- x.rightUnigrams.activeElements) {
+        val newBG = gramIndex(Bigram(charIndex.get(xc),charIndex.get(yc)));
+        rightBigrams(newBG) = logSum(rightBigrams(newBG),xprob + yprob);
+      }
+
+      for {
+        (xc,xprob) <- length1.activeElements
+        (yc,yprob) <- x.leftUnigrams.activeElements
+        if isAcceptableHistoryChar(yc)
+      } {
+        val newBG = gramIndex(Bigram(charIndex.get(xc),charIndex.get(yc)));
+        leftBigrams(newBG) = logSum(leftBigrams(newBG),xprob + yprob);
+      }
+
+
+      val r = Elem(leftUnigrams, leftBigrams,
+                   newCounts2,length0score, length1,
+                   p_*, 
+                   rightUnigrams, rightBigrams);
+      r
     }
 
-    val one = Elem(mkSparseVector,mkGramCharMap,0.0,mkSparseVector,0.0,mkSparseVector);
-    val zero = Elem(mkSparseVector,mkGramCharMap,-1.0/0.0,mkSparseVector,-1.0/0.0,mkSparseVector);
+    val one = Elem(mkSparseVector,mkSparseVector,mkGramCharMap,0.0,mkSparseVector,0.0,mkSparseVector,mkSparseVector);
+    val zero = Elem(mkSparseVector,mkSparseVector,mkGramCharMap,-1.0/0.0,mkSparseVector,-1.0/0.0,mkSparseVector,mkSparseVector);
   }
 
   def promote[S](a: Arc[Double,S,Char,Char]) = {
     val counts = mkGramCharMap;
-    val active = mkSparseVector;
+    val border = mkSparseVector;
+    val active = mkSparseVector
     if(a.in != epsilon || a.out != epsilon) {
-      val id = gramIndex(Unigram(encode(a.in,a.out)));
-      active(id) = a.weight;
+      val id = charIndex(encode(a.in,a.out));
+      border(id) = a.weight;
+      // It can only be a length-1-spanning character
+      // if the char can be a history character
+      if(isAcceptableHistoryChar(id)) {
+        active(id) = a.weight; 
+      }
     } 
     val nonceScore = if(a.in != epsilon || a.out != epsilon) {
       Double.NegativeInfinity;
     } else {
       a.weight;
     }
-    Elem(active,counts,nonceScore,active,a.weight,active);
+    Elem(leftUnigrams = border, leftBigrams = mkSparseVector,
+         counts = counts,
+         length0Score = nonceScore, length1Chars = active,
+         totalProb = a.weight,
+         rightUnigrams = active,
+         rightBigrams = mkSparseVector);
   }
 
   def promoteOnlyWeight(w: Double) = {
     val counts = mkGramCharMap;
     val active = mkSparseVector;
+    val activeBG = mkSparseVector
     active(beginningUnigramId) = w;
-    active(beginningBigramId) = w;
+    activeBG(beginningBigramId) = w + w;
     val l1active = mkSparseVector;
-    l1active(beginningUnigramId) = w;
-    Elem(active,counts,Double.NegativeInfinity,l1active,w,active);
+    Elem(active,activeBG,counts,Double.NegativeInfinity,l1active,w,active,activeBG);
   }
 
 }
 
 object TrigramSemiring {
-  type EncodedChars = Int
+  type EncodedChars = (Char,Char)
 
-  def encode(ch1: Char, ch2: Char) = ((ch1.toInt << 16)|(ch2)):EncodedChars
+  //def encode(ch1: Char, ch2: Char) = ((ch1.toInt << 16)|(ch2)):EncodedChars
+  def encode(ch1: Char, ch2: Char) = (ch1,ch2);
   def encodeOne(ch: Char) = encode(ch,ch);
-  def decode(cc: EncodedChars) = ((cc >> 16).toChar,(cc & 0XFFFF).toChar);
+  //def decode(cc: EncodedChars) = ((cc >> 16).toChar,(cc & 0XFFFF).toChar);
+  def decode(cc: EncodedChars):(Char,Char) = cc;
 
-  sealed abstract class Gram {
-    def length : Int
-
-    def join(g: Gram) = (this,g) match {
-      case (_,b: Bigram) => Seq(b)
-      case (_:Bigram,b: Unigram) => Seq.empty
-      case (a:Unigram,b: Unigram) => Seq(Bigram(a._1,b._1),b);
-      case (_,Noncegram) => Seq(this)
-      case (Noncegram,_) => Seq(g);
-    }
-  }
-
-  case class Bigram(_1: EncodedChars, _2:EncodedChars) extends Gram {
+  case class Bigram(_1: EncodedChars, _2:EncodedChars) {
     def length = 2;
-    override def hashCode = _1 * 37 + _2;
-  }
-  case class Unigram(_1: EncodedChars) extends Gram {
-    def length = 1;
-    override def hashCode = _1;
-  }
-  case object Noncegram extends Gram {
-    def length = 0;
-    override def hashCode = 0;
+    override val hashCode = _1.hashCode * 37 + _2.hashCode;
   }
 
   // for Automata, we can pass in just chars
   object Bigram {
     def apply(ch1: Char, ch2: Char) = new Bigram(encodeOne(ch1),encodeOne(ch2));
-  } 
+  }
 
-  // for Automata, we can pass in just chars
-  object Unigram {
-    def apply(ch1: Char) = new Unigram(encodeOne(ch1));
-  } 
-
-  val beginningUnigram = Unigram(encode('#','#'));
+  val beginningUnigram = encode('#','#');
   val beginningBigram = Bigram(encode('#','#'),encode('#','#'));
 }

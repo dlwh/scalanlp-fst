@@ -15,7 +15,7 @@ import scala.collection.mutable.PriorityQueue;
 import org.scalacheck._;
 
 object TrigramSetup {
-  val validChars = Seq('a','b','c','d');
+  val validChars = Seq('a','b','c','d','H','e','l','o');
   val validPairs = validChars zip validChars;
   val tgring = new TrigramSemiring(Set.empty ++ validPairs);
 }
@@ -26,6 +26,7 @@ import tgring._;
 @RunWith(classOf[JUnitRunner])
 class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
+  import TrigramSemiring._;
   import ring._;
   import Arbitrary.arbitrary;
 
@@ -45,30 +46,34 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
   def arb: Arbitrary[Elem] = Arbitrary(Gen.oneOf(compositeWeight,simpleWeight));
 
-  /*
-  test("bg zero + zero == zero") {
-    assert(plus(zero,zero) === zero)
-  }
-  test("bg one + zero == one") {
-    assert(plus(one,zero) === one)
-  }
-  test("bg zero + one == one") {
-    assert(plus(zero,one) === one)
-  }
-
-  test("zero* == 1") {
-    assert(closure(zero) === one);
-  }
+  import Math.log;
 
   test("simple* works") {
-    import Math.log;
-    val w = promoteOnlyWeight(log(1/2.));
+    val enc = encode('a','a');
+    val w = promote(Arc(0,0,'a','a',log(0.5)));
     val cl = closure(w);
-    assert(cl.totalProb == log(2.0));
-    // closure * (1/2 * 1/2) * closure again
-    assert(cl.decode.apply(beginningUnigram,encode('#','#')) === 0.0);
+    assert(cl.totalProb === log(2.0));
+    val decoded = cl.decode;
+    val bigram = Bigram(enc,enc);
+    assert(cl.leftUnigrams === cl.rightUnigrams);
+    assert(cl.leftBigrams === cl.rightBigrams);
+    assert( (decoded(bigram)(enc) - log(1.0/2.0)).abs < 1E-9,decoded(bigram)(enc) + " vs " + log(1.0/2.0) );
   }
 
+  test("composite* works") {
+    val enc = encode('a','a');
+    val enc2 = encode('b','b');
+    val w1 = promote(Arc(0,0,'a','a',log(0.25)));
+    val w2 = promote(Arc(0,0,'b','b',log(0.25)));
+    val w = plus(w1,w2);
+    val cl = closure(w);
+    assert(cl.totalProb === log(2.0));
+    val decoded = cl.decode;
+    val bigram = Bigram(enc,enc);
+    assert( (decoded(bigram)(enc) - log(0.0625)).abs < 1E-9);
+    assert(cl.leftUnigrams === cl.rightUnigrams);
+    assert(cl.leftBigrams === cl.rightBigrams);
+  }
 
   test("constant automaton") {
     import Automaton._;
@@ -78,18 +83,10 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val cost = auto.cost;
     val counts = cost.decode;
 
-    assert( counts(Unigram('#'), encodeOne('H')) === 0.0);
-    assert( counts(Unigram('H'), encodeOne('e')) === 0.0);
-    assert( counts(Unigram('l'), encodeOne('l')) === 0.0);
-    assert( counts(Unigram('l'), encodeOne('o')) === 0.0);
-    assert( counts(Unigram('o'), encodeOne('#')) === 0.0);
-    assert( counts(Unigram('o')).logTotal === 0.0);
-    assert( (counts(Unigram('l')).logTotal - 0.6931471805599453).abs < 1E-6, counts(Unigram('l')));
-    assert( counts(Unigram('e')).logTotal === 0.0);
-    assert( counts(Unigram('H')).logTotal === 0.0);
-    assert( counts(Bigram('#','H'), encodeOne('e')) === 0.0);
     assert( counts(Bigram('H','e'), encodeOne('l')) === 0.0);
+    assert( counts(Bigram('#','H'), encodeOne('e')) === 0.0);
     assert( counts(Bigram('l','o'), encodeOne('#')) === 0.0);
+    assert( counts(Bigram('l','l'), encodeOne('o')) === 0.0);
   }
 
   test("split automaton") {
@@ -103,19 +100,13 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val auto = Minimizer.minimize(auto1|auto2).reweight(promote[Int] _ , promoteOnlyWeight _);
     val counts = auto.cost.decode;
 
-    assert( counts(Unigram('#'), encodeOne('H')) === logSum(0.0,0.0));
-    assert( counts(Unigram('#'), encodeOne('#')) === Double.NegativeInfinity);
-    assert( counts(Unigram('H'), encodeOne('e')) === logSum(0.0,0.0));
-    assert( counts(Unigram('l'), encodeOne('l')) === 0.0);
-    assert( counts(Unigram('m'), encodeOne('o')) === 0.0);
-    assert( counts(Unigram('o')).logTotal === logSum(0.0,0.0));
-    assert((counts(Unigram('l')).logTotal - 0.6931471805599453).abs < 1E-6, counts(Unigram('l')));
-    assert( counts(Unigram('H')).logTotal === logSum(0.0,0.0));
     assert( counts(Bigram('#','H'), encodeOne('e')) === logSum(0.0,0.0));
     assert( counts(Bigram('H','e'), encodeOne('l')) === 0.0);
+    assert( counts(Bigram('l','l'), encodeOne('o')) === 0.0);
+    // m isn't an acceptible char
+    assert( counts(Bigram('m','m'), encodeOne('o')) === Double.NegativeInfinity);
     assert( counts(Bigram('l','o'), encodeOne('#')) === 0.0);
   }
-  */
 
   
 }

@@ -41,7 +41,7 @@ trait SemiringAxioms[W] extends FunSuite with Checkers {
   }
   
   test("multiplication associates") {
-    check( (a: W, b: W, c: W) => closeTo(times(times(a,b),c),times(a,times(b,c))));
+    check( (a: W, b: W, c: W) => traceEq(times(times(a,b),c),times(a,times(b,c))));
   }
   
   test("multiplication has identity 1") {
