@@ -38,6 +38,7 @@ object Distance {
     import ring._;
 
     val (distances,allStates) = neighborDistances(fst);
+
     import fst._;
 
     val d = makeMap[W](zero);
@@ -59,10 +60,6 @@ object Distance {
       S.dequeue();
       enqueued(from) = false;
 
-      if(visited(from) > 2) {
-        import scalanlp.util.Log._;
-        globalLog(WARN)("Already visited state " + from + "! Cycle?!");
-      }
       visited(from) += 1;
 
       if(visited(from) == 1) {
