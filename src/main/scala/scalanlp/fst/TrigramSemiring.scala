@@ -20,6 +20,7 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)]) {
 
   val charIndex = Index[EncodedChars]();
   val gramIndex = Index[Bigram]();
+  charIndex(beginningUnigram);
   for( (a,b) <- acceptableChars) {
     charIndex(encode(a,b));
   }
