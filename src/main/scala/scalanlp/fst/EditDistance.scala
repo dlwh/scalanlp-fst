@@ -40,7 +40,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
   }
 
 
-  def rhoInsCost = if(rhoSize == 0) Math.NEG_INF_DOUBLE else logRhoSize + insCost;
+  def rhoInsCost = if(rhoSize == 0) Double.NegativeInfinity else logRhoSize + insCost;
   // |alpha|^2 - |alpha| subs will be covered by "real" characters
   // we need (|alpha| + rhoSize)^2 - |alpha| - rhoSize total substitutions
   //
@@ -50,9 +50,9 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
   // so we need rhoSize^2 - rhoSize other substitutions
   def rhoSubCost = {
     val size = Math.log( (rhoSize * rhoSize - rhoSize));
-    if(rhoSize == 0) Math.NEG_INF_DOUBLE else size + subCost;
+    if(rhoSize == 0) Double.NegativeInfinity else size + subCost;
   }
-  def rhoMatchCost = if(rhoSize == 0) Math.NEG_INF_DOUBLE else logRhoSize + matchCost;
+  def rhoMatchCost = if(rhoSize == 0) Double.NegativeInfinity else logRhoSize + matchCost;
 
   private val logRhoSize = Math.log(rhoSize.toDouble);
   private val Eps = inAlpha.epsilon;
@@ -77,7 +77,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
         b <- allChars.iterator;
         if a != Eps || b != Eps
         cost = costOf(a,b)
-        if cost != Math.NEG_INF_DOUBLE
+        if cost != Double.NegativeInfinity
       } yield {
         Arc(0,0,a,b, cost);
       }

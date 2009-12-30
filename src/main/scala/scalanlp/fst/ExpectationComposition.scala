@@ -6,7 +6,7 @@ import scalanlp.math._;
 */
 final case class LogExpectedWeight(sign: Boolean, prob: Double, score: Double) {
   assert(!prob.isNaN);
-  assert(prob != Math.POS_INF_DOUBLE);
+  assert(prob != Double.PositiveInfinity);
   assert(!score.isNaN);
   def value = if(sign) Math.exp(score-prob) else -Math.exp(score-prob);
 }
