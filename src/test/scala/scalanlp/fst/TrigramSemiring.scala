@@ -17,7 +17,9 @@ import org.scalacheck._;
 object TrigramSetup {
   val validChars = Seq('a','b','c','d','H','e','l','o');
   val validPairs = validChars zip validChars;
-  val tgring = new TrigramSemiring(Set.empty ++ validPairs);
+  val validBasicBigrams = (validPairs.drop(1) zip validPairs.take(validChars.length -1)) ++ validPairs.zip(validPairs);
+  val moreBigrams = "##Hello".zip("#Hello#") map { case (a,b) => ((a,a),(b,b)) };
+  val tgring = new TrigramSemiring(Set.empty ++ validPairs, Set.empty ++ validBasicBigrams ++ moreBigrams);
 }
 import TrigramSetup._;
 import tgring._;
@@ -56,7 +58,6 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val decoded = cl.decode;
     val bigram = Bigram(enc,enc);
     assert(cl.leftUnigrams === cl.rightUnigrams);
-    assert(cl.leftBigrams === cl.rightBigrams);
     assert( (decoded(bigram)(enc) - log(1.0/2.0)).abs < 1E-9,decoded(bigram)(enc) + " vs " + log(1.0/2.0) );
   }
 
@@ -72,7 +73,6 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val bigram = Bigram(enc,enc);
     assert( (decoded(bigram)(enc) - log(0.0625)).abs < 1E-9);
     assert(cl.leftUnigrams === cl.rightUnigrams);
-    assert(cl.leftBigrams === cl.rightBigrams);
   }
 
   test("constant automaton") {
