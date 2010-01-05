@@ -1,11 +1,11 @@
 package scalanlp.fst;
 
 import scalanlp.math._;
-import Numerics.logSum;
+import scalanlp.math.Numerics._;
+import scala.runtime.ScalaRunTime;
 import scalala.Scalala._;
 import scalala.tensor.sparse._;
 import scalala.tensor.sparse._;
-import scala.collection.mutable.ArrayBuffer;
 import scalanlp.collection.mutable.ArrayMap;
 import scalanlp.counters.LogCounters._;
 

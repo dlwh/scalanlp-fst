@@ -129,4 +129,6 @@
       </plugin>
     </plugins>
   </reporting>
+    <name>Scalanlp FST</name>
 </project>
+

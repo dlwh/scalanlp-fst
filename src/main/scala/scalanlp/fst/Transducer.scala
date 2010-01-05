@@ -2,33 +2,31 @@ package scalanlp.fst
 
 import scalanlp.math._;
 import scalanlp.util.Log._;
-import scala.collection.Traversable;
 import scala.collection.Seq;
 import scala.collection.{mutable=>muta}
 import scala.collection.mutable.ArrayBuffer;
-import scala.collection.mutable.PriorityQueue;
 import scala.collection.immutable.IntMap;
 import scalanlp.collection.mutable.ArrayMap;
 
 /**
-* A Transducer is a graph that assigns scores in some semiring over
-*weights W to pairs of sequences of Ins and Outs. They are analgous
-*to Finite State Machines with weighted arcs that have input and
-*output symbols. Another way of thinking about them is that they
-*convert an input string to an output string with some score W, which
-* is like a probability.
-* 
-*The representation is a set of states, and a set of arcs from some
-*state to another state, where each arc is labeled with a weight
-*W, an input symbol, and an output symbol. Epsilons are determined
-*by an alphabet implicit for each input and output symbol
-*
-*In practice, we only need initial states, the arcs going from one
-*state to another state, and the final states.
-*
-* @author dlwh
-*
-*/
+ * A Transducer is a graph that assigns scores in some semiring over
+ *weights W to pairs of sequences of Ins and Outs. They are analgous
+ *to Finite State Machines with weighted arcs that have input and
+ *output symbols. Another way of thinking about them is that they
+ *convert an input string to an output string with some score W, which
+ * is like a probability.
+ *
+ *The representation is a set of states, and a set of arcs from some
+ *state to another state, where each arc is labeled with a weight
+ *W, an input symbol, and an output symbol. Epsilons are determined
+ *by an alphabet implicit for each input and output symbol
+ *
+ *In practice, we only need initial states, the arcs going from one
+ *state to another state, and the final states.
+ *
+ * @author dlwh
+ *
+ */
 abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
                                           final val inAlpha: Alphabet[In],
                                           final val outAlpha: Alphabet[Out]) { outer =>
@@ -37,34 +35,34 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   type Arc = scalanlp.fst.Arc[W,State,In,Out];
 
   /**
-  * Maps states to scores W. This is the "probability" that a given sequence starts in this state.
-  */
+   * Maps states to scores W. This is the "probability" that a given sequence starts in this state.
+   */
   val initialStateWeights: Map[State,W];
   /**
-  * Maps states to scores W. This is the "probability" that a given sequence terminates in this state.
-  */
+   * Maps states to scores W. This is the "probability" that a given sequence terminates in this state.
+   */
   def finalWeight(s: State): W;
 
   def edgesMatching(s: State, in: In, out: Out): Iterator[Arc];
   
   /**
-  * Returns all Arcs leaving this node to some other node.
-  */
+   * Returns all Arcs leaving this node to some other node.
+   */
   final def edgesFrom(s: State):Iterator[Arc] = edgesMatching(s,inAlpha.sigma,outAlpha.sigma);
 
   /**
-  * Returns all Arcs leaving this node to some other node with this input label.
-  */
+   * Returns all Arcs leaving this node to some other node with this input label.
+   */
   final def edgesWithInput(a: State, trans: In): Iterator[Arc] = edgesMatching(a,trans,outAlpha.sigma)
 
   /**
-  * Returns all Arcs leaving this node to some other node with this output label.
-  */
+   * Returns all Arcs leaving this node to some other node with this output label.
+   */
   final def edgesWithOutput(a: State, trans: Out): Iterator[Arc] = edgesMatching(a,inAlpha.sigma,trans);
 
   /**
-  * Returns all edges in the FST: will expand all the states.
-  */
+   * Returns all edges in the FST: will expand all the states.
+   */
   def allEdges :Seq[Arc] = {
     val buf = new ArrayBuffer[Arc]();
     breadthFirstSearch( buf += _ );
@@ -72,8 +70,8 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Retyrns a map from states to all edges in the FST. Will expand all states.
-  */
+   * Retyrns a map from states to all edges in the FST. Will expand all states.
+   */
   def allEdgesByOrigin = {
     val m = allEdges.groupBy(_.from) 
     val statesWithoutEdges = for( (s,_) <- finalStateWeights if !m.contains(s)) yield (s,Seq.empty);
@@ -83,13 +81,13 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   def allStates = Set() ++ initialStateWeights.keysIterator ++ allEdges.iterator.map(_.to);
 
   /**
-  * Returns a map from states to its final weight. may expand all nodes.
-  */
+   * Returns a map from states to its final weight. may expand all nodes.
+   */
   def finalStateWeights = Map.empty ++ allStates.map { s => (s,finalWeight(s)) }
 
   /**
-  * Returns a transducer where each arc's input and output are swapped.
-  */
+   * Returns a transducer where each arc's input and output are swapped.
+   */
   def swapLabels: Transducer[W,State,Out,In] = new Transducer[W,State,Out,In]()(ring, outAlpha, inAlpha) {
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
@@ -100,8 +98,8 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Returns an automaton where each arc is labeled only with the input.
-  */
+   * Returns an automaton where each arc is labeled only with the input.
+   */
   def inputProjection:Automaton[W,State,In] = new Automaton[W,State,In]()(ring, inAlpha) {
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
@@ -112,8 +110,8 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Returns an automaton where each arc is labeled only with the output.
-  */
+   * Returns an automaton where each arc is labeled only with the output.
+   */
   def outputProjection: Automaton[W,State,Out] = new Automaton[W,State,Out]()(ring, outAlpha) {
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
@@ -124,8 +122,8 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Transforms the weights but otherwise returns the same automata.
-  */
+   * Transforms the weights but otherwise returns the same automata.
+   */
   def scaleInitialWeights(f: W) = new Transducer[W,State,In,Out]()(ring, inAlpha, outAlpha) {
     val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,ring.times(f,v)) }
     def finalWeight(s: State) = outer.finalWeight(s);
@@ -135,8 +133,8 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
 
 
   /**
-  * Transforms the weights but otherwise returns the same automata.
-  */
+   * Transforms the weights but otherwise returns the same automata.
+   */
   def reweight[W2:Semiring](f: Arc=>W2, initReweight: W=>W2): Transducer[W2,State,In,Out] = new Transducer[W2,State,In,Out]()(implicitly[Semiring[W2]], inAlpha, outAlpha) {
     val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,initReweight(v))}
     def finalWeight(s: State) = initReweight(outer.finalWeight(s));
@@ -147,9 +145,9 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Epsilon-free composition. If you have epsilons, this will almost certainly generate incorrect results.
-  * Basically, we take the cartesian product over states.
-  */ 
+   * Epsilon-free composition. If you have epsilons, this will almost certainly generate incorrect results.
+   * Basically, we take the cartesian product over states.
+   */
   def >!>[S,Out2](that: Transducer[W,S,Out,Out2]):Transducer[W,(State,S),In,Out2] = new Transducer[W,(State,S),In,Out2]()(ring,inAlpha,that.outAlpha) {
     val initialStateWeights = for {
       (k1,w1) <- outer.initialStateWeights;
@@ -168,8 +166,8 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Creates a new Transducer that collapses
-  */
+   * Creates a new Transducer that collapses
+   */
   def collapseEdges:Transducer[W,State,In,Out] = new Transducer[W,State,In,Out]()(ring,inAlpha,outAlpha) {
 
     override val initialStateWeights = outer.initialStateWeights;
@@ -180,7 +178,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       // group edges by their follow, input and output arcs
       // i.e. everything except their weight.
       val matchingEdges = outer.edgesMatching(s,in,out).toSeq.groupBy { case Arc(from,to,in,out,w) =>
-        (to,in,out);
+          (to,in,out);
       }
 
       // collapse all the weights
@@ -196,19 +194,19 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Simple composition in the general epsilon-ful case.
-  */
+   * Simple composition in the general epsilon-ful case.
+   */
   def >>[S,Out2](that: Transducer[W,S,Out,Out2]) = compose[S,Out2,W,W](that,implicitly[Semiring[W]].times(_,_));
 
   /**
-  * Composition of two transducers in the general case.
-  * Special handling for epsilons described in Mohri (2002). This supports an extension
-  * where we can handle two distinct weight types as long as we have a way of composing them
-  * into a composite weight. In normal composition, this is just product.
-  */
+   * Composition of two transducers in the general case.
+   * Special handling for epsilons described in Mohri (2002). This supports an extension
+   * where we can handle two distinct weight types as long as we have a way of composing them
+   * into a composite weight. In normal composition, this is just product.
+   */
   def compose[S,Out2,W2,W3](that: Transducer[W2,S,Out,Out2],
                             composeW: (W,W2)=>W3)
-                          (implicit sr: Semiring[W3]):Transducer[W3,(State,S,InboundEpsilon),In,Out2] = {
+  (implicit sr: Semiring[W3]):Transducer[W3,(State,S,InboundEpsilon),In,Out2] = {
     val InEps = implicitly[Alphabet[In]].epsilon;
     val Out1Eps = implicitly[Alphabet[Out]].epsilon;
     val Out2Eps = that.outAlpha.epsilon;
@@ -270,8 +268,8 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Prints out a graph in DOT format showing only connectivity
-  */
+   * Prints out a graph in DOT format showing only connectivity
+   */
   def toConnectivityDot = {
     def escape(s: String) = s.replaceAll("\"","\\\"");
     val sb = new StringBuilder;
@@ -287,8 +285,8 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   }
 
   /**
-  * Prints out a graph in DOT format. Useful for visualization and inspection.
-  */
+   * Prints out a graph in DOT format. Useful for visualization and inspection.
+   */
   override def toString = {
     def escape(s: String) = s.replaceAll("\"","\\\"");
     val inEps = inAlpha.epsilon;
@@ -337,19 +335,19 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
   override def equals(that: Any) =  that match {
     case that: Transducer[_,_,_,_] => (this eq that) || (
         this.ring == that.ring
-      &&this.initialStateWeights == that.initialStateWeights
-      && { 
-        val theseEdges = this.allEdges;
-        val thoseEdges = that.allEdges;
-        (
-         Set(theseEdges:_*) == Set(that.allEdges:_*) &&
-         {for(Arc(from,to,_,_,_) <- thoseEdges) yield (
-           finalWeight(from.asInstanceOf[State]) == that.finalWeight(from)
-           && finalWeight(to.asInstanceOf[State]) == that.finalWeight(to)
-         ) }.forall ( x => x )
-       )
-      }
-    )
+        &&this.initialStateWeights == that.initialStateWeights
+        && {
+          val theseEdges = this.allEdges;
+          val thoseEdges = that.allEdges;
+          (
+            Set(theseEdges:_*) == Set(that.allEdges:_*) &&
+            {for(Arc(from,to,_,_,_) <- thoseEdges) yield (
+                finalWeight(from.asInstanceOf[State]) == that.finalWeight(from)
+                && finalWeight(to.asInstanceOf[State]) == that.finalWeight(to)
+              ) }.forall ( x => x )
+          )
+        }
+      )
     case _ => false;
   }
 
@@ -390,27 +388,27 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       val newStateMap = collection.mutable.Map[State,Int]();
       val seqArcs = new collection.mutable.ArrayBuffer[scalanlp.fst.Arc[W,Int,In,Out]];
       outer.breadthFirstSearch { case Arc(from,to,in,out,score) =>
-        val newFrom = newStateMap.getOrElseUpdate(from,nextIndex);
-        seqArcs += Arc(newFrom,newStateMap.getOrElseUpdate(to,nextIndex),in,out,score);
+          val newFrom = newStateMap.getOrElseUpdate(from,nextIndex);
+          seqArcs += Arc(newFrom,newStateMap.getOrElseUpdate(to,nextIndex),in,out,score);
       }
       (seqArcs,newStateMap)
     }
     
     val myFinalWeights = IntMap(stateToU.iterator.map { case (s,u) =>
-      (u, outer.finalWeight(s));
-    }.toSeq:_*);
+          (u, outer.finalWeight(s));
+      }.toSeq:_*);
 
     val initialStateWeights = IntMap(outer.initialStateWeights.map { case (k,v) =>
-      (stateToU(k),v) 
-    }.toSeq:_*);
+          (stateToU(k),v)
+      }.toSeq:_*);
 
     intTransducer[W,In,Out](initialStateWeights,myFinalWeights)(arcs:_*);
   }
       
 
   /**
-  * Determinizes the transducer lazily.
-  */
+   * Determinizes the transducer lazily.
+   */
   def determinize(implicit wld: WLDSemiring[W]): Transducer[W,Map[State,W],In,Out] = new Transducer[W,Map[State,W],In,Out]()(wld,inAlpha,outAlpha) {
     val initialStateWeights = {
       Map(outer.initialStateWeights -> ring.one);
@@ -424,7 +422,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
 
       for((s,v) <- map;
           Arc(_,to,in1,out1,w) <- outer.edgesMatching(s,in,out)) {
-          val label = (in1,out1);
+        val label = (in1,out1);
         // sum over all the different ways to follow arc with label label to 
         // state t
         val newTo = labeledStates.getOrElseUpdate(label,Map[State,W]())
@@ -437,7 +435,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
       
       // normalize by w
       val arcs = for((label,newState) <- labeledStates.elements;
-          w = labeledWeights(label)) yield {
+                     w = labeledWeights(label)) yield {
         newState.transform { (innerState,v) =>
           wld.leftDivide(w,v);
         }
@@ -449,15 +447,15 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
 
     def finalWeight(map: Map[State,W]) = {
       val weights = for( (state,v) <- map.elements;
-          fW = outer.finalWeight(state))
-        yield ring.times(v,fW);
+                        fW = outer.finalWeight(state))
+                          yield ring.times(v,fW);
       weights.foldLeft(ring.zero)(ring.plus _);
     }
   }
 
   /**
-  * True iff the graph contains a non self-loop cycle
-  */
+   * True iff the graph contains a non self-loop cycle
+   */
   lazy val isCyclic = {
     val WHITE = 0
     val GREY = 1
@@ -496,14 +494,14 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
 
 
   /**
-  * Computes the total value of all paths through the transducer.
-  * Automatically selects the algorithm based on cyclicity
-  */
+   * Computes the total value of all paths through the transducer.
+   * Automatically selects the algorithm based on cyclicity
+   */
   lazy val cost = if(false) { //if(isCyclic) {
     val costs = Distance.allPairDistances(this);
     var cost = ring.zero;
     for( (from,initWeight) <- initialStateWeights;
-         (to,pathWeight) <- costs(from)) {
+        (to,pathWeight) <- costs(from)) {
       cost = ring.plus(cost,ring.times(initWeight,ring.times(pathWeight,finalWeight(to))));
 
     }
@@ -531,7 +529,7 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
           s = a.from;
           w = finalWeight(s);
           if w != ring.zero)
-        yield (s,w)
+            yield (s,w)
     );
 
     val finalWeights = initialStateWeights;
@@ -550,16 +548,16 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
     globalLog.log(DEBUG)("rev costs" + costs);
     val initWeights = initialStateWeights map { case (k,v) => (k,times(v,costs(k))) }
     val finalWeights = for( (s,w) <- rev.initialStateWeights;
-      d = costs(s);
-      if d != zero)
-      yield (s,leftDivide(d,w));
+                           d = costs(s);
+                           if d != zero)
+                             yield (s,leftDivide(d,w));
 
     // re-reverse and reweight
     val arcs = {
       for(Arc(to,from,in,out,w) <- rev.allEdges;
-        d = costs(from);
-        if d != zero)
-        yield Arc(from,to,in,out,leftDivide(d,times(w,costs(to))));
+          d = costs(from);
+          if d != zero)
+            yield Arc(from,to,in,out,leftDivide(d,times(w,costs(to))));
     }
 
     Transducer.transducer(initWeights,finalWeights)(arcs:_*);
@@ -569,8 +567,8 @@ abstract class Transducer[W,State,In,Out](implicit final val ring: Semiring[W],
 
 object Transducer {
   /**
-  * Creates a transducer with the given initial states, final states, and arcs.
-  */
+   * Creates a transducer with the given initial states, final states, and arcs.
+   */
   def intTransducer[W:Semiring,In:Alphabet,Out:Alphabet](initialStates: Map[Int,W], finalWeights: Map[Int,W])(arcs: Arc[W,Int,In,Out]*): Transducer[W,Int,In,Out] = {
     
     val arcMap =  arcs.groupBy(_.from);
@@ -614,13 +612,13 @@ object Transducer {
 
 
   /**
-  * Creates a transducer with the given initial states, final states, and arcs.
-  */
+   * Creates a transducer with the given initial states, final states, and arcs.
+   */
   def transducer
-      [W:Semiring,S,In:Alphabet,Out:Alphabet]
-      (initialStates: Map[S,W], finalWeights: Map[S,W])
-      (arcs: Arc[W,S,In,Out]*)
-      : Transducer[W,S,In,Out] = {
+  [W:Semiring,S,In:Alphabet,Out:Alphabet]
+  (initialStates: Map[S,W], finalWeights: Map[S,W])
+  (arcs: Arc[W,S,In,Out]*)
+  : Transducer[W,S,In,Out] = {
     new Transducer[W,S,In,Out]()(implicitly[Semiring[W]], implicitly[Alphabet[In]], implicitly[Alphabet[Out]]) {
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
@@ -640,22 +638,22 @@ object Transducer {
   }
 
   /**
-  * This class can be used to create transducers with a dot-like syntax:
-  <code>
+   * This class can be used to create transducers with a dot-like syntax:
+   <code>
    {
-    val dsl = new DSL[Int,Double];
-    import dsl._;
-    dsl.transducer(initialStates=Map(1-&gt;1.0),finalWeights=Map(3-&gt;1.0))(
-      1 -&gt; 2 (in='3',out=eps,weight=10.),
-      1 -&gt; 3 (in='4',out=eps,weight=11.),
-      2 -&gt; 3 (in='5',out=eps,weight=1.0),
-      1 -&gt; 2 (in=eps,out='3',weight=1.0),
-      2 -&gt; 2 (in='3',out=eps,weight= -1.0)
-    );
-  }
-  </code>
-  *
-  */
+   val dsl = new DSL[Int,Double];
+   import dsl._;
+   dsl.transducer(initialStates=Map(1-&gt;1.0),finalWeights=Map(3-&gt;1.0))(
+   1 -&gt; 2 (in='3',out=eps,weight=10.),
+   1 -&gt; 3 (in='4',out=eps,weight=11.),
+   2 -&gt; 3 (in='5',out=eps,weight=1.0),
+   1 -&gt; 2 (in=eps,out='3',weight=1.0),
+   2 -&gt; 2 (in='3',out=eps,weight= -1.0)
+   );
+   }
+   </code>
+   *
+   */
   class DSL[S,W:Semiring,In:Alphabet,Out:Alphabet] {
     private val inEps = implicitly[Alphabet[In]].epsilon;
     private val outEps = implicitly[Alphabet[Out]].epsilon;
@@ -688,10 +686,10 @@ object Transducer {
   }
 
   /**
-  * These classes represent bookkeeping states for doing composition
-  * in the presence of epsilons. They are essential, but you can
-  * safely ignore them.
-  */
+   * These classes represent bookkeeping states for doing composition
+   * in the presence of epsilons. They are essential, but you can
+   * safely ignore them.
+   */
   sealed abstract class InboundEpsilon;
   case object NoEps extends InboundEpsilon;
   case object LeftEps extends InboundEpsilon;

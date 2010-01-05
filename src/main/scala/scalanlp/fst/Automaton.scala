@@ -1,8 +1,6 @@
 package scalanlp.fst
 
 import scalanlp.math._;
-import scala.collection.Traversable;
-import scala.collection.mutable.PriorityQueue;
 
 import Transducer._;
 
