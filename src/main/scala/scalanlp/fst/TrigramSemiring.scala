@@ -88,7 +88,7 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)], acceptableBigrams: Set[
         (xcI, row) <- bigramCounts.iterator;
         xc = charIndex.get(xcI);
         (ycI, v) <- row.activeElements;
-        yc = charIndex.get(ycI);
+        yc = charIndex.get(ycI)
       } {
         result(xc,yc) = v;
       } 
