@@ -17,6 +17,18 @@ object Composition {
   def compose[W1:Semiring,W2:Semiring,S1,S2,In:Alphabet,Mid:Alphabet,Out:Alphabet,W3:Semiring]
             (transA: Transducer[W1,S1,In,Mid], transB: Transducer[W2,S2,Mid,Out], composeW: (W1,W2)=>W3)
     :Transducer[W3,(S1,S2,InboundEpsilon),In,Out] = {
+      compose(transA,transB,{(a:Option[Mid],b:W1,c:W2) => composeW(b,c)});
+   }
+
+/**
+   * Composition of two transducers in the general case.
+   * Special handling for epsilons described in Mohri (2002). This supports an extension
+   * where we can handle two distinct weight types as long as we have a way of composing them
+   * into a composite weight. In normal composition, this is just product.
+   */
+  def compose[W1:Semiring,W2:Semiring,S1,S2,In:Alphabet,Mid:Alphabet,Out:Alphabet,W3:Semiring]
+            (transA: Transducer[W1,S1,In,Mid], transB: Transducer[W2,S2,Mid,Out], composeW: (Option[Mid],W1,W2)=>W3)
+    :Transducer[W3,(S1,S2,InboundEpsilon),In,Out] = {
 
     val InEps = implicitly[Alphabet[In]].epsilon;
     val MidEps = implicitly[Alphabet[Mid]].epsilon;
@@ -32,12 +44,12 @@ object Composition {
       val initialStateWeights: Map[(S1,S2,InboundEpsilon),W3] = for {
         (k1,w1) <- transA.initialStateWeights;
         (k2,w2) <-  transB.initialStateWeights
-        w = composeW(w1,w2)
+        w = composeW(None,w1,w2)
         if w != sr.zero
       } yield ((k1,k2,NoEps:InboundEpsilon),w);
 
 
-      def finalWeight(s: (S1,S2,InboundEpsilon)) = composeW(transA.finalWeight(s._1),transB.finalWeight(s._2));
+      def finalWeight(s: (S1,S2,InboundEpsilon)) = composeW(None,transA.finalWeight(s._1),transB.finalWeight(s._2));
 
       override def edgesMatching(s: (S1,S2,InboundEpsilon), inout: (In, Out)) = {
         val (in,out) = inout;
@@ -46,7 +58,7 @@ object Composition {
           if out1 != MidEps
           a2 @ Arc(from2,to2,(in2,out2),w2) <- transB.edgesMatching(s._2,(out1,out))
         } yield {
-          Arc(s, (to1,to2,NoEps), (in1,out2),composeW(w1,w2));
+          Arc(s, (to1,to2,NoEps), (in1,out2),composeW(Some(out1),w1,w2));
         }
 
         // todo XXX: make this lazy.
@@ -56,26 +68,26 @@ object Composition {
             case NoEps =>
               if(out == OutEps || out == OutSigma)
                 for( Arc(_,to1,(in1,_),w)  <- transA.edgesMatching(s._1,(in,MidEps)) ) {
-                  arcs += Arc(s,(to1,s._2,LeftEps),(in1,OutEps),composeW(w,ring2.one));
+                  arcs += Arc(s,(to1,s._2,LeftEps),(in1,OutEps),composeW(Some(MidEps),w,ring2.one));
                 }
               if(in == InEps || in == InSigma)
                 for( Arc(_,to,(_,out2),w)  <- transB.edgesMatching(s._2,(MidEps,out)) ) {
-                  arcs += Arc(s,(s._1,to,RightEps),(InEps,out2),composeW(ring1.one,w));
+                  arcs += Arc(s,(s._1,to,RightEps),(InEps,out2),composeW(Some(MidEps),ring1.one,w));
                 }
               if( (in == InEps || in == InSigma) && (out == OutEps || out == OutSigma))
                 for(Arc(_,to1,(in1,_),w)  <- transA.edgesMatching(s._1,(in,MidEps));
                     Arc(_,to2,(_,out2),w2) <- transB.edgesMatching(s._2,(MidEps,out))) {
-                  arcs += Arc(s,(to1,to2,NoEps),(in1,out2),composeW(w,w2));
+                  arcs += Arc(s,(to1,to2,NoEps),(in1,out2),composeW(Some(MidEps),w,w2));
                 }
             case LeftEps=>
               if(out == OutEps || out == OutSigma)
                 for( Arc(_,to1,(in1,_),w)  <- transA.edgesMatching(s._1,(in,MidEps)) ) {
-                  arcs += Arc(s,(to1,s._2,LeftEps),(in1,OutEps),composeW(w,ring2.one));
+                  arcs += Arc(s,(to1,s._2,LeftEps),(in1,OutEps),composeW(Some(MidEps),w,ring2.one));
                 }
             case RightEps =>
               if(in == InEps || in == InSigma)
                 for( Arc(_,to,(_,out2),w)  <- transB.edgesMatching(s._2,(MidEps,out)) ) {
-                  arcs += Arc(s,(s._1,to,RightEps),(InEps,out2),composeW(ring1.one,w));
+                  arcs += Arc(s,(s._1,to,RightEps),(InEps,out2),composeW(Some(MidEps),ring1.one,w));
                 }
           }
           arcs iterator;
