@@ -16,8 +16,7 @@ import scala.annotation.switch;
  *
  * @author dlwh
  */
-class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rhoSize: Int = 0)
-        extends Transducer[Double,Int,Char,Char]()(doubleIsLogSpace,implicitly[Alphabet[Char]],implicitly[Alphabet[Char]]) {
+class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rhoSize: Int = 0) extends Transducer[Double,Int,Char,Char] {
   import Transducer._;
   require( subRatio < 0);
   require( insRatio < 0);
@@ -55,6 +54,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
   def rhoMatchCost = if(rhoSize == 0) Double.NegativeInfinity else logRhoSize + matchCost;
 
   private val logRhoSize = Math.log(rhoSize.toDouble);
+  private val inAlpha = implicitly[Alphabet[Char]];
   private val Eps = inAlpha.epsilon;
   private val Rho = inAlpha.rho;
   private val Sigma = inAlpha.sigma;
@@ -68,9 +68,10 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
 
   def finalWeight(s: Int) = Math.log(1 - Math.exp(Math.log(totalChars) + insCost));
 
-  override def allEdges:Seq[Arc] = (edgesMatching(0,inAlpha.sigma,outAlpha.sigma)).toSeq;
+  override def allEdges:Seq[Arc] = (edgesMatching(0,(Sigma,Sigma))).toSeq;
 
-  def edgesMatching(s: Int, a: Char, b: Char) = if(s != 0) Iterator.empty else {
+  def edgesMatching(s: Int, ab: (Char,Char)) = if(s != 0) Iterator.empty else {
+    val (a,b) = ab;
     if(a == Sigma && b == Sigma) {
       for {
         a <- allChars.iterator;
@@ -79,28 +80,28 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
         cost = costOf(a,b)
         if cost != Double.NegativeInfinity
       } yield {
-        Arc(0,0,a,b, cost);
+        Arc(0,0,(a,b), cost);
       }
     } else if(a == Sigma) {
       if(b == Eps) {
         for(a <- alphaAndRho.iterator)
-          yield Arc(0,0,a,Eps,costOf(a,Eps));
+          yield Arc(0,0,(a,Eps),costOf(a,Eps));
       } else {
         for(a <- allChars.iterator)
-          yield Arc(0,0,a,b,costOf(a,b));
+          yield Arc(0,0,(a,b),costOf(a,b));
       }
     } else if(b == Sigma) {
       if(a == Eps) {
         for(b <- alphaAndRho.iterator)
-          yield Arc(0,0,Eps,b,costOf(Eps,b));
+          yield Arc(0,0,(Eps,b),costOf(Eps,b));
       } else {
         for(b <- allChars.iterator)
-          yield Arc(0,0,a,b,costOf(a,b));
+          yield Arc(0,0,(a,b),costOf(a,b));
       }
     } else if(a == b && b == Eps) {
       Iterator.empty;
     } else {
-      Iterator.single(Arc(0,0,a,b,costOf(a,b)));
+      Iterator.single(Arc(0,0,(a,b),costOf(a,b)));
     }
 
   }

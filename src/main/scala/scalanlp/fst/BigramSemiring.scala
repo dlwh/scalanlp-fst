@@ -115,13 +115,12 @@ object BigramSemiring {
     val zero = Elem(LogDoubleCounter(), LogPairedDoubleCounter[Char,Char](),-1.0/0.0,-1.0/0.0,LogDoubleCounter());
   }
 
-  def promote[S](a: Arc[Double,S,Char,Char]) = {
-    assert(a.in == a.out);
+  def promote[S](a: Arc[Double,S,Char]) = {
     val counts = LogPairedDoubleCounter[Char,Char]();
     val active = LogDoubleCounter[Char]();
-    if(a.in != epsilon)
-      active(a.in) = a.weight;
-    val emptyScore = if(a.in == epsilon) a.weight else Double.NegativeInfinity;
+    if(a.label != epsilon)
+      active(a.label) = a.weight;
+    val emptyScore = if(a.label == epsilon) a.weight else Double.NegativeInfinity;
     Elem(active, counts,a.weight,emptyScore,active);
   }
 

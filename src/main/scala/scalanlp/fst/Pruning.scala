@@ -3,7 +3,7 @@ package scalanlp.fst;
 import scalanlp.math._;
 
 object Pruning {
-  def calculateStateFlow[W:Semiring,State,In,Out](auto: Transducer[W,State,In,Out]): Map[State,W] = {
+  def calculateStateFlow[W:Semiring,State,T](auto: Automaton[W,State,T]): Map[State,W] = {
     val ring = implicitly[Semiring[W]];
     val forward = Distance.singleSourceShortestDistances(auto);
     val backward = Distance.singleSourceShortestDistances(auto.reverse)
@@ -16,10 +16,10 @@ object Pruning {
       (s,ring.times(f,b));
     }
 
-    combined withDefaultValue auto.ring.zero;
+    combined withDefaultValue ring.zero;
   }
 
-  def prune[W:Semiring,State,In:Alphabet,Out:Alphabet](auto: Transducer[W,State,In,Out], belowThreshold: W=>Boolean): Transducer[W,State,In,Out] = {
+  def prune[W:Semiring,State,T:Alphabet](auto: Automaton[W,State,T], belowThreshold: W=>Boolean): Automaton[W,State,T] = {
     val zero = implicitly[Semiring[W]].zero;
 
     val fb = calculateStateFlow(auto);
@@ -27,12 +27,12 @@ object Pruning {
     val initWeights = auto.initialStateWeights.filter { case (k,v) => validStates(k) };
     val newFinalWeights = auto.finalStateWeights.filter { case(k,v) => validStates(k) };
 
-    val newArcs = for( a@Arc(from,to,in,out,w) <- auto.allEdges
+    val newArcs = for( a@Arc(from,to,label,w) <- auto.allEdges
       if validStates(from) && validStates(to) ) 
       yield a;
       
     val imInitWeights = Map.empty ++ initWeights withDefaultValue(zero);
     val imFinalWeights = Map.empty ++ newFinalWeights withDefaultValue(zero);
-    Transducer.transducer(imInitWeights,imFinalWeights)(newArcs:_*);
+    Automaton.automaton(imInitWeights,imFinalWeights)(newArcs:_*);
   }
 }

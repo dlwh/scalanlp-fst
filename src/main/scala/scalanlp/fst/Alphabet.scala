@@ -20,4 +20,10 @@ object Alphabet {
     val sigma = '\1';
     val rho = '\2';
   }
+
+  implicit def tupleize[A:Alphabet,B:Alphabet] = new Alphabet[(A,B)] {
+    val epsilon = (implicitly[Alphabet[A]].epsilon,implicitly[Alphabet[B]].epsilon);
+    val sigma = (implicitly[Alphabet[A]].sigma,implicitly[Alphabet[B]].sigma);
+    val rho = (implicitly[Alphabet[A]].rho,implicitly[Alphabet[B]].rho);
+  }
 }

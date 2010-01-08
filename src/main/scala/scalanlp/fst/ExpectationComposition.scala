@@ -78,8 +78,9 @@ object ExpectationComposition {
   *with Applications to Minimum-Risk Training on Translation, table 1 and 3.
   *
   */
-  def logSpaceExpectationCompose[S1,S2,In,Mid,Out](a: Transducer[Double,S1,In,Mid],
+  def logSpaceExpectationCompose[S1,S2,In:Alphabet,Mid:Alphabet,Out:Alphabet](a: Transducer[Double,S1,In,Mid],
     b: Transducer[Double,S2,Mid,Out]) = {
-    a.compose(b,LogExpectedWeight(_:Double,_:Double))(logExpectedWeightIsSemiring);
+    import scalanlp.math.Semiring.LogSpace._;
+    Composition.compose(a,b,LogExpectedWeight(_:Double,_:Double))
   }
 }

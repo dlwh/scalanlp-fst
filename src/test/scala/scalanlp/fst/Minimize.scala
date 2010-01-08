@@ -57,7 +57,7 @@ class MinimizeTest extends FunSuite {
     import Semiring.LogSpace._;
     import ApproximatePartitioner._;
     val words = List("cu","ko");
-    val auto = words.map(w => Automaton.constant(w,0.0) );
+    val auto = words.map(w => Automaton.constant(w,0.0).asTransducer );
     val ed = new EditDistance(-3,-4,Set.empty ++ words.iterator.flatMap(_.iterator));
 
     val eds = auto.map(a => (ed >> a).inputProjection);

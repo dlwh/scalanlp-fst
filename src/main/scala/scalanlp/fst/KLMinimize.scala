@@ -9,13 +9,13 @@ import Numerics._;
 object KLMinimize {
   import Minimizer._;
 
-  implicit def partitioner[State,In,Out] = new KLPartitioner[State,In,Out](3.0);
+  implicit def partitioner[State,T] = new KLPartitioner[State,T](3.0);
 
-  class KLPartitioner[State,In,Out](cutoff: Double) extends Partitioner[Double,State,In,Out] {
-    def repartition(partitions: Iterable[Partition[Double,State,In,Out]]) = {
+  class KLPartitioner[State,T](cutoff: Double) extends Partitioner[Double,State,T] {
+    def repartition(partitions: Iterable[Partition[Double,State,T]]) = {
       val iter = partitions.iterator;
 
-      val newPartitions = new ArrayBuffer[Partition[Double,State,In,Out]];
+      val newPartitions = new ArrayBuffer[Partition[Double,State,T]];
       newPartitions += iter.next
 
       for( part1@(p1,states1) <- iter) {
@@ -42,7 +42,7 @@ object KLMinimize {
     }
   }
 
-  def computeKLDivergence[In,Out](p1: EquivalenceInfo[Double,In,Out], p2: EquivalenceInfo[Double,In,Out]) = {
+  def computeKLDivergence[T](p1: EquivalenceInfo[Double,T], p2: EquivalenceInfo[Double,T]) = {
     // how much smoothing
     val extraMass1 = try { p1.arcs.valuesIterator.toSeq.min/10 } catch { case _ => Math.log(1E-4) }
     val extraMass2 = try { p2.arcs.valuesIterator.toSeq.min/10 } catch { case _ => Math.log(1E-4) };

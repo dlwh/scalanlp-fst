@@ -9,8 +9,7 @@ import scalanlp.math.Semiring.LogSpace._;
 *
 * @author dlwh
 */
-class DecayAutomaton( val expectedLength:Double, chars: Set[Char], rhoSize: Int = 0) 
-    extends Automaton[Double,Int,Char]()(doubleIsLogSpace,implicitly[Alphabet[Char]]) {
+class DecayAutomaton(val expectedLength:Double, chars: Set[Char], rhoSize: Int = 0) extends Automaton[Double,Int,Char] {
   import Transducer._;
   require( expectedLength > 0);
   // E[|X|] = p / (1-p)
@@ -30,21 +29,21 @@ class DecayAutomaton( val expectedLength:Double, chars: Set[Char], rhoSize: Int 
 
   def finalWeight(s: Int) = stopProb;
 
-  override lazy val allEdges:Seq[Arc] = edgesMatching(0,inAlpha.sigma).toSeq;
+  override lazy val allEdges:Seq[Arc] = edgesMatching(0,alphabet.sigma).toSeq;
 
-  private val rhoEdge = Arc(0,0,inAlpha.rho,inAlpha.rho,Math.log(rhoSize) + arcCost);
+  private val rhoEdge = Arc(0,0,alphabet.rho,Math.log(rhoSize) + arcCost);
 
   def edgesMatching(s: Int, a: Char) = {
     if(s == 0) {
-      if(a == inAlpha.sigma) {
+      if(a == alphabet.sigma) {
         val subs = for(a <- chars.iterator)
-          yield Arc(0,0,a,a,arcCost)
+          yield Arc(0,0,a,arcCost)
         if(rhoSize == 0) subs
         else subs ++ Iterator.single(rhoEdge)
-      } else if(a == inAlpha.rho)
+      } else if(a == alphabet.rho)
         Iterator.single(rhoEdge);
-      else if(a != inAlpha.epsilon)
-        Iterator.single(Arc(0,0,a,a,arcCost))
+      else if(a != alphabet.epsilon)
+        Iterator.single(Arc(0,0,a,arcCost))
       else Iterator.empty;
     } else {
       Iterator.empty;

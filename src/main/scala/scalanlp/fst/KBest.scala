@@ -11,14 +11,13 @@ trait KBest {
 
   protected def computeHeuristics[W:Semiring,State,T](auto: Automaton[W,State,T]): (State=>W);
 
-  def extract[W:Ordering,State,T](auto: Automaton[W,State,T]):Iterator[(Seq[T],W)] = {
-    import auto.ring; // XXX
-    val heuristics = computeHeuristics(auto)(auto.ring);
+  def extract[W,State,T](auto: Automaton[W,State,T])
+                        (implicit ring: Semiring[W], ord: Ordering[W], alphabet : Alphabet[T]):Iterator[(Seq[T],W)] = {
+    val heuristics = computeHeuristics(auto)(ring);
 
     val pq = initialPQ(auto,heuristics);
 
     val derivations = new Iterator[Derivation[W,State,T]] {
-      import auto.ring._;
 
       def hasNext:Boolean = {
         !pq.isEmpty
@@ -35,9 +34,9 @@ trait KBest {
     kbest
   }
 
-  def extractList[W:Ordering,State,T](auto: Automaton[W,State,T], num: Int):Seq[(Seq[T],W)] = {
-    import auto.ring._;
-    val heuristics = computeHeuristics(auto)(auto.ring);
+  def extractList[W,State,T](auto: Automaton[W,State,T], num: Int)
+                            (implicit ring: Semiring[W], ord: Ordering[W], alphabet: Alphabet[T]):Seq[(Seq[T],W)] = {
+    val heuristics = computeHeuristics(auto)(ring);
 
     val pq = initialPQ(auto,heuristics);
     val kbest = new ArrayBuffer[(Seq[T],W)];
@@ -53,11 +52,10 @@ trait KBest {
     kbest
   }
 
-  private def initialPQ[W:Ordering,State,T](auto: Automaton[W,State,T],heuristics: State=>W) = {
-    import auto.ring._;
+  private def initialPQ[W,State,T](auto: Automaton[W,State,T],heuristics: State=>W)(implicit ring: Semiring[W], ord: Ordering[W]) = {
     val pq = new PriorityQueue[Derivation[W,State,T]];
     for( (state,w) <- auto.initialStateWeights) {
-      pq += Derivation(ArrayBuffer.empty,state,w,times(w,heuristics(state)),false);
+      pq += Derivation(ArrayBuffer.empty,state,w,ring.times(w,heuristics(state)),false);
     }
 
     pq
@@ -65,8 +63,9 @@ trait KBest {
   }
 
   // Pops the top derivation off and adds any descendents to the queue, returns that derivation
-  private def relax[W,S,T](auto: Automaton[W,S,T], pq: PriorityQueue[Derivation[W,S,T]], heuristics: S=>W) = {
-    import auto.ring._;
+  private def relax[W,S,T](auto: Automaton[W,S,T], pq: PriorityQueue[Derivation[W,S,T]], heuristics: S=>W)
+                          (implicit ring: Semiring[W], ord: Ordering[W], alphabet: Alphabet[T]) = {
+    import ring._;
     val deriv@Derivation(str,state,weight,_,atFinal) = pq.dequeue;
     if(!atFinal) {
       val finalWeight = auto.finalWeight(state);
@@ -75,8 +74,8 @@ trait KBest {
         pq += Derivation(str,state,finalScore,finalScore,true);
       }
 
-      for( Arc(_,to,ch,_,w) <- auto.edgesFrom(state)) {
-        val newDeriv = if(ch == auto.inAlpha.epsilon) str else (str.clone() += ch)
+      for( Arc(_,to,ch,w) <- auto.edgesFrom(state)) {
+        val newDeriv = if(ch == alphabet.epsilon) str else (str.clone() += ch)
           val newWeight = times(weight,w);
         val newHeuristic = times(newWeight,heuristics(to));
         pq += Derivation(newDeriv,to,newWeight,newHeuristic,false);

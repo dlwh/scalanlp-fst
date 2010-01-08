@@ -16,10 +16,9 @@ import org.scalacheck._;
 
 object TrigramSetup {
   val validChars = Seq('a','b','c','d','H','e','l','o');
-  val validPairs = validChars zip validChars;
-  val validBasicBigrams = (validPairs.drop(1) zip validPairs.take(validChars.length -1)) ++ validPairs.zip(validPairs);
-  val moreBigrams = "##Hello".zip("#Hello#") map { case (a,b) => ((a,a),(b,b)) };
-  val tgring = new TrigramSemiring(Set.empty ++ validPairs, Set.empty ++ validBasicBigrams ++ moreBigrams);
+  val validBasicBigrams = (validChars.drop(1) zip validChars.take(validChars.length -1)) ++ validChars.zip(validChars);
+  val moreBigrams = "##Hello".zip("#Hello#");
+  val tgring = new TrigramSemiring(Set.empty ++ validChars, Set.empty ++ validBasicBigrams ++ moreBigrams, '#');
 }
 import TrigramSetup._;
 import tgring._;
@@ -35,10 +34,10 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
   def makeRing = tgring.ring;
 
   def simpleWeight = for {
-    ch <- Gen.elements(validPairs:_*);
+    ch <- Gen.elements(validChars:_*);
     w <- arbitrary[Double];
     if !w.isNaN
-  } yield promote(Arc(0,0,ch._1,ch._2,w));
+  } yield promote(Arc(0,0,ch,w));
 
   def compositeWeight = for {
     w1 <- simpleWeight;
@@ -51,8 +50,8 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
   import Math.log;
 
   test("simple* works") {
-    val enc = encode('a','a');
-    val w = promote(Arc(0,0,'a','a',log(0.5)));
+    val enc = 'a';
+    val w = promote(Arc(0,0,'a',log(0.5)));
     val cl = closure(w);
     assert(cl.totalProb === log(2.0));
     val decoded = cl.decode;
@@ -62,10 +61,10 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
   }
 
   test("composite* works") {
-    val enc = encode('a','a');
-    val enc2 = encode('b','b');
-    val w1 = promote(Arc(0,0,'a','a',log(0.25)));
-    val w2 = promote(Arc(0,0,'b','b',log(0.25)));
+    val enc = 'a';
+    val enc2 = 'b';
+    val w1 = promote(Arc(0,0,'a',log(0.25)));
+    val w2 = promote(Arc(0,0,'b',log(0.25)));
     val w = plus(w1,w2);
     val cl = closure(w);
     assert(cl.totalProb === log(2.0));
@@ -83,10 +82,10 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val cost = auto.cost;
     val counts = cost.decode;
 
-    assert( counts(Bigram('H','e'), encodeOne('l')) === 0.0);
-    assert( counts(Bigram('#','H'), encodeOne('e')) === 0.0);
-    assert( counts(Bigram('l','o'), encodeOne('#')) === 0.0);
-    assert( counts(Bigram('l','l'), encodeOne('o')) === 0.0);
+    assert( counts(Bigram('H','e'), ('l')) === 0.0);
+    assert( counts(Bigram('#','H'), ('e')) === 0.0);
+    assert( counts(Bigram('l','o'), ('#')) === 0.0);
+    assert( counts(Bigram('l','l'), ('o')) === 0.0);
   }
 
   test("split automaton") {
@@ -100,12 +99,12 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val auto = Minimizer.minimize(auto1|auto2).reweight(promote[Int] _ , promoteOnlyWeight _);
     val counts = auto.cost.decode;
 
-    assert( counts(Bigram('#','H'), encodeOne('e')) === logSum(0.0,0.0));
-    assert( counts(Bigram('H','e'), encodeOne('l')) === 0.0);
-    assert( counts(Bigram('l','l'), encodeOne('o')) === 0.0);
+    assert( counts(Bigram('#','H'), ('e')) === logSum(0.0,0.0));
+    assert( counts(Bigram('H','e'), ('l')) === 0.0);
+    assert( counts(Bigram('l','l'), ('o')) === 0.0);
     // m isn't an acceptible char
-    assert( counts(Bigram('m','m'), encodeOne('o')) === Double.NegativeInfinity);
-    assert( counts(Bigram('l','o'), encodeOne('#')) === 0.0);
+    assert( counts(Bigram('m','m'), ('o')) === Double.NegativeInfinity);
+    assert( counts(Bigram('l','o'), ('#')) === 0.0);
   }
 
   

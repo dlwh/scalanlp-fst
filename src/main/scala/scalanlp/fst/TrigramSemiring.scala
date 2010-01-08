@@ -16,17 +16,18 @@ import scalanlp.util.Index;
  * @param acceptableChars : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
  */
-class TrigramSemiring(acceptableChars: Set[(Char,Char)], acceptableBigrams: Set[((Char,Char),(Char,Char))]) {
+class TrigramSemiring[T:Alphabet](acceptableChars: Set[T], acceptableBigrams: Set[(T,T)],beginningUnigram: T) {
   import TrigramSemiring._;
+  val beginningBigram = Bigram(beginningUnigram,beginningUnigram);
 
-  val charIndex = Index[EncodedChars]();
+  val charIndex = Index[T]();
   charIndex(beginningUnigram);
-  for( (a,b) <- acceptableChars) {
-    charIndex(encode(a,b));
+  for( ab <- acceptableChars) {
+    charIndex(ab);
   }
   val maxAcceptableChar = charIndex.size;
 
-  val gramIndex = Index[Bigram]();
+  val gramIndex = Index[Bigram[T]]();
   gramIndex(beginningBigram);
   for( ch <- acceptableChars) {
     val bg1 = Bigram(ch,beginningUnigram);
@@ -70,7 +71,7 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)], acceptableBigrams: Set[
     * Returns a counter of the conditional trigrams we learned.
     */ 
     def decode = {
-      val result = LogPairedDoubleCounter[Bigram,EncodedChars]();
+      val result = LogPairedDoubleCounter[Bigram[T],T]();
       for {
         (xcI,row) <- trigramCounts.iterator
         xc = gramIndex.get(xcI);
@@ -83,7 +84,7 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)], acceptableBigrams: Set[
     }
 
     def decodeBigrams = {
-      val result = LogPairedDoubleCounter[EncodedChars,EncodedChars]();
+      val result = LogPairedDoubleCounter[T,T]();
       for {
         (xcI, row) <- bigramCounts.iterator;
         xc = charIndex.get(xcI);
@@ -118,7 +119,13 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)], acceptableBigrams: Set[
       for( (k,row) <- from) {
         val old = to(k);
         if (old.activeDomain.size == 0) {
-          old := row + scale;
+          var offset = 0;
+          while(offset < row.used) {
+            val k =  row.index(offset);
+            val v =  row.data(offset);
+            old(k) = v+scale;
+            offset += 1;
+          }
         } else {
           logAddInPlace(old,row,scale);
         }
@@ -362,12 +369,12 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)], acceptableBigrams: Set[
     val zero = Elem(mkSparseVector,mkSparseVector,mkGramCharMap, mkGramCharMap,-1.0/0.0,mkSparseVector,-1.0/0.0,mkSparseVector,mkSparseVector);
   }
 
-  def promote[S](a: Arc[Double,S,Char,Char]) = {
+  def promote[S](a: Arc[Double,S,T]) = {
     val counts = mkGramCharMap;
     val border = mkSparseVector;
     val active = mkSparseVector
-    if (a.in != epsilon || a.out != epsilon) {
-      val id = charIndex(encode(a.in,a.out));
+    if (a.label != implicitly[Alphabet[T]].epsilon) {
+      val id = charIndex(a.label);
       border(id) = a.weight;
       // It can only be a length-1-spanning character
       // if the char can be a history character
@@ -375,7 +382,7 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)], acceptableBigrams: Set[
         active(id) = a.weight; 
       }
     } 
-    val nonceScore = if (a.in != epsilon || a.out != epsilon) {
+    val nonceScore = if (a != implicitly[Alphabet[T]].epsilon) {
       Double.NegativeInfinity;
     } else {
       a.weight;
@@ -402,24 +409,11 @@ class TrigramSemiring(acceptableChars: Set[(Char,Char)], acceptableBigrams: Set[
 }
 
 object TrigramSemiring {
-  type EncodedChars = (Char,Char)
 
-  //def encode(ch1: Char, ch2: Char) = ((ch1.toInt << 16)|(ch2)):EncodedChars
-  def encode(ch1: Char, ch2: Char) = (ch1,ch2);
-  def encodeOne(ch: Char) = encode(ch,ch);
-  //def decode(cc: EncodedChars) = ((cc >> 16).toChar,(cc & 0XFFFF).toChar);
-  def decode(cc: EncodedChars):(Char,Char) = cc;
-
-  case class Bigram(_1: EncodedChars, _2:EncodedChars) {
+  case class Bigram[T](_1: T, _2:T) {
     def length = 2;
     override val hashCode = _1.hashCode * 37 + _2.hashCode;
   }
 
-  // for Automata, we can pass in just chars
-  object Bigram {
-    def apply(ch1: Char, ch2: Char) = new Bigram(encodeOne(ch1),encodeOne(ch2));
-  }
-
-  val beginningUnigram = encode('#','#');
-  val beginningBigram = Bigram(encode('#','#'),encode('#','#'));
+  val beginningUnigram = '#';
 }

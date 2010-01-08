@@ -19,7 +19,8 @@ class ParameterizedEditDistance(costFunction: (Char,Char)=>Double, alphabet: Set
         extends Transducer[Double,Int,Char,Char]() {
   import Transducer._;
 
-  val totalChars = alphabet.size;
+  def totalChars = alphabet.size;
+  private def inAlpha = implicitly[Alphabet[Char]];
 
   /**
    * total costs for each input character
@@ -42,29 +43,30 @@ class ParameterizedEditDistance(costFunction: (Char,Char)=>Double, alphabet: Set
   
   // 1 - all insertions possible 
   private val theFinalWeight = {
-    val edges = edgesMatching(0,Eps,Sigma).map(_.weight).toSeq;
+    val edges = edgesMatching(0,(Eps,Sigma)).map(_.weight).toSeq;
     val totalInsertMass = logSum(edges);
     Math.log(1- Math.exp(totalInsertMass));
   }
   def finalWeight(s: Int) = theFinalWeight;
 
-  override def allEdges:Seq[Arc] = (edgesMatching(0,inAlpha.sigma,outAlpha.sigma)).toSeq;
+  override def allEdges:Seq[Arc] = (edgesMatching(0,(inAlpha.sigma,inAlpha.sigma))).toSeq;
 
-  def edgesMatching(s: Int, a: Char, b: Char) = {
+  def edgesMatching(s: Int, ab: (Char, Char)) = {
+    val (a,b) = ab;
 
     if(a == Sigma) {
       for {
         a <- allChars.iterator
       } yield {
-        Arc(0,0,a,b, cost);
+        Arc(0,0,(a,b), cost);
       }
     } else if(b == Sigma) {
       for(b <- allChars.iterator) yield
-        Arc(0,0,a,b,costFunction(a,b));
+        Arc(0,0,(a,b),costFunction(a,b));
     } else if(a == b && b == Eps) {
       Iterator.empty;
-    } else { // Woot.
-      Iterator.single(Arc(0,0,a,b,costFunction(a,b)));
+    } else { 
+      Iterator.single(Arc(0,0,(a,b),costFunction(a,b)));
     }
   }
 }

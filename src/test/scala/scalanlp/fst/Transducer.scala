@@ -18,21 +18,22 @@ class TransducerTest extends FunSuite {
   import Transducer._;
 
   test("Mohri hwa fig 7 epsilon-full composition") {
-    val dsl = new DSL[Int,Boolean,Char,Char]();
+    val dsl = new Transducer.DSL[Int,Boolean,Char,Char]();
     import dsl._;
     val t1 = transducer( Map(0->true), Map(4->true))(
-      0 -> 1 ('a','a',true),
+      0 -> (1)('a','a',true),
       1 -> 2 ('b',eps,true),
       2 -> 3 ('c',eps,true),
-      3 -> 4 ('d','d',true)
+      3 -> (4)('d','d',true)
     );
     val t2 = transducer( Map(0->true), Map(3->true))(
-      0 -> 1 ('a','d',true),
+      0 -> (1)  ('a','d',true),
       1 -> 2 (eps,'e',true),
-      2 -> 3 ('d','a',true)
+      2 -> (3)  ('d','a',true)
     );
 
     val result = {
+      import Composition._;
       val dsl = new DSL[(Int,Int,InboundEpsilon),Boolean,Char,Char]();
       import dsl._;
       transducer(Map((0,0,NoEps:InboundEpsilon)->true),Map( (4,3,NoEps:InboundEpsilon)-> true))( 
@@ -50,7 +51,7 @@ class TransducerTest extends FunSuite {
 
   test("cost of a one-arc system is correct") {
     import Semiring.LogSpace._;
-    val fst = Transducer.transducer[Double,Int,Char,Char](Map(0->0.0),Map(1->0.0))(Arc(0,1,'a','b',0.0));
+    val fst = Transducer.transducer[Double,Int,Char,Char](Map(0->0.0),Map(1->0.0))(Arc(0,1,('a','b'),0.0));
     assert(fst.cost === 0.0);
   }
 
@@ -58,16 +59,17 @@ class TransducerTest extends FunSuite {
     import Semiring.LogSpace._;
     val selfLoopScore = -1.0;
     val trueCost = doubleIsLogSpace.closure(selfLoopScore)
-    val fst = Transducer.transducer[Double,Int,Char,Char](Map(0->0.0),Map(0->0.0))(Arc(0,0,'\0','\0',selfLoopScore));
+    val fst = Transducer.transducer[Double,Int,Char,Char](Map(0->0.0),Map(0->0.0))(Arc(0,0,('\0','\0'),selfLoopScore));
     assert(fst.cost === trueCost);
   }
 
   test("reverse works nicely") {
     import Semiring.LogSpace._;
-    val fst = transducer[Double,Int,Char,Char](Map(0->0.0),Map(2->0.0))( Arc(0,1,'\0','\0',-1.0), 
-        Arc(1,0,'\0','\0',-2.0), Arc(1,2,'\0',('3'),-3.0), Arc(2,0,'\0',('4'),-5.0));
-    val myRevd = transducer[Double,Int,Char,Char](Map(2->0.0),Map(0->0.0))( Arc(1,0,'\0','\0',-1.0), 
-        Arc(0,1,'\0','\0',-2.0), Arc(2,1,'\0',('3'),-3.0), Arc(0,2,'\0',('4'),-5.0));
+    import Automaton._;
+    val fst = automaton[Double,Int,Char](Map(0->0.0),Map(2->0.0))( Arc(0,1,'\0',-1.0),
+        Arc(1,0,'\0',-2.0), Arc(1,2,('3'),-3.0), Arc(2,0,'4',-5.0));
+    val myRevd = automaton[Double,Int,Char](Map(2->0.0),Map(0->0.0))( Arc(1,0,'\0',-1.0),
+        Arc(0,1,'\0',-2.0), Arc(2,1,('3'),-3.0), Arc(0,2,('4'),-5.0));
     assert(myRevd.initialStateWeights === fst.reverse.initialStateWeights);
     assert(myRevd === fst.reverse);
   }
@@ -132,7 +134,7 @@ class TransducerTest extends FunSuite {
 
   test("relabel doesn't screw up cost") {
     import Semiring.LogSpace._;
-    val a = Automaton.constant("aa",0.0);
+    val a = Automaton.constant("aa",0.0).asTransducer;
     val ed = new EditDistance(-3,-3,Set('a','b'));
     val pushed = (a >> ed).pushWeights(doubleIsLogSpace);
     val pC = pushed.cost;

@@ -27,7 +27,7 @@ class BigramSemiringTest extends FunSuite with SemiringAxioms[BigramSemiring.Ele
     ch <- Gen.alphaChar;
     w <- arbitrary[Double];
     if !w.isNaN
-  } yield promote(Arc(0,0,ch,ch,w));
+  } yield promote(Arc(0,0,ch,w));
 
   def compositeWeight = for {
     w1 <- (simpleWeight);

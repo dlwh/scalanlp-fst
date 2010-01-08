@@ -9,7 +9,7 @@ object Distance {
   * Selects between singleSourceShortestDistance and allPairDistances
   * based on cyclicity
   */
-  def allPathDistances[W:Semiring,State,In,Out](fst: Transducer[W,State,In,Out]) = if(fst.isCyclic) {
+  def allPathDistances[W:Semiring,State,T](fst: Automaton[W,State,T]) = if(fst.isCyclic) {
     val ring = implicitly[Semiring[W]];
 
     val allPairs = allPairDistances(fst);
@@ -33,7 +33,7 @@ object Distance {
   * for acyclic graphs, k-closed semirings, or grahs that are acyclic except
   * for self-loops
   */
-  def singleSourceShortestDistances[W:Semiring,State,In,Out](fst: Transducer[W,State,In,Out]):Map[State,W] = {
+  def singleSourceShortestDistances[W:Semiring,State,T](fst: Automaton[W,State,T]):Map[State,W] = {
     val ring = implicitly[Semiring[W]];
     import ring._;
 
@@ -99,14 +99,14 @@ object Distance {
   * Returns the distances between individual pairs of states using
   * only one hop
   */
-  private def neighborDistances[W:Semiring,State,In,Out](fst: Transducer[W,State,In,Out]) = {
+  private def neighborDistances[W:Semiring,State,T](fst: Automaton[W,State,T]) = {
     val ring = implicitly[Semiring[W]];
     import ring._;
     import fst._;
 
     val distances = makeMap(makeMap(zero));
     val allStates = makeMap[State](null.asInstanceOf[State]); // XXX
-    breadthFirstSearch { case Arc(from,to,_,_,w) =>
+    breadthFirstSearch { case Arc(from,to,_,w) =>
       val current = distances(from)(to);
       distances(from)(to) = plus(current,w);
       allStates(from) = from;
@@ -120,7 +120,7 @@ object Distance {
   * Finds all pair-wise distances between all points in O(n^3),
   * where n is the number of states. Works for any complete semiring.
   */
-  def allPairDistances[W:Semiring,State,In,Out](fst: Transducer[W,State,In,Out]) = {
+  def allPairDistances[W:Semiring,State,T](fst: Automaton[W,State,T]) = {
     val ring = implicitly[Semiring[W]];
     import ring._;
     val (distances,allStates) = neighborDistances(fst);

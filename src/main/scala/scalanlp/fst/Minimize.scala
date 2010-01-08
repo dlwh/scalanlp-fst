@@ -1,7 +1,6 @@
 package scalanlp.fst;
 
 import scala.collection.mutable.HashMap;
-import scala.collection.mutable.OpenHashMap;
 import scala.collection.mutable.ArrayBuffer;
 import scalanlp.collection.mutable.ArrayMap;
 
@@ -11,15 +10,15 @@ object Minimizer {
   // two states are potentially equivalent if they have the same follow set (nextStates)
   // and are equivalent if their final states are similar, and their individual
   // arcs have similar weights.
-  case class EquivalenceInfo[W,In,Out](val finalWeight: W, val arcs: OpenHashMap[(Int,In,Out),W]);
+  case class EquivalenceInfo[W,T](val finalWeight: W, val arcs: HashMap[(Int,T),W]);
 
-  type Partition[W,State,In,Out] = (EquivalenceInfo[W,In,Out],Set[State]);
+  type Partition[W,State,T] = (EquivalenceInfo[W,T],Set[State]);
 
-  trait Partitioner[W,State,In,Out] {
+  trait Partitioner[W,State,T] {
     /**
     * Given a set of partitions, split or merge these partitions into better partitions.
     */
-    def repartition(partitions: Iterable[Partition[W,State,In,Out]]): Seq[Partition[W,State,In,Out]];
+    def repartition(partitions: Iterable[Partition[W,State,T]]): Seq[Partition[W,State,T]];
   }
 
   /**
@@ -30,22 +29,24 @@ object Minimizer {
   * This is the labeled generalization of Ullman's 1967 algorithm to weighted
   * automata with extra support for weighted NFAs.
   */
-  def minimize[W,State,In,Out](trans: Transducer[W,State,In,Out])
+  def minimize[W,State,T](trans: Automaton[W,State,T])
                               (implicit ring: Semiring[W],
-                              partitioner: Partitioner[W,State,In,Out]): Transducer[W,Int,In,Out] = {
-    new MinimizeWorker(trans).minimize;
+                              partitioner: Partitioner[W,State,T],
+                              alphabet: Alphabet[T]) = {
+    new MinimizeWorker[W,State,T](trans)(partitioner,ring,alphabet).minimize;
   }
   
 
   // Worker just prevents a lot of passing around of states and types.
-  private class MinimizeWorker[W,State,In,Out](trans: Transducer[W,State,In,Out])
-                                              (implicit partitioner: Partitioner[W,State,In,Out],
-                                                ring: Semiring[W]) {
+  private class MinimizeWorker[W,State,T](trans: Automaton[W,State,T])
+                                              (implicit partitioner: Partitioner[W,State,T],
+                                                ring: Semiring[W],
+                                                alpha: Alphabet[T]) {
     private val edgesByOrigin = trans.allEdgesByOrigin;
 
     def minimize = {
       // initialpartition:
-      val partitions = new ArrayBuffer[Partition[W,State,In,Out]];
+      val partitions = new ArrayBuffer[Partition[W,State,T]];
       partitions ++= partition(Set.empty ++ edgesByOrigin.keysIterator,_ => 0);
 
       val partitionOf:scala.collection.mutable.Map[State,Int] = trans.makeMap(-1);
@@ -111,7 +112,7 @@ object Minimizer {
       val newFinalWeights = new ArrayMap[W] {
         override def defValue = ring.zero;
       };
-      type NewArc = scalanlp.fst.Arc[W,Int,In,Out];
+      type NewArc = scalanlp.fst.Arc[W,Int,T];
       val arcs = new ArrayBuffer[NewArc];
 
       for( (s,w) <- trans.initialStateWeights) {
@@ -119,14 +120,14 @@ object Minimizer {
       }
       for( ((equivInfo,partition),index) <- partitions.zipWithIndex) {
         newFinalWeights(index) = equivInfo.finalWeight;
-        for( ( (to,in,out),w) <- equivInfo.arcs) {
-          arcs += new NewArc(index,to,in,out,w);
+        for( ( (to,label),w) <- equivInfo.arcs) {
+          arcs += new NewArc(index,to,label,w);
         }
       }
         
       val imInitWeights = Map.empty ++ initWeights withDefaultValue(ring.zero);
       val imFinalWeights = Map.empty ++ newFinalWeights withDefaultValue(ring.zero);
-      Transducer.intTransducer(imInitWeights,imFinalWeights)(arcs:_*)(ring,trans.inAlpha,trans.outAlpha);
+      Automaton.intAutomaton(imInitWeights,imFinalWeights)(arcs:_*);
     }
 
     private def partition(states: Set[State], parter: State=>Int) = {
@@ -139,12 +140,13 @@ object Minimizer {
       partitioner.repartition(partitions);
     }
 
-    private def aggregateArcs(arcs : Seq[Arc[W,State,In,Out]], destMapper: State=>Int) = {
-      val edgeMap = new OpenHashMap[(Int,In,Out),W](arcs.length * 2) {
-        override def default(i: (Int,In,Out)) = ring.zero;
+    private def aggregateArcs(arcs : Seq[Arc[W,State,T]], destMapper: State=>Int) = {
+      val edgeMap = new HashMap[(Int,T),W]() {
+        override def initialSize = arcs.length * 2;
+        override def default(i: (Int,T)) = ring.zero;
       }
-      for( Arc(_,to,in,out,w) <- arcs) {
-        edgeMap( (destMapper(to),in,out)) = ring.plus(edgeMap(destMapper(to),in,out),w);
+      for( Arc(_,to,label,w) <- arcs) {
+        edgeMap( (destMapper(to),label)) = ring.plus(edgeMap(destMapper(to),label),w);
       }
       edgeMap
     }
@@ -155,10 +157,10 @@ object Minimizer {
 import Minimizer._;
 
 object IdentityPartitioner {
-  implicit def partitioner[W,State,In,Out] = new IdentityPartitioner[W,State,In,Out];
+  implicit def partitioner[W,State,T] = new IdentityPartitioner[W,State,T];
 
-  class IdentityPartitioner[W,State,In,Out] extends Partitioner[W,State,In,Out] {
-    def repartition(partitions: Iterable[Partition[W,State,In,Out]]) = partitions.toSeq;
+  class IdentityPartitioner[W,State,T] extends Partitioner[W,State,T] {
+    def repartition(partitions: Iterable[Partition[W,State,T]]) = partitions.toSeq;
   }
 }
 
@@ -167,15 +169,15 @@ object IdentityPartitioner {
 */
 object ApproximatePartitioner {
 
-  implicit def partitioner[W:Semiring,State,In,Out] = new ApproxPartitioner[W,State,In,Out];
+  implicit def partitioner[W:Semiring,State,T] = new ApproxPartitioner[W,State,T];
 
-  class ApproxPartitioner[W:Semiring,State,In,Out] extends Partitioner[W,State,In,Out] {
+  class ApproxPartitioner[W:Semiring,State,T] extends Partitioner[W,State,T] {
     val ring = implicitly[Semiring[W]];
     import ring._;
-    def repartition(partitions: Iterable[Partition[W,State,In,Out]]) = {
+    def repartition(partitions: Iterable[Partition[W,State,T]]) = {
       val iter = partitions.iterator;
 
-      val newPartitions = new ArrayBuffer[Partition[W,State,In,Out]];
+      val newPartitions = new ArrayBuffer[Partition[W,State,T]];
       newPartitions += iter.next
 
       for( part1@(p1,states1) <- iter) {
