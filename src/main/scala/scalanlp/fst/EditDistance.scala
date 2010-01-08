@@ -16,13 +16,13 @@ import scala.annotation.switch;
  *
  * @author dlwh
  */
-class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rhoSize: Int = 0) extends Transducer[Double,Int,Char,Char] {
+class EditDistance( subRatio: Double, insRatio: Double, private val alpha: Set[Char], private val rhoSize: Int = 0) extends Transducer[Double,Int,Char,Char] {
   import Transducer._;
   require( subRatio < 0);
   require( insRatio < 0);
   require( rhoSize >= 0);
 
-  val totalChars = alphabet.size + rhoSize;
+  val totalChars = alpha.size + rhoSize;
   /**
    * Costs for each kind of parameter.
    */
@@ -59,7 +59,7 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
   private val Rho = inAlpha.rho;
   private val Sigma = inAlpha.sigma;
   // only include Rho if we need it.
-  private val alphaAndRho = if(rhoSize == 0) alphabet else alphabet + Rho;
+  private val alphaAndRho = if(rhoSize == 0) alpha else alpha + Rho;
   private val allChars = alphaAndRho + Eps;
 
   val rhoSubMatchCost = ring.plus(rhoSubCost,rhoMatchCost);
@@ -126,6 +126,21 @@ class EditDistance( subRatio: Double, insRatio: Double, alphabet: Set[Char], rho
         } else if(a==b)
           matchCost
         else subCost;
+    }
+  }
+}
+
+object EditDistance {
+  def rhoSquaredCost(ed1: EditDistance, ed2: EditDistance) = {
+    require(ed1.rhoSize == ed2.rhoSize);
+    require(ed1.alpha == ed2.alpha);
+    val Rho = implicitly[Alphabet[Char]].rho;
+    val Eps = implicitly[Alphabet[Char]].epsilon;
+    (labels: Option[(Char,Char,Char)], s1: Double, s2: Double) => labels match {
+      case Some((Rho,Rho,Rho)) => s1 + s2 - ed1.logRhoSize;
+      case Some( (Eps,Rho,Eps) ) => s1 + s2 - ed1.logRhoSize;
+      case Some( (a,Rho,b) ) => s1 + s2 - ed1.logRhoSize;
+      case _ => s1 + s2;
     }
   }
 }
