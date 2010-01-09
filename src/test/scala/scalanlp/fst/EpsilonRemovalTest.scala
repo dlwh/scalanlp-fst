@@ -38,9 +38,6 @@ class EpsilonRemovalTest extends FunSuite {
     );
 
     val result = EpsilonRemoval.removeEpsilons(t1).collapseEdges;
-    println(t1);
-    println(t2);
-    println(result);
     assert(result === t2);
  }
 

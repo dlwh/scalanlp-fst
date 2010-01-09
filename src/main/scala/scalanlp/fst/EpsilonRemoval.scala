@@ -9,11 +9,7 @@ object EpsilonRemoval {
     import ring._;
 
     val epsilonsOnly = a.filterArcs(_.label == epsilon);
-    println(epsilonsOnly.initialStateWeights);
-    println(epsilonsOnly.allEdges);
     val pairDistances = Distance.allPairDistances(epsilonsOnly);
-    println(epsilonsOnly);
-    println(pairDistances);
   //  val oldArcs = a.filterArcs(_.label != epsilon).allEdges;
 
     val newArcs = for {
