@@ -9,7 +9,7 @@ object Distance {
   * Selects between singleSourceShortestDistance and allPairDistances
   * based on cyclicity
   */
-  def allPathDistances[W:Semiring,State,T](fst: Automaton[W,State,T]) = if(fst.isCyclic) {
+  def allPathDistances[@specialized("Double") W:Semiring,State,@specialized("Char") T](fst: Automaton[W,State,T]) = if(fst.isCyclic) {
     val ring = implicitly[Semiring[W]];
 
     val allPairs = allPairDistances(fst);
@@ -33,7 +33,7 @@ object Distance {
   * for acyclic graphs, k-closed semirings, or grahs that are acyclic except
   * for self-loops
   */
-  def singleSourceShortestDistances[W:Semiring,State,T](fst: Automaton[W,State,T]):Map[State,W] = {
+  def singleSourceShortestDistances[@specialized("Double") W:Semiring,State,@specialized("Char") T](fst: Automaton[W,State,T]):Map[State,W] = {
     val ring = implicitly[Semiring[W]];
     import ring._;
 
@@ -99,7 +99,7 @@ object Distance {
   * Returns the distances between individual pairs of states using
   * only one hop
   */
-  private def neighborDistances[W:Semiring,State,T](fst: Automaton[W,State,T]) = {
+  private def neighborDistances[@specialized("Double") W:Semiring,State, @specialized("Char") T](fst: Automaton[W,State,T]) = {
     val ring = implicitly[Semiring[W]];
     import ring._;
     import fst._;
@@ -120,7 +120,7 @@ object Distance {
   * Finds all pair-wise distances between all points in O(n^3),
   * where n is the number of states. Works for any complete semiring.
   */
-  def allPairDistances[W:Semiring,State,T](fst: Automaton[W,State,T]) = {
+  def allPairDistances[@specialized("Double") W:Semiring,State, @specialized("Char") T](fst: Automaton[W,State,T]) = {
     val ring = implicitly[Semiring[W]];
     import ring._;
     val (distances,allStates) = neighborDistances(fst);

@@ -16,7 +16,7 @@ import scalanlp.util.Index;
  * @param acceptableChars : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
  */
-class TrigramSemiring[T:Alphabet](acceptableChars: Set[T], acceptableBigrams: Set[(T,T)],beginningUnigram: T) {
+class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T], acceptableBigrams: Set[(T,T)],beginningUnigram: T) {
   import TrigramSemiring._;
   val beginningBigram = Bigram(beginningUnigram,beginningUnigram);
 
@@ -408,7 +408,7 @@ class TrigramSemiring[T:Alphabet](acceptableChars: Set[T], acceptableBigrams: Se
 
 object TrigramSemiring {
 
-  case class Bigram[T](_1: T, _2:T) {
+  case class Bigram[@specialized("Char") T](_1: T, _2:T) {
     def length = 2;
     override val hashCode = _1.hashCode * 37 + _2.hashCode;
   }

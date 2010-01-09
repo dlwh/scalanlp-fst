@@ -10,7 +10,7 @@ import Transducer._;
 /**
  * A weighted automaton is just a transducer where the input label is the same as the output label.
  */
-abstract class Automaton[W:Semiring,State,T:Alphabet] { outer =>
+abstract class Automaton[@specialized("Double") W:Semiring,State,@specialized("Char") T:Alphabet] { outer =>
   import Automaton._;
   type Arc = scalanlp.fst.Arc[W,State,T];
   protected final def ring = implicitly[Semiring[W]];

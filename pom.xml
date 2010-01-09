@@ -95,7 +95,7 @@
             <arg>-Xmx2G</arg>
           </jvmArgs>
           <args>
-            <arg>-Yspecialize</arg>
+            <!-- <arg>-Yspecialize</arg> -->
             <arg>-optimize</arg>
             <arg>-deprecation</arg>
             <arg>-unchecked</arg>
