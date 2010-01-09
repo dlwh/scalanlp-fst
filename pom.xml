@@ -91,9 +91,12 @@
         <configuration>
           <displayCmd>true</displayCmd>
           <scalaVersion>${scala.version}</scalaVersion>
+          <jvmArgs>
+            <arg>-Xmx2G</arg>
+          </jvmArgs>
           <args>
-            <arg>-target:jvm-1.5</arg>
             <arg>-Yspecialize</arg>
+            <arg>-optimize</arg>
             <arg>-deprecation</arg>
             <arg>-unchecked</arg>
           </args>
