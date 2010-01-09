@@ -177,6 +177,20 @@ abstract class Automaton[W:Semiring,State,T:Alphabet] { outer =>
   }
 
   /**
+   * Keeps only arcs that match the filter f. Lazy.
+   */
+  def filterArcs(f: Arc=>Boolean): Automaton[W,State,T] = new Automaton[W,State,T] {
+    val initialStateWeights = outer.initialStateWeights;
+    def finalWeight(s: State) = outer.finalWeight(s);
+    def edgesMatching(s: State, label: T) = outer.edgesMatching(s,label) filter f;
+    override def allEdges = outer.allEdges filter f;
+    // Need this because we might lose all states otherwise.
+    override def allStates = outer.allStates;
+    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
+  }
+
+
+  /**
    * Creates a new automaton that collapses edges with the same label ane destination
    */
   def collapseEdges:Automaton[W,State,T] = new Automaton[W,State,T] {
@@ -367,7 +381,7 @@ abstract class Automaton[W:Semiring,State,T:Alphabet] { outer =>
     sb ++= "digraph A {\n";
     
     val states = collection.mutable.Set[State]();
-    breadthFirstSearch{ case Arc(s,to,label,weight) =>
+    allEdges.foreach { case Arc(s,to,label,weight) =>
         sb ++= "    \"" + escape2(s.toString) + "\"->\"" + escape2(to.toString) +"\"";
         sb ++= "[ label=\""+transform(label)+"/" + weight +"\"]\n";
         states += s;

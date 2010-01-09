@@ -106,7 +106,7 @@ object Distance {
 
     val distances = makeMap(makeMap(zero));
     val allStates = makeMap[State](null.asInstanceOf[State]); // XXX
-    breadthFirstSearch { case Arc(from,to,_,w) =>
+    allEdges.foreach { case Arc(from,to,_,w) =>
       val current = distances(from)(to);
       distances(from)(to) = plus(current,w);
       allStates(from) = from;
