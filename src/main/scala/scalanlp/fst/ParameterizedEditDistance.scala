@@ -15,8 +15,7 @@ import scalanlp.math.Numerics._;
  *
  * @author dlwh
  */
-class ParameterizedEditDistance(costFunction: (Char,Char)=>Double, alphabet: Set[Char])
-        extends Transducer[Double,Int,Char,Char]() {
+class ParameterizedEditDistance(costFunction: (Char,Char)=>Double, alphabet: Set[Char]) extends Transducer[Double,Int,Char,Char] {
   import Transducer._;
 
   def totalChars = alphabet.size;
@@ -70,4 +69,3 @@ class ParameterizedEditDistance(costFunction: (Char,Char)=>Double, alphabet: Set
     }
   }
 }
-
