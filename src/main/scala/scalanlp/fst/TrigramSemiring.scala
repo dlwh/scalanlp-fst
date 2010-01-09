@@ -218,10 +218,8 @@ class TrigramSemiring[T:Alphabet](acceptableChars: Set[T], acceptableBigrams: Se
       }
 
       val newBigrams = mkGramCharMap;
-      for( (k,row) <- x.bigramCounts) {
-        newBigrams(k) = row.copy;
-      }
-      logAddInPlace2D(newBigrams,y.bigramCounts)
+      logAddInPlace2D(newBigrams,x.bigramCounts,y.totalProb)
+      logAddInPlace2D(newBigrams,y.bigramCounts,x.totalProb)
 
       // X Y --> Z (bigram)
       for( (yc,yprob) <- y.leftUnigrams.activeElements;
