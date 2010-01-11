@@ -16,7 +16,10 @@ import scalanlp.util.Index;
  * @param acceptableChars : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
  */
-class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T], acceptableBigrams: Set[(T,T)],beginningUnigram: T) {
+class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
+                                                       acceptableBigrams: Set[(T,T)],
+                                                       beginningUnigram: T,
+                                                       cheatOnPlus: Boolean=false) {
   import TrigramSemiring._;
   val beginningBigram = Bigram(beginningUnigram,beginningUnigram);
 
@@ -157,10 +160,9 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T], 
 
     override def closeTo(x: Elem, y: Elem) = {
       import Semiring.LogSpace.doubleIsLogSpace;
-      val ret = (doubleIsLogSpace.closeTo(x.totalProb, y.totalProb) &&
-                 x.trigramCounts.size == y.trigramCounts.size)
-      if (!ret && (doubleIsLogSpace.closeTo(x.totalProb, y.totalProb)))
-        println("Close to problem!");
+      val ret = doubleIsLogSpace.closeTo(x.totalProb, y.totalProb) &&
+                 // x.trigramCounts.size == y.trigramCounts.size &&
+                 true
       ret
     }
 
@@ -394,7 +396,7 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T], 
          rightBigrams = mkSparseVector);
   }
 
-  def promoteOnlyWeight(w: Double) = {
+  def promoteOnlyWeight(w: Double) = if(w == Double.NegativeInfinity) ring.zero else {
     val counts = mkGramCharMap;
     val active = mkSparseVector;
     val activeBG = mkSparseVector

@@ -89,7 +89,7 @@ trait KBest {
 object KBest extends KBest {
 
   override protected def computeHeuristics[W:Semiring,State,T](auto: Automaton[W,State,T]) = {
-    Distance.allPathDistances(auto.reverse);
+    Distance.allPathDistances(auto.reverse) withDefaultValue implicitly[Semiring[W]].zero;
   }
 }
 
