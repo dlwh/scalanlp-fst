@@ -15,7 +15,7 @@ import scalanlp.util.Index;
  * @param acceptableTs : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
  */
-class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: Int) {
+class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: Int, beginningUnigram: T) {
 
   case class Elem(counts: Seq[LogDoubleCounter[T]], positionScores: Seq[Double], totalProb: Double);
 
@@ -129,8 +129,10 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
 
   def promoteOnlyWeight(w: Double) = if(w == Double.NegativeInfinity) ring.zero else {
     val arr = Array.fill(maxPosition)(Double.NegativeInfinity);
-    arr(0) = w;
-    Elem(Array.fill(maxPosition)(LogDoubleCounter[T]()), arr, w);
+    val counts = Array.fill(maxPosition)(LogDoubleCounter[T]());
+    counts(0)(beginningUnigram) = w;
+    arr(1) = w;
+    Elem(counts, arr, w);
   }
 
 }

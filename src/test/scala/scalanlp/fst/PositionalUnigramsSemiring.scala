@@ -15,7 +15,7 @@ import scala.collection.mutable.PriorityQueue;
 import org.scalacheck._;
 
 object PositionalUnigramSetup {
-  val tgring = new PositionalUnigramSemiring[Char](10);
+  val tgring = new PositionalUnigramSemiring[Char](10,'#');
 }
 import PositionalUnigramSetup.tgring;
 import tgring._;
@@ -77,17 +77,21 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val cost = auto.cost;
     val counts = cost.counts;
 
-    assert( counts(0)('H') === 0.0);
+    assert( counts(0)('#') === 0.0);
     assert( counts(0).logTotal === 0.0);
-    assert( counts(1)('e') === 0.0);
+    assert( counts(1)('H') === 0.0);
     assert( counts(1).logTotal === 0.0);
-    assert( counts(2)('l') === 0.0);
+    assert( counts(2)('e') === 0.0);
     assert( counts(2).logTotal === 0.0);
     assert( counts(3)('l') === 0.0);
     assert( counts(3).logTotal === 0.0);
-    assert( counts(4)('o') === 0.0);
+    assert( counts(4)('l') === 0.0);
     assert( counts(4).logTotal === 0.0);
-    assert( counts(5).logTotal === Double.NegativeInfinity);
+    assert( counts(5)('o') === 0.0);
+    assert( counts(5).logTotal === 0.0);
+    assert( counts(6)('#') === 0.0);
+    assert( counts(6).logTotal === 0.0);
+    assert( counts(7).logTotal ===Double.NegativeInfinity);
   }
 
   test("split automaton") {
@@ -101,16 +105,19 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val auto = Minimizer.minimize(auto1|auto2).reweight(promote[Int] _ , promoteOnlyWeight _);
     val counts = auto.cost.counts;
 
-    assert( counts(0)('H') === logSum(0.0,0.0));
-    assert( counts(0).logTotal === logSum(0.0,0.0));
-    assert( counts(1)('e') === logSum(0.0,0.0));
+    assert( counts(0)('#') === logSum(0.0,0.0));
+    assert( counts(1)('H') === logSum(0.0,0.0));
     assert( counts(1).logTotal === logSum(0.0,0.0));
-    assert( counts(2)('l') === 0.0);
-    assert( counts(2)('m') === 0.0);
+    assert( counts(2)('e') === logSum(0.0,0.0));
     assert( counts(2).logTotal === logSum(0.0,0.0));
-    assert( counts(4)('o') === logSum(0.0,0.0));
-    assert( counts(4).logTotal === logSum(0.0,0.0));
-    assert( counts(5).logTotal === Double.NegativeInfinity);
+    assert( counts(3)('l') === 0.0);
+    assert( counts(3)('m') === 0.0);
+    assert( counts(3).logTotal === logSum(0.0,0.0));
+    assert( counts(5)('o') === logSum(0.0,0.0));
+    assert( counts(5).logTotal === logSum(0.0,0.0));
+    assert( counts(6)('#') === logSum(0.0,0.0));
+    assert( counts(6).logTotal === logSum(0.0,0.0));
+    assert( counts(7).logTotal === Double.NegativeInfinity);
   }
 
   
