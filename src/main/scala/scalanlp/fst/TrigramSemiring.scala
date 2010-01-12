@@ -21,7 +21,6 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
                                                        beginningUnigram: T,
                                                        cheatOnPlus: Boolean=false) {
   import TrigramSemiring._;
-  val beginningBigram = Bigram(beginningUnigram,beginningUnigram);
 
   val charIndex = Index[T]();
   charIndex(beginningUnigram);
@@ -31,7 +30,6 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   val maxAcceptableChar = charIndex.size;
 
   val gramIndex = Index[Bigram[T]]();
-  gramIndex(beginningBigram);
   for( ch <- acceptableChars) {
     val bg1 = Bigram(ch,beginningUnigram);
     val bg2 = Bigram(beginningUnigram,ch);
@@ -113,7 +111,6 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   }
 
   val beginningUnigramId = charIndex(beginningUnigram)
-  val beginningBigramId = gramIndex(beginningBigram)
 
   private val epsilon = Alphabet.zeroEpsCharBet.epsilon;
 
@@ -401,7 +398,7 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
     val active = mkSparseVector;
     val activeBG = mkSparseVector
     active(beginningUnigramId) = w;
-    activeBG(beginningBigramId) = w + w;
+    //activeBG(beginningBigramId) = w + w;
     val l1active = mkSparseVector;
     Elem(active,activeBG,counts,counts,Double.NegativeInfinity,l1active,w,active,activeBG);
   }
