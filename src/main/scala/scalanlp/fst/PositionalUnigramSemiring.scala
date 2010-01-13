@@ -50,8 +50,10 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
 
   private def logAddInPlace(to: DenseVector, from: DenseVector, scale: Double=0.0) {
     if (scale != Double.NegativeInfinity) {
-      for( k <- 0 until charIndex.size) {
+      var k = 0;
+      while( k < charIndex.size) {
         to(k) = logSum(to(k),from(k) + scale);
+        k += 1;
       }
     }
   }
