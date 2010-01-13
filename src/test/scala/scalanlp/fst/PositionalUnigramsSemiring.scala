@@ -15,9 +15,10 @@ import scala.collection.mutable.PriorityQueue;
 import org.scalacheck._;
 
 object PositionalUnigramSetup {
-  val tgring = new PositionalUnigramSemiring[Char](10,'#');
+  val validChars = Set.empty ++ "Helloabcdem";
+  val tgring = new PositionalUnigramSemiring[Char](10,validChars,'#');
 }
-import PositionalUnigramSetup.tgring;
+import PositionalUnigramSetup._;
 import tgring._;
 
 
@@ -31,7 +32,7 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
   def makeRing = tgring.ring;
 
   def simpleWeight = for {
-    ch <- Gen.alphaChar;
+    ch <- Gen.elements(validChars.toSeq:_*);
     w <- arbitrary[Double];
     if !w.isNaN
   } yield promote(Arc(0,0,ch,w));
@@ -50,9 +51,10 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val enc = 'a';
     val w = promote(Arc(0,0,'a',log(0.5)));
     val cl = closure(w);
+    val counts = cl.decode;
     assert(cl.totalProb === log(2.0));
     for(i <- 0 until cl.counts.length) {
-      assert(cl.counts(i)('a') === log(0.5) * (i+1));
+      assert(counts(i)('a') === log(0.5) * (i+1));
     }
   }
 
@@ -63,9 +65,10 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val w2 = promote(Arc(0,0,'b',log(0.25)));
     val w = plus(w1,w2);
     val cl = closure(w);
+    val counts = cl.decode;
     assert(cl.totalProb === log(2.0));
     for(i <- 0 until cl.counts.length) {
-      assert(cl.counts(i)('a') === log(0.25) + log(0.5) * (i));
+      assert(counts(i)('a') === log(0.25) + log(0.5) * (i));
     }
   }
 
@@ -75,7 +78,7 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
     val auto = constant("Hello",0.0).reweight(promote[Int] _ , promoteOnlyWeight _);
     val cost = auto.cost;
-    val counts = cost.counts;
+    val counts = cost.decode;
 
     assert( counts(0)('#') === 0.0);
     assert( counts(0).logTotal === 0.0);
@@ -103,7 +106,7 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val auto1 = constant("Hello",0.0);
     val auto2 = constant("Hemmo",0.0)
     val auto = Minimizer.minimize(auto1|auto2).reweight(promote[Int] _ , promoteOnlyWeight _);
-    val counts = auto.cost.counts;
+    val counts = auto.cost.decode;
 
     assert( counts(0)('#') === logSum(0.0,0.0));
     assert( counts(1)('H') === logSum(0.0,0.0));
