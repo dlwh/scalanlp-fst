@@ -5,7 +5,6 @@ import scalanlp.math.Numerics._;
 import scala.runtime.ScalaRunTime;
 import scalala.Scalala._;
 import scalala.tensor.sparse._;
-import scalala.tensor.sparse._;
 import scalanlp.collection.mutable.ArrayMap;
 import scalanlp.counters.LogCounters._;
 
@@ -59,7 +58,7 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   }
 
   // Yuck.
-  case class Elem(leftUnigrams: SparseVector, 
+  case class Elem(leftUnigrams: SparseVector,
                   leftBigrams: SparseVector,
                   bigramCounts: ArrayMap[SparseVector],
                   trigramCounts: ArrayMap[SparseVector],
