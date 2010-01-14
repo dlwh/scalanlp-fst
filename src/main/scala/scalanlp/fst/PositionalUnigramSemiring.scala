@@ -15,7 +15,7 @@ import scalanlp.util.Index;
  * @param acceptableTs : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
  */
-class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: Int, chars: Set[T], beginningUnigram: T) {
+class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: Int, chars: Set[T], beginningUnigram: T, cheatOnEquals: Boolean=false) {
 
   case class Elem(counts: Seq[DenseVector], positionScores: Seq[Double], totalProb: Double) {
     def decode: Seq[LogDoubleCounter[T]] = {
@@ -41,7 +41,7 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
   }
 
 
-  private def logAdd(to: DenseVector, from: DenseVector, scale: Double=0.0) = {
+  private def logAdd(to: DenseVector,  from: DenseVector, scale: Double=0.0) = {
     val ret = to.copy;
     logAddInPlace(ret,from,scale);
     ret;
@@ -58,13 +58,24 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
     }
   }
 
+  private def mnorm(x: DenseVector, y: DenseVector): Boolean = {
+    var i = 0;
+    while(i < x.size) {
+      if(!Semiring.LogSpace.doubleIsLogSpace.closeTo(x(i),y(i))) return false
+      i += 1;
+    }
+    true
+  }
+
   implicit val ring: Semiring[Elem] = new Semiring[Elem] {
 
     override def closeTo(x: Elem, y: Elem) = {
       import Semiring.LogSpace.doubleIsLogSpace;
       val ret = doubleIsLogSpace.closeTo(x.totalProb, y.totalProb) &&
-                 // x.trigramCounts.size == y.trigramCounts.size &&
-                 true
+               (cheatOnEquals || ((x.counts zip y.counts forall {case (x,y) => mnorm(x,y)}) &&
+                (x.positionScores zip y.positionScores forall {case (x,y) => Semiring.LogSpace.doubleIsLogSpace.closeTo(x,y)})
+               ))
+                true
       ret
     }
 

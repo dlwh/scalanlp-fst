@@ -40,12 +40,12 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
   } yield promote(Arc(0,0,ch,w));
 
   def compositeWeight = for {
-    w1 <- arbGen;
-    w2 <- arbGen;
-    bool <- arbitrary[Boolean]
-  } yield if(bool) times(w1,w2) else plus(w1,w2);
+    ws <- Gen.listOf(simpleWeight);
+    if ws.length > 1
+    combine <- Gen.listOfN(ws.size-1,arbitrary[Boolean])
+  } yield ws.drop(1).zip(combine).foldLeft(ws(0)) { (acc,w2com) => if(w2com._2) times(acc,w2com._1) else plus(acc,w2com._1) }
 
-  def arbGen: Gen[Elem] = Gen.frequency( (120,simpleWeight),(80,compositeWeight));
+  def arbGen: Gen[Elem] = Gen.oneOf(simpleWeight, compositeWeight);
 
   def arb: Arbitrary[Elem] = Arbitrary(arbGen);
 

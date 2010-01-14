@@ -23,8 +23,7 @@ trait SemiringAxioms[W] extends FunSuite with Checkers {
   import ring._;
 
   def traceEq(w1: W, w2: W) = if(closeTo(w1,w2)) true else {
-    println("No EQ! 1 :" + w1 + "\n 2: " + w2);
-    false
+    throw new Exception("No EQ! 1 :" + w1 + "\n 2: " + w2);
   }
 
   test("zero is the additive identity") {
@@ -55,8 +54,8 @@ trait SemiringAxioms[W] extends FunSuite with Checkers {
   }
   
   test("multiplication distributes over addition") {
-    check( (a: W, b: W, c: W) => closeTo(times(a,plus(b,c)),plus(times(a,b),times(a,c))));
-    check( (a: W, b: W, c: W) => closeTo(times(plus(b,c),a),plus(times(b,a),times(c,a))));
+    check( (a: W, b: W, c: W) => traceEq(times(a,plus(b,c)),plus(times(a,b),times(a,c))));
+    check( (a: W, b: W, c: W) => traceEq(times(plus(b,c),a),plus(times(b,a),times(c,a))));
   }
   
   test("zero* == 1") {
