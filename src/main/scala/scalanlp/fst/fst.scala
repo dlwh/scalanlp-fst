@@ -8,6 +8,8 @@ package scalanlp
 import scalanlp.collection.mutable.ArrayMap
 import scalanlp.math.Semiring
 
+import scalanlp.fst._;
+
 package object fst {
   /**
    * A Transducer is an Automaton with an input label and an output label
@@ -190,4 +192,5 @@ package object fst {
 
     }
   }
+
 }
