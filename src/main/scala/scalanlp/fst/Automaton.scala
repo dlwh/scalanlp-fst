@@ -473,7 +473,7 @@ object Automaton {
     };
 
     def edgesMatching(s: Int, l: T) = {
-      if(s == x.length || (myEdges(s).label != l && l != alpha.sigma)) Iterator.empty else Iterator(myEdges(s));
+      if(s < x.length && s >= 0 && alpha.matches(myEdges(s).label,l)) Iterator(myEdges(s)) else Iterator.empty
     }
   }
 
@@ -491,7 +491,7 @@ object Automaton {
           arcMap.getOrElse(s,Seq.empty).iterator
         } else {
           arcMap.getOrElse(s,Seq.empty) filter { arc =>
-            (l == alphabet.sigma || l == arc.label)
+            alphabet.matches(arc.label,l);
           } iterator
         }
       };
@@ -533,7 +533,7 @@ object Automaton {
           arcMap.getOrElse(s,Seq.empty).iterator
         } else {
           arcMap.getOrElse(s,Seq.empty).iterator filter { arc =>
-            (t == arc.label)
+            alphabet.matches(arc.label,t);
           };
         }
       }
