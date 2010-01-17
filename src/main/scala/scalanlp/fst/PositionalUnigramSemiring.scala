@@ -29,8 +29,9 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
   for( ch <- chars) { charIndex(ch) }
 
   private def mkDenseVector = {
-    val r = new DenseVector(charIndex.size);
-    r += Double.NegativeInfinity;
+    val data = new Array[Double](charIndex.size);
+    java.util.Arrays.fill(data,Double.NegativeInfinity);
+    val r = new DenseVector(data);
     r
   }
 

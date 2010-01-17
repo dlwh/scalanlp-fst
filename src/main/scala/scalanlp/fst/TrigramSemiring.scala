@@ -51,6 +51,22 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
     }
   }
 
+
+  private def copyGramMap(other: ArrayMap[SparseVector]) = {
+    val ret = new ArrayMap[SparseVector] {
+      override def default(k: Int) = {
+        val vec = mkSparseVector
+        update(k,vec)
+        vec
+      }
+    }
+    for( (i,vec) <- other) {
+      ret.update(i,vec.copy)
+    }
+    ret
+  }
+
+
   private def mkSparseVector = {
     val r = new SparseVector(Int.MaxValue);
     r.default = Double.NegativeInfinity;
@@ -199,17 +215,11 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
     def plus(x: Elem, y: Elem) = {
       val newProb = logSum(x.totalProb,y.totalProb);
       
-      val newTrigrams = mkGramCharMap;
-      for( (k,row) <- x.trigramCounts) {
-        newTrigrams(k) := row;
-      }
+      val newTrigrams = copyGramMap(x.trigramCounts);
       logAddInPlace2D(newTrigrams,y.trigramCounts)
 
 
-      val newBigrams = mkGramCharMap;
-      for( (k,row) <- x.bigramCounts) {
-        newBigrams(k) := row
-      }
+      val newBigrams = copyGramMap(x.bigramCounts);
       logAddInPlace2D(newBigrams,y.bigramCounts)
 
       val leftUnigrams = logAdd(x.leftUnigrams,y.leftUnigrams);
@@ -317,8 +327,7 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
       val p_* = logClosure(x.totalProb);
 
       // This is really confusing. For starters, we keep all our old counts
-      val newTrigrams = mkGramCharMap;
-      logAddInPlace2D(newTrigrams,x.trigramCounts)
+      val newTrigrams = copyGramMap(x.trigramCounts);
       // We now need to create a new trigram for each
       // right unigram <length 1 unigram> <left unigram>
       for( (mid,midscore) <- x.length1Chars.activeElements;
