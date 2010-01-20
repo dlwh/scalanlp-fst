@@ -14,28 +14,36 @@ import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
 import org.scalacheck._;
 
+object BigramSetup {
+  val acceptableChars = Set.empty ++ ('a' to 'e') ++ "Hellom"
+  val bgr = new BigramSemiring(acceptableChars,'#',false);
+}
+import BigramSetup._;
+import BigramSetup.bgr._;
+
 
 @RunWith(classOf[JUnitRunner])
-class BigramSemiringTest extends FunSuite with SemiringAxioms[BigramSemiring.Elem] {
-  import BigramSemiring._;
-  import BigramSemiring.ring._;
+class BigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
+  import ring._;
 
   import Arbitrary.arbitrary;
-  def makeRing = BigramSemiring.ring;
+  def makeRing = bgr.ring;
 
   def simpleWeight = for {
-    ch <- Gen.alphaChar;
+    ch <- Gen.alphaChar
     w <- arbitrary[Double];
     if !w.isNaN
   } yield promote(Arc(0,0,ch,w));
 
   def compositeWeight = for {
-    w1 <- (simpleWeight);
-    w2 <- (simpleWeight);
-    bool <- arbitrary[Boolean]
-  } yield if(bool) times(w1,w2) else plus(w1,w2);
+    ws <- Gen.listOf(simpleWeight)
+    if ws.length > 1
+    combine <- Gen.listOfN(ws.size-1,arbitrary[Boolean])
+  } yield ws.drop(1).zip(combine).foldLeft(ws(0)) { (acc,w2com) => if(w2com._2) times(acc,w2com._1) else plus(acc,w2com._1) }
 
-  def arb: Arbitrary[Elem] = Arbitrary(Gen.oneOf(compositeWeight,simpleWeight));
+  def arbGen: Gen[Elem] = Gen.oneOf(simpleWeight, compositeWeight);
+
+  def arb: Arbitrary[Elem] = Arbitrary(arbGen);
 
   test("simple* works") {
     import Math.log;

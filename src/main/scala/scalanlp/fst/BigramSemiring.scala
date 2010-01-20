@@ -1,134 +1,291 @@
 package scalanlp.fst;
 
 import scalanlp.math._;
-import Numerics.logSum;
+import scalanlp.math.Numerics._;
+import scala.runtime.ScalaRunTime;
 import scalala.Scalala._;
-import scala.collection.mutable.ArrayBuffer;
+import scalala.tensor.sparse._;
+import scalanlp.collection.mutable.ArrayMap;
 import scalanlp.counters.LogCounters._;
 
-object BigramSemiring {
-  case class Elem(leftFrontier: LogDoubleCounter[Char],
-                  counts: LogPairedDoubleCounter[Char,Char],
-                  totalProb: Double,
-                  emptyActive: Double,
-                  rightFrontier: LogDoubleCounter[Char]) {
+import scalanlp.util.Index;
+
+/**
+ *
+ * @param acceptableChars : only learn bigram histories that contain (only) these chars
+ * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
+ */
+class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
+                                                      beginningUnigram: T,
+                                                      cheatOnEquals: Boolean=false) {
+  val charIndex = Index[T]();
+  val beginningUnigramId = charIndex(beginningUnigram);
+  for( ab <- acceptableChars) {
+    charIndex(ab);
+  }
+  val maxAcceptableChar = charIndex.size;
+
+  def isAcceptableHistoryChar(gI: Int) = gI < maxAcceptableChar;
+
+  private def mkGramCharMap = new ArrayMap[SparseVector] {
+    override def default(k: Int) = {
+      val vec = mkSparseVector;
+      update(k,vec)
+      vec
+    }
   }
 
-  val epsilon = Alphabet.zeroEpsCharBet.epsilon;
+  private def copyGramMap(other: ArrayMap[SparseVector]) = {
+    val ret = new ArrayMap[SparseVector] {
+      override def default(k: Int) = {
+        val vec = mkSparseVector
+        update(k,vec)
+        vec
+      }
+    }
+    for( (i,vec) <- other) {
+      ret.update(i,vec.copy)
+    }
+    ret
+  }
+
+
+  private def mkSparseVector = {
+    val r = new SparseVector(Int.MaxValue);
+    r.default = Double.NegativeInfinity;
+    r
+  }
+
+  // Yuck.
+  case class Elem(leftUnigrams: SparseVector,
+                  bigramCounts: ArrayMap[SparseVector],
+                  length0Score: Double,
+                  totalProb: Double,
+                  rightUnigrams: SparseVector) {
+
+    private def decodeVector[T](vec: SparseVector, index: Index[T]) = {
+      val result = LogDoubleCounter[T]();
+      for {
+        (ycI, v) <- vec.activeElements;
+        yc = index.get(ycI)
+      } {
+        result(yc) = v;
+      }
+      result
+    }
+
+    override def toString = (
+      "Elem(lUni" + decodeVector(leftUnigrams,charIndex) + ",\nlBi="
+      + counts + ",\nl0Sc="
+      + length0Score
+      + totalProb + ",\nrUni="
+      + decodeVector(rightUnigrams,charIndex)
+    )
+
+    def counts = {
+      val result = LogPairedDoubleCounter[T,T]();
+      for {
+        (xcI, row) <- bigramCounts.iterator;
+        xc = charIndex.get(xcI);
+        (ycI, v) <- row.activeElements;
+        yc = charIndex.get(ycI)
+      } {
+        result(xc,yc) = v;
+      }
+      result;
+
+    }
+
+    override lazy val hashCode = ScalaRunTime._hashCode(this);
+
+    /*
+     override def equals(o: Any) = o match {
+     case null => false
+     // close enough for gov't work
+     case that: Elem => this.hashCode == that.hashCode && counts.size == that.counts.size && totalProb == that.totalProb
+     case _ => false
+     }
+     */
+  }
+
+
+  private val epsilon = Alphabet.zeroEpsCharBet.epsilon;
+
+  private def logAddInPlace2D(to: ArrayMap[SparseVector], from: ArrayMap[SparseVector], scale: Double=0.0) {
+    if (scale != Double.NegativeInfinity) {
+      for( (k,row) <- from) {
+        val old = to(k);
+        if (old.activeDomain.size == 0) {
+          var offset = 0;
+          while(offset < row.used) {
+            val k =  row.index(offset);
+            val v =  row.data(offset);
+            old(k) = v+scale;
+            offset += 1;
+          }
+        } else {
+          logAddInPlace(old,row,scale);
+        }
+      }
+    }
+  }
+
+  private def logAdd(to: SparseVector,from: SparseVector, scale: Double=0.0) = {
+    val ret = to.copy;
+    logAddInPlace(ret,from,scale);
+    ret;
+  }
+
+  private def logAddInPlace(to: SparseVector, from: SparseVector, scale: Double=0.0) {
+    if (scale != Double.NegativeInfinity) {
+      var offset = 0;
+      // this just iterates over the array, but we can't pay the boxing penalty
+      while(offset < from.used) {
+        val k = from.index(offset);
+        val v = from.data(offset);
+        to(k) = logSum(to(k),v+scale);
+        offset += 1;
+      }
+    }
+  }
+
+  private def mnorm(x: SparseVector, y: SparseVector): Boolean = {
+    for(i <- x.activeDomain) {
+      if(!Semiring.LogSpace.doubleIsLogSpace.closeTo(x(i),y(i))) return false
+    }
+    true
+  }
 
   implicit val ring: Semiring[Elem] = new Semiring[Elem] {
 
     override def closeTo(x: Elem, y: Elem) = {
       import Semiring.LogSpace.doubleIsLogSpace;
-      
-      (doubleIsLogSpace.closeTo(x.totalProb, y.totalProb) &&
-      doubleIsLogSpace.closeTo(x.emptyActive, y.emptyActive) &&
-      x.counts.forall { case (k,v) => doubleIsLogSpace.closeTo(v,y.counts(k))} &&
-      x.leftFrontier.forall { case (k,v) => doubleIsLogSpace.closeTo(v,y.leftFrontier(k))} &&
-      x.rightFrontier.forall { case (k,v) => doubleIsLogSpace.closeTo(v,y.rightFrontier(k))} &&
-      true )
-    }
-
-    def logAdd(a: LogDoubleCounter[Char], b: LogDoubleCounter[Char]) = {
-      val newActive = a.copy;
-      for( (k,v) <- b) {
-        newActive(k) = logSum(newActive(k),v);
-      }
-      newActive
+      val ret = doubleIsLogSpace.closeTo(x.totalProb, y.totalProb) &&
+                (cheatOnEquals ||
+                  mnorm(x.leftUnigrams,y.leftUnigrams)
+                  && mnorm(x.rightUnigrams,y.rightUnigrams)
+                 // && mnorm(x.bigramCounts,y.bigramCounts)
+                )
+      ret
     }
 
     def plus(x: Elem, y: Elem) = {
       val newProb = logSum(x.totalProb,y.totalProb);
-      val newCounts = x.counts.copy;
-      for( (k,v) <- y.counts) {
-        newCounts(k) = logSum(newCounts(k),v);
-      }
 
-      val rightFrontier = logAdd(x.rightFrontier,y.rightFrontier);
-      val leftFrontier = logAdd(x.leftFrontier,y.leftFrontier);
-      val emptyActive = logSum(x.emptyActive,y.emptyActive);
+      val newBigrams = copyGramMap(x.bigramCounts);
+      logAddInPlace2D(newBigrams,y.bigramCounts)
 
-      Elem(leftFrontier, newCounts, newProb, emptyActive, rightFrontier);
+      val leftUnigrams = logAdd(x.leftUnigrams,y.leftUnigrams);
+      val rightUnigrams = logAdd(x.rightUnigrams,y.rightUnigrams);
+
+      val length0Score = logSum(x.length0Score,y.length0Score);
+
+      Elem(leftUnigrams,  newBigrams,  length0Score,  newProb, rightUnigrams);
     }
+
 
     def times(x: Elem, y: Elem) = {
       val newProb = x.totalProb + y.totalProb;
-      val newCounts = (x.counts + y.totalProb).value;
-      for( (k1,k2,v) <- y.counts.triples) {
-        newCounts(k1,k2) = logSum(newCounts(k1,k2),v + x.totalProb);
+      val active = mkSparseVector;
+
+      val newBigrams = mkGramCharMap;
+      logAddInPlace2D(newBigrams,x.bigramCounts,y.totalProb)
+      logAddInPlace2D(newBigrams,y.bigramCounts,x.totalProb)
+
+      // X Y --> Z (bigram)
+      for( (yc,yprob) <- y.leftUnigrams.activeElements;
+          (xc,xprob) <- x.rightUnigrams.activeElements) {
+        newBigrams(xc)(yc) = logSum(newBigrams(xc)(yc), yprob + xprob);
       }
 
-      for((xc,xprob) <- x.rightFrontier; 
-          (yc,yprob) <- y.leftFrontier) {
-        newCounts(xc,yc) = logSum(newCounts(xc,yc),xprob + yprob); 
-      }
-           
-      val rightFrontier = if(y.rightFrontier.size != 0) {
-        val r = (y.rightFrontier + x.totalProb).value
+      // frontier:
+      // the left unigram frontier consists of x's old left frontier, plus y's left frontier + x's empty score
+      val leftUnigrams = mkSparseVector;
+      leftUnigrams := x.leftUnigrams + y.totalProb;
+      logAddInPlace(leftUnigrams,y.leftUnigrams,x.length0Score);
+      // the right unigram frontier consists of y's old right frontier, plus x's right frontier + y's empty score
+      val rightUnigrams = mkSparseVector;
+      rightUnigrams := y.rightUnigrams + x.totalProb
+      logAddInPlace(rightUnigrams,x.rightUnigrams,y.length0Score);
 
-        if(y.emptyActive != Double.NegativeInfinity) {
-          for( (xc,xprob) <- x.rightFrontier) {
-            r(xc) = logSum(r(xc),xprob + y.emptyActive);
-          }
-        }
+      val length0Score = x.length0Score + y.length0Score;
 
-        r;
-      } else {
-        (x.rightFrontier + y.totalProb).value;
-      }
-
-      val leftFrontier = if(x.leftFrontier.size != 0) {
-        val r = (x.leftFrontier + y.totalProb).value
-
-        if(x.emptyActive != Double.NegativeInfinity) {
-          for( (xc,xprob) <- y.leftFrontier) {
-            r(xc) = logSum(r(xc),xprob + y.emptyActive);
-          }
-        }
-
-        r;
-      } else {
-        (y.leftFrontier + x.totalProb).value;
-      }
-      
-
-      val r = Elem(leftFrontier,newCounts,newProb,y.emptyActive + x.emptyActive,rightFrontier);
+      val r = Elem(leftUnigrams,
+                   newBigrams,
+                   length0Score,
+                   newProb,
+                   rightUnigrams);
       r
     }
 
     def closure(x: Elem) = {
       import Semiring.LogSpace.doubleIsLogSpace.{closure=>logClosure};
       val p_* = logClosure(x.totalProb);
-      val newCounts = x.counts.copy;
 
-      for((x1,p1) <- x.rightFrontier;
-          (x2,p2) <- x.leftFrontier) {
-        newCounts(x1,x2) = logSum(newCounts(x1,x2),p1+p2);
+      val newBigrams = mkGramCharMap;
+      logAddInPlace2D(newBigrams,x.bigramCounts);
+      for( (xc,xprob) <- x.rightUnigrams.activeElements;
+          (yc,yprob) <- x.leftUnigrams.activeElements) {
+        newBigrams(xc)(yc) = logSum(newBigrams(xc)(yc), yprob + xprob);
       }
-      val leftFrontier = (x.leftFrontier + (p_* - x.totalProb)).value;
-      val rightFrontier = (x.rightFrontier + (p_* - x.totalProb)).value;
-      
-      Elem(leftFrontier, newCounts + (2 * p_*) value, p_*, 2 * p_*, rightFrontier);
+      val newBigrams2 = mkGramCharMap;
+      logAddInPlace2D(newBigrams2,newBigrams,2 * p_*);
+
+
+      // length0 score is the some of all paths only on epsilon
+      val length0score = logClosure(x.length0Score);
+
+      // now the frontier sets. basically, this is the same as for multiplication
+      // except we scale by all that paths leading through (i.e. the closure)
+
+      // the left unigram frontier consists of x's old left frontier scaled by p_*
+      val leftUnigrams = x.leftUnigrams + p_*;
+      // the right unigram frontier consists of x's old right frontier scaled by p_*
+      val rightUnigrams = x.rightUnigrams + p_*;
+
+      val r = Elem(leftUnigrams,
+                   newBigrams2,
+                   length0score,
+                   p_*,
+                   rightUnigrams);
+      r
     }
 
-    val one = Elem(LogDoubleCounter(), LogPairedDoubleCounter[Char,Char](),0.0,0.0,LogDoubleCounter());
-    val zero = Elem(LogDoubleCounter(), LogPairedDoubleCounter[Char,Char](),-1.0/0.0,-1.0/0.0,LogDoubleCounter());
+    val one = Elem(mkSparseVector,mkGramCharMap ,0.0,0.0,mkSparseVector);
+    val zero = Elem(mkSparseVector,mkGramCharMap ,-1.0/0.0,-1.0/0.0,mkSparseVector);
   }
 
-  def promote[S](a: Arc[Double,S,Char]) = {
-    val counts = LogPairedDoubleCounter[Char,Char]();
-    val active = LogDoubleCounter[Char]();
-    if(a.label != epsilon)
-      active(a.label) = a.weight;
-    val emptyScore = if(a.label == epsilon) a.weight else Double.NegativeInfinity;
-    Elem(active, counts,a.weight,emptyScore,active);
+  def promote[S](a: Arc[Double,S,T]) = {
+    val counts = mkGramCharMap;
+    val border = mkSparseVector;
+    val active = mkSparseVector
+    if (a.label != implicitly[Alphabet[T]].epsilon) {
+      val id = charIndex(a.label);
+      border(id) = a.weight;
+      // It can only be a length-1-spanning character
+      // if the char can be a history character
+      if (isAcceptableHistoryChar(id)) {
+        active(id) = a.weight;
+      }
+    }
+    val nonceScore = if (a != implicitly[Alphabet[T]].epsilon) {
+      Double.NegativeInfinity;
+    } else {
+      a.weight;
+    }
+    Elem(leftUnigrams = border,
+         bigramCounts = counts,
+         length0Score = nonceScore,
+         totalProb = a.weight,
+         rightUnigrams = active
+         );
   }
 
-  def promoteOnlyWeight(w: Double) = {
-    val counts = LogPairedDoubleCounter[Char,Char]();
-    val active = LogDoubleCounter[Char]();
-    active('#') = w;
-    Elem(active, counts,w,Double.NegativeInfinity,active);
+  def promoteOnlyWeight(w: Double) = if(w == Double.NegativeInfinity) ring.zero else {
+    val counts = mkGramCharMap;
+    val active = mkSparseVector;
+    active(beginningUnigramId) = w;
+    Elem(active,counts,Double.NegativeInfinity,w,active);
   }
 
 }
