@@ -491,7 +491,7 @@ object Automaton {
           arcMap.getOrElse(s,Seq.empty).iterator
         } else {
           arcMap.getOrElse(s,Seq.empty) filter { arc =>
-            alphabet.matches(arc.label,l);
+            arc.label == l || alphabet.matches(arc.label,l);
           } iterator
         }
       };
@@ -533,7 +533,7 @@ object Automaton {
           arcMap.getOrElse(s,Seq.empty).iterator
         } else {
           arcMap.getOrElse(s,Seq.empty).iterator filter { arc =>
-            alphabet.matches(arc.label,t);
+            arc.label == t || alphabet.matches(arc.label,t);
           };
         }
       }
