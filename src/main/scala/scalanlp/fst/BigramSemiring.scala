@@ -28,7 +28,7 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   def isAcceptableHistoryChar(gI: Int) = gI < maxAcceptableChar;
 
   private def mkGramCharMap = new ArrayMap[SparseVector] {
-    override def default(k: Int) = {
+    override final def default(k: Int) = {
       val vec = mkSparseVector;
       update(k,vec)
       vec
@@ -56,7 +56,6 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
     r
   }
 
-  // Yuck.
   case class Elem(leftUnigrams: SparseVector,
                   bigramCounts: ArrayMap[SparseVector],
                   length0Score: Double,
@@ -114,8 +113,8 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   private def logAddInPlace2D(to: ArrayMap[SparseVector], from: ArrayMap[SparseVector], scale: Double=0.0) {
     if (scale != Double.NegativeInfinity) {
       for( (k,row) <- from) {
-        val old = to(k);
-        if (old.activeDomain.size == 0) {
+        if (!to.contains(k)) {
+          val old = mkSparseVector;
           var offset = 0;
           while(offset < row.used) {
             val k =  row.index(offset);
@@ -123,7 +122,9 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
             old(k) = v+scale;
             offset += 1;
           }
+          to(k) = old;
         } else {
+        val old =  to(k);
           logAddInPlace(old,row,scale);
         }
       }
@@ -155,17 +156,22 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
     }
     true
   }
+  
+  private def goodEnoughCloseTo(x: Double, y:Double) = {
+    x == y || (x == 0 && y.abs < 5E-4) || ( ( (x-y)/x).abs < 5E-4);
+  }
 
   implicit val ring: Semiring[Elem] = new Semiring[Elem] {
 
     override def closeTo(x: Elem, y: Elem) = {
       import Semiring.LogSpace.doubleIsLogSpace;
-      val ret = doubleIsLogSpace.closeTo(x.totalProb, y.totalProb) &&
+      val ret = goodEnoughCloseTo(x.totalProb,y.totalProb) &&
                 (cheatOnEquals ||
                   mnorm(x.leftUnigrams,y.leftUnigrams)
                   && mnorm(x.rightUnigrams,y.rightUnigrams)
                  // && mnorm(x.bigramCounts,y.bigramCounts)
                 )
+      //if(!ret) println(x.totalProb,y.totalProb);
       ret
     }
 
@@ -182,6 +188,22 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
 
       Elem(leftUnigrams,  newBigrams,  length0Score,  newProb, rightUnigrams);
     }
+
+
+    override def maybe_+=(x:Elem, y: Elem) = if(x.totalProb == Double.NegativeInfinity) (y,closeTo(zero,y)) else {
+      import scalanlp.math.Semiring.LogSpace.doubleIsLogSpace
+      if(doubleIsLogSpace.closeTo(x.totalProb,logSum(x.totalProb,y.totalProb))) {
+        (x,true)
+      } else {
+        logAddInPlace(x.leftUnigrams,y.leftUnigrams);
+        logAddInPlace2D(x.bigramCounts,y.bigramCounts);
+        logAddInPlace(x.rightUnigrams,y.rightUnigrams);
+        val newLength0Score = logSum(x.length0Score,y.length0Score);
+        val newTotalProb = logSum(x.totalProb,y.totalProb);
+        (x.copy(totalProb=newTotalProb,length0Score=newLength0Score),false);
+      }
+    }
+
 
 
     def times(x: Elem, y: Elem) = {

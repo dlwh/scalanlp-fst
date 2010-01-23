@@ -76,8 +76,9 @@ object Distance {
         val dt = d(to);
         val wRFrom = times(rFrom,w);
         val dt_p_wRFrom = plus(dt,wRFrom);
-        if( !closeTo(dt,dt_p_wRFrom) ) {
-          r(to) = plus(r(to),wRFrom);
+        val (dt_p_wrFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
+        if( !tooCloseToMatter ) {
+          r(to) = maybe_+=(r(to),wRFrom)._1;
           d(to) = dt_p_wRFrom;
           if(!enqueued(to)) {
             S += to;
@@ -108,7 +109,7 @@ object Distance {
     val allStates = makeMap[State](null.asInstanceOf[State]); // XXX
     allEdges.foreach { case Arc(from,to,_,w) =>
       val current = distances(from)(to);
-      distances(from)(to) = plus(current,w);
+      distances(from)(to) = maybe_+=(current,w)._1;
       allStates(from) = from;
       allStates(to) = to;
     }
@@ -145,7 +146,7 @@ object Distance {
       } {
         val current = distances(i)(j);
         val pathsThroughK = times(dik,times(dkkStar,dkj));
-        distances(i)(j) = plus(current,pathsThroughK);
+        distances(i)(j) = maybe_+=(current,pathsThroughK)._1;
       }
 
       for (i <- allStates.keysIterator if i != k) {

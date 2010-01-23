@@ -7,6 +7,20 @@ trait Semiring[T] {
   val one: T
   // Not a real semiring operation, but we need it
   def closeTo(t1: T, t2: T): Boolean = t1 == t2;
+
+  /**
+   * This is a complex function that I wouldn't add if
+   * it weren't so necessary. If t1 is non-zero, the function may
+   * reuse t1's storage to do the addition inplace, and
+   * not at all of closeTo(t1,plus(t1,t2)) would return true.
+   *
+   * @returns ( plus(t1,t2),closeTo(t1,plus(t1,t2))
+   */
+  def maybe_+=(t1: T, t2: T): (T,Boolean) = {
+    val res = plus(t1,t2);
+    (res,closeTo(t1,res))
+  }
+
   /**
   * Also not a guaranteed property, but we need it for most ops.
   * Should be equiv to \sum_{k=1}^\infty t^k.

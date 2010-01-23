@@ -45,6 +45,16 @@ class UnigramSemiring[@specialized("Char") T:Alphabet](chars: Set[T], beginningU
       Elem(newProb, counts);
     }
 
+    override def maybe_+=(x:Elem, y: Elem) = if(x.totalProb == Double.NegativeInfinity) (y,closeTo(zero,y)) else {
+      import scalanlp.math.Semiring.LogSpace.doubleIsLogSpace
+      if(doubleIsLogSpace.closeTo(x.totalProb,logSum(x.totalProb,y.totalProb))) {
+        (x,true)
+      } else {
+        logAddInPlace(x.counts,y.counts);
+        (Elem(logSum(x.totalProb,y.totalProb),x.counts),false);
+      }
+    }
+
 
     def times(x: Elem, y: Elem) = {
       val newProb = x.totalProb + y.totalProb;
