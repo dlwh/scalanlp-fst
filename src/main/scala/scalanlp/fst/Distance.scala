@@ -17,7 +17,7 @@ object Distance {
     val paths = fst.makeMap(ring.zero);
     for( (from,initWeight) <- fst.initialStateWeights;
          (to,pathWeight) <- allPairs(from)) {
-      paths(to) = ring.plus(paths(to),ring.times(initWeight,pathWeight));
+      paths(to) = ring.maybe_+=(paths(to),ring.times(initWeight,pathWeight))._1;
     }
     Map.empty ++ paths;
   } else {
@@ -49,8 +49,8 @@ object Distance {
     val visited = makeMap(0);
     val enqueued = makeMap(false);
     for( (s,w) <- initialStateWeights if w != zero) {
-      d(s) = w;
-      r(s) = w;
+      d(s) = plus(w,zero);
+      r(s) = plus(w,zero);
       S += s;
       enqueued(s) = true;
     }
@@ -75,10 +75,10 @@ object Distance {
       for( (to,w) <- distances(from) if w != zero && from != to) {
         val dt = d(to);
         val wRFrom = times(rFrom,w);
-        val dt_p_wRFrom = plus(dt,wRFrom);
-        val (dt_p_wrFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
+        //val (dt_p_wRFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
+        val (dt_p_wRFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
         if( !tooCloseToMatter ) {
-          r(to) = maybe_+=(r(to),wRFrom)._1;
+          r(to) = plus(r(to),wRFrom);
           d(to) = dt_p_wRFrom;
           if(!enqueued(to)) {
             S += to;
