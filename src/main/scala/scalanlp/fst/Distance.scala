@@ -64,6 +64,8 @@ object Distance {
 
       if(visited(from) == 1) {
         selfLoops(from) = closure(distances(from)(from));
+      } else if(visited(from) > 4) {
+        println("Visited " + from + " " + visited(from) + " times!");
       }
       val dkk_star = selfLoops(from);
 
@@ -78,7 +80,7 @@ object Distance {
         //val (dt_p_wRFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
         val (dt_p_wRFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
         if( !tooCloseToMatter ) {
-          r(to) = plus(r(to),wRFrom);
+          r(to) = maybe_+=(r(to),wRFrom)._1;
           d(to) = dt_p_wRFrom;
           if(!enqueued(to)) {
             S += to;
