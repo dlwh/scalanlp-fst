@@ -11,7 +11,7 @@ class UnigramSemiring[@specialized("Char") T:Alphabet](chars: Set[T], beginningU
 
   val charIndex = Index[T]();
   val beginningUnigramId = charIndex(beginningUnigram)
-  for( ch <- chars) { charIndex(ch) }
+  for( ch <- chars) { charIndex.index(ch) }
 
   case class Elem(totalProb: Double, counts: SparseVector) {
     def decode: LogDoubleCounter[T] = {
@@ -45,7 +45,7 @@ class UnigramSemiring[@specialized("Char") T:Alphabet](chars: Set[T], beginningU
       Elem(newProb, counts);
     }
 
-    override def maybe_+=(x:Elem, y: Elem) = if(x.totalProb == Double.NegativeInfinity) (y,closeTo(zero,y)) else {
+    override def maybe_+=(x:Elem, y: Elem) = if(x.totalProb == Double.NegativeInfinity) (plus(y,zero),closeTo(zero,y)) else {
       import scalanlp.math.Semiring.LogSpace.doubleIsLogSpace
       if(doubleIsLogSpace.closeTo(x.totalProb,logSum(x.totalProb,y.totalProb))) {
         (x,true)

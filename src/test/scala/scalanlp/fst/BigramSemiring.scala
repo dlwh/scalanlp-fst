@@ -30,7 +30,7 @@ class BigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
   def makeRing = bgr.ring;
 
   def simpleWeight = for {
-    ch <- Gen.alphaChar
+    ch <- Gen.elements(BigramSetup.acceptableChars.toSeq:_*)
     w <- arbitrary[Double];
     if !w.isNaN
   } yield promote(Arc(0,0,ch,w));

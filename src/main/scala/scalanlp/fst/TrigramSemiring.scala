@@ -5,7 +5,7 @@ import scalanlp.math.Numerics._;
 import scala.runtime.ScalaRunTime;
 import scalala.Scalala._;
 import scalala.tensor.sparse._;
-import scalanlp.collection.mutable.ArrayMap;
+import scalanlp.collection.mutable.SparseArray;
 import scalanlp.counters.LogCounters._;
 
 import scalanlp.util.Index;
@@ -43,7 +43,7 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   def isAcceptableHistoryChar(gI: Int) = gI < maxAcceptableChar;
   def isAcceptableBigram(gI: Int) = gI < maxAcceptableGram;
 
-  private def mkGramCharMap = new ArrayMap[SparseVector] {
+  private def mkGramCharMap = new SparseArray[SparseVector](Int.MaxValue,0) {
     override def default(k: Int) = {
       val vec = mkSparseVector;
       update(k,vec)
@@ -52,8 +52,8 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   }
 
 
-  private def copyGramMap(other: ArrayMap[SparseVector]) = {
-    val ret = new ArrayMap[SparseVector] {
+  private def copyGramMap(other: SparseArray[SparseVector]) = {
+    val ret = new SparseArray[SparseVector](other.maxSize,other.size) {
       override def default(k: Int) = {
         val vec = mkSparseVector
         update(k,vec)
@@ -76,8 +76,8 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   // Yuck.
   case class Elem(leftUnigrams: SparseVector,
                   leftBigrams: SparseVector,
-                  bigramCounts: ArrayMap[SparseVector],
-                  trigramCounts: ArrayMap[SparseVector],
+                  bigramCounts: SparseArray[SparseVector],
+                  trigramCounts: SparseArray[SparseVector],
                   length0Score: Double,
                   length1Chars: SparseVector,
                   totalProb: Double,
@@ -152,7 +152,7 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
 
   private val epsilon = Alphabet.zeroEpsCharBet.epsilon;
 
-  private def logAddInPlace2D(to: ArrayMap[SparseVector], from: ArrayMap[SparseVector], scale: Double=0.0) {
+  private def logAddInPlace2D(to: SparseArray[SparseVector], from: SparseArray[SparseVector], scale: Double=0.0) {
     if (scale != Double.NegativeInfinity) {
       for( (k,row) <- from) {
         val old = to(k);
