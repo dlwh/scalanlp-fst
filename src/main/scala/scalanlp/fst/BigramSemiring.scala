@@ -50,9 +50,10 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   }
 
 
-  private def mkAdaptiveVector = {
+  private def mkAdaptiveVector:AdaptiveVector = {
     val r = new AdaptiveVector(charIndex.size);
     r.default = Double.NegativeInfinity;
+    assert(r.default == Double.NegativeInfinity);
     r
   }
 
@@ -82,10 +83,12 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
     }
 
     override def toString = (
-      "Elem(lUni" + decodeVector(leftUnigrams,charIndex) + ",\nlBi="
+      "Elem(lUni" + decodeVector(leftUnigrams,charIndex) + leftUnigrams.innerVector.getClass
+      + ",\nlBi="
       + counts + ",\nl0Sc="
       + length0Score
       + totalProb + ",\nrUni="
+      + rightUnigrams.innerVector.getClass
       + decodeVector(rightUnigrams,charIndex)
     )
 
@@ -134,15 +137,8 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
             }
             to(k) = old;
           case row: DenseVector =>
-            val old = mkDenseVector
-            var offset = 0;
-            while(offset < row.size) {
-              val k = offset
-              val v = row(offset);
-              old(k) = v+scale;
-              offset += 1;
-            }
-            to(k) = new AdaptiveVector(old);
+            val old = mkAdaptiveVector;
+            old := (row +scale).value;
         } else {
           val old = to(k);
           logAddInPlace(old,vec,scale);
@@ -152,7 +148,8 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   }
 
   private def logAdd(to: AdaptiveVector,from: AdaptiveVector, scale: Double=0.0) = {
-    val ret = to.copy;
+    val ret = mkAdaptiveVector;
+    logAddInPlace(ret,to);
     logAddInPlace(ret,from,scale);
     ret;
   }
@@ -174,7 +171,7 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
           while(offset < from.size) {
             val k = offset
             val v = from(offset);
-            to(k) = logSum(to(k),v+scale);
+            if(v != Double.NegativeInfinity) to(k) = logSum(to(k),v+scale);
             offset += 1;
           }
       }
@@ -266,7 +263,7 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
 
       // frontier:
       // the left unigram frontier consists of x's old left frontier, plus y's left frontier + x's empty score
-      val leftUnigrams = mkAdaptiveVector;
+      val leftUnigrams:AdaptiveVector = mkAdaptiveVector;
       leftUnigrams := x.leftUnigrams + y.totalProb;
       logAddInPlace(leftUnigrams,y.leftUnigrams,x.length0Score);
       // the right unigram frontier consists of y's old right frontier, plus x's right frontier + y's empty score
