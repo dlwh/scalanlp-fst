@@ -166,7 +166,9 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
             to(k) = logSum(to(k),v+scale);
             offset += 1;
           }
+          //println(from.used * 1.0 / from.size);
         case from: DenseVector =>
+          to.densify();
           var offset = 0;
           while(offset < from.size) {
             val k = offset

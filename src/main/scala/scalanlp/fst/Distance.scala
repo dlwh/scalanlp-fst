@@ -64,7 +64,7 @@ object Distance {
 
       if(visited(from) == 1) {
         selfLoops(from) = closure(distances(from)(from));
-      } else if(visited(from) > 4) {
+      } else if(visited(from) % 20 == 0) {
         println("Visited " + from + " " + visited(from) + " times!");
       }
       val dkk_star = selfLoops(from);
