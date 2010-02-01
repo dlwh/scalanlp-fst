@@ -59,7 +59,7 @@ trait SemiringAxioms[W] extends FunSuite with Checkers {
   }
   
   test("zero* == 1") {
-    assert(closure(zero) === one);
+    assert( closeTo(closure(zero),one));
   }
   
 }

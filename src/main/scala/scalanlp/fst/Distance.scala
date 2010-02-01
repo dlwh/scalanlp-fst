@@ -48,7 +48,7 @@ object Distance {
     val S = new collection.mutable.Queue[State]();
     val visited = makeMap(0);
     val enqueued = makeMap(false);
-    for( (s,w) <- initialStateWeights if w != zero) {
+    for( (s,w) <- initialStateWeights if !closeTo(w,zero)) {
       d(s) = plus(w,zero);
       r(s) = plus(w,zero);
       S += s;
@@ -74,7 +74,7 @@ object Distance {
       val rFrom = r(from);
       r -= from;
       
-      for( (to,w) <- distances(from) if w != zero && from != to) {
+      for( (to,w) <- distances(from) if !closeTo(w,zero) && from != to) {
         val dt = d(to);
         val wRFrom = times(rFrom,w);
         //val (dt_p_wRFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
@@ -90,7 +90,7 @@ object Distance {
       }
     }
 
-    for(  (s,mass) <- selfLoops if mass != zero) {
+    for(  (s,mass) <- selfLoops if !closeTo(mass,zero)) {
       d(s) = times(d(s),mass);
     }
 
@@ -140,11 +140,11 @@ object Distance {
 
       for {
         (j,dkj) <- distances(k).iterator
-        if j != k && dkj != zero
+        if j != k && !closeTo(dkj,zero)
         i <- allStates.keysIterator
         if i != k
         dik = distances(i)(k)
-        if dik != zero
+        if !closeTo(dik,zero)
       } {
         val current = distances(i)(j);
         val pathsThroughK = times(dik,times(dkkStar,dkj));
