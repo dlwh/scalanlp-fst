@@ -2,6 +2,7 @@ package scalanlp.fst;
 
 import scalanlp.math._;
 import scalanlp.math.Numerics._;
+import scala.reflect.OptManifest;
 import scala.runtime.ScalaRunTime;
 import scalala.Scalala.{iArrayToVector=>_, _};
 import scalala.tensor.adaptive._;
@@ -9,6 +10,7 @@ import scalala.tensor.sparse._;
 import scalala.tensor.dense._;
 import scalanlp.collection.mutable.ArrayMap;
 import scalanlp.counters.LogCounters._;
+import java.util.Arrays
 import scala.collection.mutable.{Seq=>MSeq};
 
 import scalanlp.util.Index;
@@ -18,9 +20,10 @@ import scalanlp.util.Index;
  * @param acceptableTs : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
  */
-class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: Int, chars: Set[T], beginningUnigram: T, cheatOnEquals: Boolean=false) {
+class PositionalUnigramSemiring[@specialized("Char") T](maxPosition: Int, chars: Set[T], beginningUnigram: T, cheatOnEquals: Boolean=false)
+                                                       (implicit alpha: Alphabet[T], man: OptManifest[T]) {
 
-  case class Elem(counts: Seq[AdaptiveVector], positionScores: MSeq[Double], totalProb: Double) {
+  case class Elem(counts: MSeq[AdaptiveVector], positionScores: Array[Double], totalProb: Double) {
     def decode: Seq[LogDoubleCounter[T]] = {
       val result = counts.map { v => aggregate(v.activeElements.map { (iv:(Int,Double)) => (charIndex.get(iv._1),iv._2) } )};
       result;
@@ -37,9 +40,17 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
     r
   }
 
-  private def logAddInPlace2D(to: Seq[AdaptiveVector], from: Seq[AdaptiveVector], scale: Double=0.0) {
-    for(i <- 0 until maxPosition) {
-      logAddInPlace(to(i),from(i),scale);
+  private def logAddInPlace2D(to: MSeq[AdaptiveVector], from: MSeq[AdaptiveVector], scale: Double=0.0) {
+    var i = 0;
+    while(i < maxPosition) {
+      if(from(i) != null) {
+        if(to(i) == null) {
+          to(i) = from(i) + scale;
+        } else {
+          logAddInPlace(to(i),from(i),scale);
+        }
+      }
+      i +=1 ;
     }
   }
 
@@ -76,11 +87,23 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
     }
   }
 
-  private def mnorm(x: AdaptiveVector, y: AdaptiveVector): Boolean = {
+  private def mnorm(x: AdaptiveVector, y: AdaptiveVector): Boolean = (x == null && y == null) || {
     var i = 0;
-    while(i < x.size) {
-      if(!Semiring.LogSpace.doubleIsLogSpace.closeTo(x(i),y(i))) return false
-      i += 1;
+    if(x != null && y != null) {
+      while(i < x.size) {
+        if(!Semiring.LogSpace.doubleIsLogSpace.closeTo(x(i),y(i))) return false
+        i += 1;
+      }
+    } else if(x != null && y == null) {
+      while(i < x.size) {
+        if(!Semiring.LogSpace.doubleIsLogSpace.closeTo(x(i),Double.NegativeInfinity)) return false
+        i += 1;
+      }
+    } else {
+      while(i < y.size) {
+        if(!Semiring.LogSpace.doubleIsLogSpace.closeTo(y(i),Double.NegativeInfinity)) return false
+        i += 1;
+      }
     }
     true
   }
@@ -103,8 +126,10 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
       if(doubleIsLogSpace.closeTo(x.totalProb,logSum(x.totalProb,y.totalProb))) {
         (x,true)
       } else {
-        for(p <- 0 until maxPosition) {
+        var p = 0;
+        while(p < maxPosition) {
           x.positionScores(p) = logSum(x.positionScores(p),y.positionScores(p));
+          p += 1;
         }
         logAddInPlace2D(x.counts,y.counts)
         val newTotalProb = logSum(x.totalProb,y.totalProb);
@@ -118,7 +143,7 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
     def plus(x: Elem, y: Elem) = {
       val newProb = logSum(x.totalProb,y.totalProb);
       
-      val counts = x.counts.map(_.copy);
+      val counts = x.counts.map(arr => if(arr eq null) null else arr.copy);
       logAddInPlace2D(counts,y.counts)
 
       val positionScores = Array.tabulate(maxPosition){ p => logSum(x.positionScores(p),y.positionScores(p)) };
@@ -130,18 +155,32 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
     def times(x: Elem, y: Elem) = {
       val newProb = x.totalProb + y.totalProb;
 
-      val counts = x.counts.map { _ + y.totalProb value };
+      val counts = x.counts.map { arr =>
+        if(arr eq null) null else arr + y.totalProb value
+      };
       for( i <- 0 until maxPosition;
           if x.positionScores(i) != Double.NegativeInfinity;
            j <- 0 until (maxPosition - i)) {
-         logAddInPlace(counts(i+j),y.counts(j),x.positionScores(i));
+         if(y.counts(j) != null) {
+           if(counts(i+j) == null) {
+             counts(i+j) = y.counts(j) + x.positionScores(i) value;
+           } else {
+             logAddInPlace(counts(i+j),y.counts(j),x.positionScores(i));
+           }
+         }
       }
 
       val positionScores = Array.fill(maxPosition)(Double.NegativeInfinity);
-      for( i <- 0 until maxPosition;
-          if x.positionScores(i) != Double.NegativeInfinity;
-          j <- 0 until (maxPosition - i)) {
-        positionScores(i+j) = logSum(positionScores(i+j),x.positionScores(i) + y.positionScores(j));
+      var i = 0;
+      while(i < maxPosition) {
+        if(x.positionScores(i) != Double.NegativeInfinity) {
+          var j = 0;
+          while(j < maxPosition - i) {
+            positionScores(i+j) = logSum(positionScores(i+j),x.positionScores(i) + y.positionScores(j));
+            j+= 1;
+          }
+        }
+        i += 1;
       }
 
       val r = Elem(counts,  positionScores, newProb);
@@ -155,14 +194,15 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
       // counts. We're just going to assume that we're only closing over counts in position 0
       // XXX TODO
       val counts = Array.fill(maxPosition)(mkAdaptiveVector);
-      counts(0) := x.counts(0);
-      val total = logSum(x.counts(0).toArray);
+      val x0 = if(x.counts(0) == null) mkAdaptiveVector else x.counts(0);
+      counts(0) := x0;
+      val total = logSum(x0.toArray);
       for( i <- 1 until maxPosition) {
-        counts(i) := x.counts(0) + total * i;
+        counts(i) := x0 + total * i;
       }
 
-      var positionScores : MSeq[Double] = counts.map(a => logSum(a.toArray)).take(maxPosition-1);
-      positionScores = MSeq(logClosure(x.positionScores(0))) ++ positionScores;
+      var positionScores : Array[Double] = counts.map(a => logSum(a.toArray)).take(maxPosition-1);
+      positionScores = Array(logClosure(x.positionScores(0))) ++ positionScores;
 
       val r = Elem(counts,positionScores,p_*);
       r
@@ -171,16 +211,18 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
     val one = {
       val arr = Array.fill(maxPosition)(Double.NegativeInfinity);
       arr(0) = 0.0;
-      Elem(Array.fill(maxPosition)(mkAdaptiveVector),arr,0.0);
+      Elem(new Array[AdaptiveVector](maxPosition),arr,0.0);
     }
 
-    val zero = Elem(Array.fill(maxPosition)(mkAdaptiveVector),Array.fill(maxPosition)(Double.NegativeInfinity),-1.0/0.0);
+    val zero = Elem(new Array[AdaptiveVector](maxPosition),Array.fill(maxPosition)(Double.NegativeInfinity),-1.0/0.0);
   }
 
   def promote[S](a: Arc[Double,S,T]) = {
-    val counts = Array.fill(maxPosition)(mkAdaptiveVector);
-    val posScores = Array.fill(maxPosition)(Double.NegativeInfinity);
+    val counts = new Array[AdaptiveVector](maxPosition);
+    val posScores = new Array[Double](maxPosition);
+    Arrays.fill(posScores,Double.NegativeInfinity);
     if (a.label != implicitly[Alphabet[T]].epsilon) {
+      counts(0) = mkAdaptiveVector;
       counts(0)(charIndex(a.label)) = a.weight;
       posScores(1) = a.weight;
     } else {
@@ -190,11 +232,13 @@ class PositionalUnigramSemiring[@specialized("Char") T:Alphabet](maxPosition: In
   }
 
   def promoteOnlyWeight(w: Double) = if(w == Double.NegativeInfinity) ring.zero else {
-    val arr = Array.fill(maxPosition)(Double.NegativeInfinity);
-    val counts = Array.fill(maxPosition)(mkAdaptiveVector);
+    val posScores = new Array[Double](maxPosition);
+    Arrays.fill(posScores,Double.NegativeInfinity);
+    val counts = new Array[AdaptiveVector](maxPosition);
+    counts(0) = mkAdaptiveVector;
     counts(0)(beginningUnigramId) = w;
-    arr(1) = w;
-    Elem(counts, arr, w);
+    posScores(1) = w;
+    Elem(counts, posScores, w);
   }
 
 }
