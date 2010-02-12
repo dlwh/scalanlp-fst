@@ -86,7 +86,7 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
       "Elem(lUni" + decodeVector(leftUnigrams,charIndex) + leftUnigrams.innerVector.getClass
       + ",\nlBi="
       + counts + ",\nl0Sc="
-      + length0Score
+      + length0Score + ",\ntotal="
       + totalProb + ",\nrUni="
       + rightUnigrams.innerVector.getClass
       + decodeVector(rightUnigrams,charIndex)
@@ -139,6 +139,7 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
           case row: DenseVector =>
             val old = mkAdaptiveVector;
             old := (row +scale).value;
+            to(k) = old;
         } else {
           val old = to(k);
           logAddInPlace(old,vec,scale);
