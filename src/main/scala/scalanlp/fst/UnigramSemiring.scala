@@ -1,16 +1,16 @@
 package scalanlp.fst
 
-import scalala.Scalala.{iArrayToVector=>_, _};
+import scalala.Scalala._;
 import scalala.tensor.sparse._
-import scalanlp.counters.LogCounters._;
+import scalala.tensor.counters.LogCounters.{logSum=>_,_};
 import scalanlp.math.Semiring
-import scalanlp.math.Numerics._;import scalanlp.util.Index
+import scalanlp.util.Index
 
 
 class UnigramSemiring[@specialized("Char") T:Alphabet](chars: Set[T], beginningUnigram:T, cheatOnEquals:Boolean=false) {
 
   val charIndex = Index[T]();
-  val beginningUnigramId = charIndex(beginningUnigram)
+  val beginningUnigramId = charIndex.index(beginningUnigram)
   for( ch <- chars) { charIndex.index(ch) }
 
   case class Elem(totalProb: Double, counts: SparseVector) {

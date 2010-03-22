@@ -1,15 +1,14 @@
 package scalanlp.fst;
 
 import scalanlp.math._;
-import scalanlp.math.Numerics._;
 import scala.reflect.OptManifest;
 import scala.runtime.ScalaRunTime;
-import scalala.Scalala.{iArrayToVector=>_, _};
+import scalala.Scalala._;
 import scalala.tensor.adaptive._;
 import scalala.tensor.sparse._;
 import scalala.tensor.dense._;
 import scalanlp.collection.mutable.ArrayMap;
-import scalanlp.counters.LogCounters._;
+import scalala.tensor.counters.LogCounters.{logSum=>_,_};
 import java.util.Arrays
 import scala.collection.mutable.{Seq=>MSeq};
 
@@ -31,8 +30,8 @@ class PositionalUnigramSemiring[@specialized("Char") T](maxPosition: Int, chars:
   }
 
   val charIndex = Index[T]();
-  val beginningUnigramId = charIndex(beginningUnigram)
-  for( ch <- chars) { charIndex(ch) }
+  val beginningUnigramId = charIndex.index(beginningUnigram)
+  for( ch <- chars) { charIndex.index(ch) }
 
   private def mkAdaptiveVector = {
     val r = new AdaptiveVector(charIndex.size);

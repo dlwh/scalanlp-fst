@@ -32,11 +32,11 @@ trait SemiringAxioms[W] extends FunSuite with Checkers {
   }
   
   test("addition commutes") {
-    check( (a: W, b: W) => closeTo(plus(a,b),plus(b,a)));
+    check( (a: W, b: W) => traceEq(plus(a,b),plus(b,a)));
   }
   
   test("addition associates") {
-    check( (a: W, b: W, c: W) => closeTo(plus(plus(a,b),c),plus(a,plus(b,c))));
+    check( (a: W, b: W, c: W) => traceEq(plus(plus(a,b),c),plus(a,plus(b,c))));
   }
   
   test("multiplication associates") {

@@ -1,12 +1,11 @@
 package scalanlp.fst;
 
 import scalanlp.math._;
-import scalanlp.math.Numerics._;
 import scala.runtime.ScalaRunTime;
 import scalala.Scalala._;
 import scalala.tensor.sparse._;
 import scalanlp.collection.mutable.SparseArray;
-import scalanlp.counters.LogCounters._;
+import scalala.tensor.counters.LogCounters.{logSum => _, _};
 
 import scalanlp.util.Index;
 
@@ -22,9 +21,9 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   import TrigramSemiring._;
 
   val charIndex = Index[T]();
-  charIndex(beginningUnigram);
+  charIndex.index(beginningUnigram);
   for( ab <- acceptableChars) {
-    charIndex(ab);
+    charIndex.index(ab);
   }
   val maxAcceptableChar = charIndex.size;
 
@@ -32,16 +31,16 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
   for( ch <- acceptableChars) {
     val bg1 = Bigram(ch,beginningUnigram);
     val bg2 = Bigram(beginningUnigram,ch);
-    gramIndex(bg1);
-    gramIndex(bg2);
+    gramIndex.index(bg1);
+    gramIndex.index(bg2);
   }
   for( (a,b) <- acceptableBigrams) {
-    gramIndex(new Bigram(a,b));
+    gramIndex.index(new Bigram(a,b));
   }
   val maxAcceptableGram = gramIndex.size;
 
-  def isAcceptableHistoryChar(gI: Int) = gI < maxAcceptableChar;
-  def isAcceptableBigram(gI: Int) = gI < maxAcceptableGram;
+  def isAcceptableHistoryChar(gI: Int) = gI < maxAcceptableChar && gI >= 0;
+  def isAcceptableBigram(gI: Int) = gI < maxAcceptableGram && gI >= 0;
 
   private def mkGramCharMap = new SparseArray[SparseVector](Int.MaxValue,0) {
     override def default(k: Int) = {
@@ -304,11 +303,12 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
       for {
         (xc,xprob) <- x.length1Chars.activeElements;
         (yc,yprob) <- y.leftUnigrams.activeElements
-        if isAcceptableHistoryChar(yc)
+        if isAcceptableHistoryChar(xc)
       } {
         // we have to accept any leftbigram we get (unless xc isn't an acceptableChar, which is ensured earlier)
         val newBG = gramIndex(Bigram(charIndex.get(xc),charIndex.get(yc)));
-        leftBigrams(newBG) = logSum(leftBigrams(newBG),xprob + yprob);
+        if(isAcceptableBigram(newBG))
+          leftBigrams(newBG) = logSum(leftBigrams(newBG),xprob + yprob);
       }
 
       val length0Score = x.length0Score + y.length0Score;
@@ -391,7 +391,8 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
       for( (yc,yprob) <- length1.activeElements;
           (xc,xprob) <- x.rightUnigrams.activeElements) {
         val newBG = gramIndex(Bigram(charIndex.get(xc),charIndex.get(yc)));
-        rightBigrams(newBG) = logSum(rightBigrams(newBG),xprob + yprob);
+        if(isAcceptableBigram(newBG))
+          rightBigrams(newBG) = logSum(rightBigrams(newBG),xprob + yprob);
       }
 
       for {
@@ -399,8 +400,9 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
         (yc,yprob) <- x.leftUnigrams.activeElements
         if isAcceptableHistoryChar(yc)
       } {
-        val newBG = gramIndex(Bigram(charIndex.get(xc),charIndex.get(yc)));
-        leftBigrams(newBG) = logSum(leftBigrams(newBG),xprob + yprob);
+        val newBG = gramIndex.index(Bigram(charIndex.get(xc),charIndex.get(yc)));
+        if(isAcceptableBigram(newBG))
+          leftBigrams(newBG) = logSum(leftBigrams(newBG),xprob + yprob);
       }
 
 
@@ -421,7 +423,7 @@ class TrigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
     val border = mkSparseVector;
     val active = mkSparseVector
     if (a.label != implicitly[Alphabet[T]].epsilon) {
-      val id = charIndex(a.label);
+      val id = charIndex.index(a.label);
       border(id) = a.weight;
       // It can only be a length-1-spanning character
       // if the char can be a history character

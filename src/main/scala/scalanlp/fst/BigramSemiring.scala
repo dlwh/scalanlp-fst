@@ -1,7 +1,6 @@
 package scalanlp.fst;
 
 import scalanlp.math._;
-import scalanlp.math.Numerics._;
 import java.util.Arrays
 import scala.runtime.ScalaRunTime;
 import scalala.Scalala._;
@@ -10,7 +9,7 @@ import scalala.tensor.Vector;
 import scalala.tensor.dense._;
 import scalala.tensor.sparse._;
 import scalanlp.collection.mutable.SparseArray;
-import scalanlp.counters.LogCounters._;
+import scalala.tensor.counters.LogCounters.{logSum=>_,_};
 
 import scalanlp.util.Index;
 /**
@@ -22,7 +21,7 @@ class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
                                                       beginningUnigram: T,
                                                       cheatOnEquals: Boolean=false) {
   val charIndex = Index[T]();
-  val beginningUnigramId = charIndex(beginningUnigram);
+  val beginningUnigramId = charIndex.index(beginningUnigram);
   for( ab <- acceptableChars) {
     charIndex.index(ab);
   }

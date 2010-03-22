@@ -46,6 +46,36 @@ class MinimizeTest extends FunSuite {
     assert(minimized === Minimizer.minimize(fst.pushWeights));
   }
 
+  test("Mohri hwa fig12d minimization with ApproxPartitioner") {
+    import scalanlp.math._;
+    import Semiring.Tropical._;
+    val dsl = new DSL[Int,Double,Char,Char]();
+    import dsl._;
+    val fst = transducer(Map(0->0.0),Map(3->0.0))(
+      0 -> 1 ('a',eps,0),
+      0 -> 1 ('b',eps,1),
+      0 -> 1 ('c',eps,5),
+      0 -> 2 ('d',eps,0),
+      0 -> 2 ('e',eps,1),
+      1 -> 3 ('e',eps,0),
+      1 -> 3 ('f',eps,1),
+      2 -> 3 ('e',eps,4),
+      2 -> 3 ('f',eps,5)
+    );
+    val minimized = transducer(Map(0->0.0),Map(2->0.0))(
+      0 -> 1 ('a',eps,0),
+      0 -> 1 ('b',eps,1),
+      0 -> 1 ('c',eps,5),
+      0 -> 1 ('d',eps,4),
+      0 -> 1 ('e',eps,5),
+      1 -> 2 ('e',eps,0),
+      1 -> 2 ('f',eps,1)
+    );
+    import ApproximatePartitioner._;
+    assert(minimized === Minimizer.minimize(fst.pushWeights));
+  }
+
+
   test("minimize works on a simple string") {
     import IdentityPartitioner._;
     val a = Automaton.constant("hello",1.0);
