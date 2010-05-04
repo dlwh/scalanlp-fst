@@ -1,6 +1,6 @@
 package scalanlp.fst
 
-abstract class Alphabet[T] {
+abstract class Alphabet[@specialized(Char) T] {
   val epsilon: T;
   /**
   * Sigma represents any of the "normal" characters.

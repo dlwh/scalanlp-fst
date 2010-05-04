@@ -17,7 +17,7 @@ import scalanlp.util.Index;
  * @param acceptableChars : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
  */
-class BigramSemiring[@specialized("Char") T:Alphabet](acceptableChars: Set[T],
+class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
                                                       beginningUnigram: T,
                                                       cheatOnEquals: Boolean=false) {
   val charIndex = Index[T]();

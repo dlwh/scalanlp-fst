@@ -7,7 +7,7 @@ import scalanlp.math.Semiring
 import scalanlp.util.Index
 
 
-class UnigramSemiring[@specialized("Char") T:Alphabet](chars: Set[T], beginningUnigram:T, cheatOnEquals:Boolean=false) {
+class UnigramSemiring[@specialized(Char) T:Alphabet](chars: Set[T], beginningUnigram:T, cheatOnEquals:Boolean=false) {
 
   val charIndex = Index[T]();
   val beginningUnigramId = charIndex.index(beginningUnigram)

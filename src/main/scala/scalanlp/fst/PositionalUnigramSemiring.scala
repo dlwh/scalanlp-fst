@@ -19,7 +19,7 @@ import scalanlp.util.Index;
  * @param acceptableTs : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
  */
-class PositionalUnigramSemiring[@specialized("Char") T](maxPosition: Int, chars: Set[T], beginningUnigram: T, cheatOnEquals: Boolean=false)
+class PositionalUnigramSemiring[@specialized(Char) T](maxPosition: Int, chars: Set[T], beginningUnigram: T, cheatOnEquals: Boolean=false)
                                                        (implicit alpha: Alphabet[T], man: OptManifest[T]) {
 
   case class Elem(counts: MSeq[AdaptiveVector], positionScores: Array[Double], totalProb: Double) {

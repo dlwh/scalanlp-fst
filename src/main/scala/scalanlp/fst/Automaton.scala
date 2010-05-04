@@ -10,7 +10,7 @@ import Transducer._;
 /**
  * A weighted automaton is just a transducer where the input label is the same as the output label.
  */
-abstract class Automaton[@specialized("Double") W:Semiring,State,@specialized("Char") T:Alphabet] { outer =>
+abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char) T:Alphabet] { outer =>
   import Automaton._;
   type Arc = scalanlp.fst.Arc[W,State,T];
   protected final def ring = implicitly[Semiring[W]];
@@ -462,18 +462,16 @@ object Automaton {
   /**
    * Create an automaton that accepts this word and only this word with the given weight.
    */
-  def constant[@specialized("Char") T:Alphabet,W:Semiring](x: Seq[T], w: W): Automaton[W,Int,T] = new Automaton[W,Int,T] {
-    private def sring = implicitly[Semiring[W]];
-    private def alpha = implicitly[Alphabet[T]];
-    val initialStateWeights = Map(0 -> sring.one);
-    def finalWeight(s: Int) = if(s == x.length) w else sring.zero;
+  def constant[@specialized(Char) T:Alphabet,W:Semiring](x: Seq[T], w: W): Automaton[W,Int,T] = new Automaton[W,Int,T] {
+    val initialStateWeights = Map(0 -> implicitly[Semiring[W]].one);
+    def finalWeight(s: Int) = if(s == x.length) w else implicitly[Semiring[W]].zero;
 
     final val myEdges:Seq[Arc] = for(s <- Array.range(0,x.length)) yield {
-      Arc(s,s+1,x(s),sring.one);
+      Arc(s,s+1,x(s),implicitly[Semiring[W]].one);
     };
 
     def edgesMatching(s: Int, l: T) = {
-      if(s < x.length && s >= 0 && alpha.matches(myEdges(s).label,l)) Iterator(myEdges(s)) else Iterator.empty
+      if(s < x.length && s >= 0 && implicitly[Alphabet[T]].matches(myEdges(s).label,l)) Iterator(myEdges(s)) else Iterator.empty
     }
   }
 
@@ -505,7 +503,7 @@ object Automaton {
     val arcMap =  arcs.groupBy(_.from);
 
     val map = new ArrayMap[Seq[Arc[W,Int,T]]] {
-      override def defValue = Seq.empty;
+      override def defValue = Seq[Arc[W,Int,T]]();
     }
     map ++= arcMap;
     for( (s,_) <- finalWeights.iterator if !map.contains(s)) {
