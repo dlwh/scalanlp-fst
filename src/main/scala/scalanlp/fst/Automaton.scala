@@ -47,7 +47,7 @@ abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char
   /**
    * Retyrns a map from states to all edges in the FST. Will expand all states.
    */
-  def allEdgesByOrigin = {
+  def allEdgesByOrigin:scala.collection.Map[State,Seq[Arc]] = {
     val m = allEdges.groupBy(_.from)
     val statesWithoutEdges = for( (s,_) <- finalStateWeights if !m.contains(s)) yield (s,Seq.empty);
     m ++ statesWithoutEdges;
@@ -195,7 +195,7 @@ abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char
    */
   def collapseEdges:Automaton[W,State,T] = new Automaton[W,State,T] {
 
-    override val initialStateWeights = outer.initialStateWeights;
+    val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
     protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
 
@@ -282,7 +282,7 @@ abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char
           (u, outer.finalWeight(s));
       }.toSeq:_*);
 
-    val initialStateWeights = IntMap(outer.initialStateWeights.map { case (k,v) =>
+    val initialStateWeights = IntMap(outer.initialStateWeights.collect { case (k,v) if v != ring.zero =>
           (stateToU(k),v)
       }.toSeq:_*);
 
@@ -347,7 +347,7 @@ abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char
           val theseEdges = this.allEdges;
           val thoseEdges = that.allEdges;
           (
-            Set(theseEdges:_*) == Set(that.allEdges:_*) &&
+            Set(theseEdges:_*) == Set(thoseEdges:_*) &&
             {for(Arc(from,to,_,_) <- thoseEdges) yield (
                 finalWeight(from.asInstanceOf[State]) == that.finalWeight(from)
                 && finalWeight(to.asInstanceOf[State]) == that.finalWeight(to)

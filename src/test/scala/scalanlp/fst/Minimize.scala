@@ -10,6 +10,7 @@ import org.junit.Before
 import scalanlp.math._;
 import scala.collection.Traversable;
 import scala.collection.Seq;
+import scala.collection.immutable.IntMap
 import scala.collection.mutable.PriorityQueue;
 
 
@@ -33,17 +34,19 @@ class MinimizeTest extends FunSuite {
       2 -> 3 ('e',eps,4),
       2 -> 3 ('f',eps,5)
     );
-    val minimized = transducer(Map(0->0.0),Map(2->0.0))(
-      0 -> 1 ('a',eps,0),
-      0 -> 1 ('b',eps,1),
-      0 -> 1 ('c',eps,5),
-      0 -> 1 ('d',eps,4),
-      0 -> 1 ('e',eps,5),
-      1 -> 2 ('e',eps,0),
-      1 -> 2 ('f',eps,1)
+
+    val minimized = transducer(IntMap(2->0.0),Map(1->0.0))(
+      0->1('f',eps,1.0),
+      0->1('e',eps,0.0),
+      2->0('b',eps,1.0),
+      2->0('a',eps,0.0),
+      2->0('c',eps,5.0),
+      2->0('d',eps,4.0),
+      2->0('e',eps,5.0)
     );
     import IdentityPartitioner._;
-    assert(minimized === Minimizer.minimize(fst.pushWeights));
+    assert(minimized.initialStateWeights === Minimizer.minimize(fst.pushWeights).relabel.initialStateWeights );
+    assert(minimized === Minimizer.minimize(fst.pushWeights).relabel);
   }
 
   test("Mohri hwa fig12d minimization with ApproxPartitioner") {
@@ -62,17 +65,20 @@ class MinimizeTest extends FunSuite {
       2 -> 3 ('e',eps,4),
       2 -> 3 ('f',eps,5)
     );
-    val minimized = transducer(Map(0->0.0),Map(2->0.0))(
-      0 -> 1 ('a',eps,0),
-      0 -> 1 ('b',eps,1),
-      0 -> 1 ('c',eps,5),
-      0 -> 1 ('d',eps,4),
-      0 -> 1 ('e',eps,5),
-      1 -> 2 ('e',eps,0),
-      1 -> 2 ('f',eps,1)
+
+     val minimized = transducer(IntMap(2->0.0),Map(1->0.0))(
+      0->1('f',eps,1.0),
+      0->1('e',eps,0.0),
+      2->0('b',eps,1.0),
+      2->0('a',eps,0.0),
+      2->0('c',eps,5.0),
+      2->0('d',eps,4.0),
+      2->0('e',eps,5.0)
     );
     import ApproximatePartitioner._;
-    assert(minimized === Minimizer.minimize(fst.pushWeights));
+    import IdentityPartitioner._;
+    assert(minimized.initialStateWeights === Minimizer.minimize(fst.pushWeights).relabel.initialStateWeights );
+    assert(minimized === Minimizer.minimize(fst.pushWeights).relabel);
   }
 
 

@@ -115,7 +115,7 @@ object Minimizer {
       type NewArc = scalanlp.fst.Arc[W,Int,T];
       val arcs = new ArrayBuffer[NewArc];
 
-      for( (s,w) <- trans.initialStateWeights) {
+      for( (s,w) <- trans.initialStateWeights if w != ring.zero) {
         initWeights(partitionOf(s)) = ring.plus(initWeights(partitionOf(s)),w);
       }
       for( ((equivInfo,partition),index) <- partitions.zipWithIndex) {
