@@ -26,22 +26,11 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
     charIndex.index(ab);
   }
 
-  private def mkGramCharMap = new SparseArray[AdaptiveVector](charIndex.size,0) {
-    override final def default(k: Int) = {
-      val vec = mkAdaptiveVector;
-      update(k,vec)
-      vec
-    }
-  }
+  private def mkGramCharMap = new SparseArray[AdaptiveVector](charIndex.size,mkAdaptiveVector,0);
 
   private def copyGramMap(other: SparseArray[AdaptiveVector]) = {
-    val ret = new SparseArray[AdaptiveVector](Int.MaxValue,other.size) {
-      override def default(k: Int) = {
-        val vec = mkAdaptiveVector
-        update(k,vec)
-        vec
-      }
-    }
+    val ret = new SparseArray[AdaptiveVector]( Int.MaxValue,mkAdaptiveVector,other.size);
+
     for( (i,vec) <- other if vec.activeDomain.size > 0) {
       ret.update(i,vec.copy)
     }

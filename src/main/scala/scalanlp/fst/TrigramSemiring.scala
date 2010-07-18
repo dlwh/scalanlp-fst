@@ -42,23 +42,10 @@ class TrigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
   def isAcceptableHistoryChar(gI: Int) = gI < maxAcceptableChar && gI >= 0;
   def isAcceptableBigram(gI: Int) = gI < maxAcceptableGram && gI >= 0;
 
-  private def mkGramCharMap = new SparseArray[SparseVector](Int.MaxValue,0) {
-    override def default(k: Int) = {
-      val vec = mkSparseVector;
-      update(k,vec)
-      vec
-    }
-  }
-
+  private def mkGramCharMap = new SparseArray[SparseVector](Int.MaxValue,mkSparseVector,0);
 
   private def copyGramMap(other: SparseArray[SparseVector]) = {
-    val ret = new SparseArray[SparseVector](other.maxSize,other.size) {
-      override def default(k: Int) = {
-        val vec = mkSparseVector
-        update(k,vec)
-        vec
-      }
-    }
+    val ret = new SparseArray[SparseVector](other.length,mkSparseVector,other.size);
     for( (i,vec) <- other) {
       ret.update(i,vec.copy)
     }
