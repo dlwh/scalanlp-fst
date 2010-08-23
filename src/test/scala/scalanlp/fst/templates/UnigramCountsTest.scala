@@ -31,7 +31,7 @@ class UnigramCountsTest extends FunSuite with Checkers {
 
     assert( counts('H') === 0.0);
     assert( counts('e') === 0.0);
-    assert( counts('l') === doubleIsLogSpace.sum(0.0,0.0));
+    assert( counts('l') === doubleIsLogSpace.plus(0.0,0.0));
     assert( counts('o') === 0.0);
     assert( counts('#') === 0.0);
   }
