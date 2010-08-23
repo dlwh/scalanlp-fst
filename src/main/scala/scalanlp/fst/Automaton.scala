@@ -3,7 +3,8 @@ package scalanlp.fst
 import scala.collection.immutable.IntMap
 import scala.collection.mutable.ArrayBuffer
 import scalanlp.collection.mutable.ArrayMap
-import scalanlp.math._;
+import scalanlp.math._
+import scalanlp.util.Index;
 
 import Transducer._;
 
@@ -262,31 +263,33 @@ abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char
    *  Relabels this transducer's states with integers. This is a strict algorithm.
    */
   def relabel:Automaton[W,Int,T] = {
-    var _nextIndex = 0;
-    def nextIndex = {
-      val nn = _nextIndex;
-      _nextIndex += 1;
-      nn;
-    }
-    val (arcs,stateToU) = {
-      val newStateMap = collection.mutable.Map[State,Int]();
+    relabelWithIndex._1
+  } 
+
+
+  def relabelWithIndex: (Automaton[W,Int,T], Index[State]) = {
+    val index = Index[State]();
+    
+    val arcs = {
       val seqArcs = new collection.mutable.ArrayBuffer[scalanlp.fst.Arc[W,Int,T]];
       outer.breadthFirstSearch { case Arc(from,to,label,score) =>
-          val newFrom = newStateMap.getOrElseUpdate(from,nextIndex);
-          seqArcs += Arc(newFrom,newStateMap.getOrElseUpdate(to,nextIndex),label,score);
+        val newFrom = index.index(from);
+        val newTo = index.index(to);
+        seqArcs += Arc(newFrom,newTo,label,score);
       }
-      (seqArcs,newStateMap)
+      seqArcs
     }
 
-    val myFinalWeights = IntMap(stateToU.iterator.map { case (s,u) =>
-          (u, outer.finalWeight(s));
-      }.toSeq:_*);
+    val myFinalWeights = IntMap(index.pairs.map { case (s,u) =>
+      (u, outer.finalWeight(s));
+    }.toSeq:_*);
 
     val initialStateWeights = IntMap(outer.initialStateWeights.collect { case (k,v) if v != ring.zero =>
-          (stateToU(k),v)
-      }.toSeq:_*);
+      (index(k),v)
+    }.toSeq:_*);
 
-    intAutomaton(initialStateWeights,myFinalWeights)(arcs:_*);
+    val auto = intAutomaton(initialStateWeights,myFinalWeights)(arcs:_*);
+    (auto,index);
   }
 
   /**
