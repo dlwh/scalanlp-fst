@@ -3,6 +3,11 @@ package scalanlp.fst;
 import scalanlp.math._;
 
 object Pruning {
+  /**
+   *
+   * For probabilistic automata (with partition 1) it's the score of posterior probability of being in any given state.
+   *
+   */
   def calculateStateFlow[W:Semiring,State,T](auto: Automaton[W,State,T]): Map[State,W] = {
     val ring = implicitly[Semiring[W]];
     val forward = Distance.singleSourceShortestDistances(auto);
