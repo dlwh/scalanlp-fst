@@ -32,7 +32,7 @@
     <orderEntry type="library" name="Maven: fastutil:fastutil:5.1.5" level="project" />
     <orderEntry type="library" name="Maven: com.thoughtworks.paranamer:paranamer:2.2" level="project" />
     <orderEntry type="library" name="Maven: org.coconut.forkjoin:jsr166y:070108" level="project" />
-    <orderEntry type="library" name="Maven: org.scalanlp:scalala_2.8.0:0.4.0" level="project" />
+    <orderEntry type="module" module-name="scalala_2.8.0.RC7" />
     <orderEntry type="library" name="Maven: org.scala-lang:scala-compiler:2.8.0" level="project" />
     <orderEntry type="library" name="Maven: jline:jline:0.9.94" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: junit:junit:4.4" level="project" />
