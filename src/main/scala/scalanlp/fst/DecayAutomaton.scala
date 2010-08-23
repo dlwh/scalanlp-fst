@@ -22,7 +22,7 @@ class DecayAutomaton(val expectedLength:Double, chars: Set[Char], rhoSize: Int =
     // we have n emissions
     // We want transitions to be markovian, so:
     //  c * n = exp(mass)
-    mass - Math.log(n)
+    mass - math.log(n)
   }
 
   val initialStateWeights = Map( 0 -> 0.0);
@@ -31,7 +31,7 @@ class DecayAutomaton(val expectedLength:Double, chars: Set[Char], rhoSize: Int =
 
   override lazy val allEdges:Seq[Arc] = edgesMatching(0,alphabet.sigma).toSeq;
 
-  private val rhoEdge = Arc(0,0,alphabet.rho,Math.log(rhoSize) + arcCost);
+  private val rhoEdge = Arc(0,0,alphabet.rho,math.log(rhoSize) + arcCost);
 
   def edgesMatching(s: Int, a: Char) = {
     if(s == 0) {

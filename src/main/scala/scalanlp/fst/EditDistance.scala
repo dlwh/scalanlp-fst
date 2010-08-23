@@ -28,7 +28,7 @@ class EditDistance( subRatio: Double, insRatio: Double, private val alpha: Set[C
    */
   val (insCost,subCost,matchCost) = {
     val n = totalChars;
-    import Math.{exp,log};
+    import math.{exp,log};
     // we want to make edges out be markovian.
     // for any input label (resp. output label), there is 1 match, n-1 subs, and and 1 deletion
     // but we also have to accept an insertion of any kind, so there are n of those.
@@ -48,12 +48,12 @@ class EditDistance( subRatio: Double, insRatio: Double, private val alpha: Set[C
   // a real char and one rho.
   // so we need rhoSize^2 - rhoSize other substitutions
   def rhoSubCost = {
-    val size = Math.log( (rhoSize * rhoSize - rhoSize));
+    val size = math.log( (rhoSize * rhoSize - rhoSize));
     if(rhoSize == 0) Double.NegativeInfinity else size + subCost;
   }
   def rhoMatchCost = if(rhoSize == 0) Double.NegativeInfinity else logRhoSize + matchCost;
 
-  private val logRhoSize = Math.log(rhoSize.toDouble);
+  private val logRhoSize = math.log(rhoSize.toDouble);
   private val inAlpha = implicitly[Alphabet[Char]];
   private val Eps = inAlpha.epsilon;
   private val Rho = inAlpha.rho;
@@ -66,7 +66,7 @@ class EditDistance( subRatio: Double, insRatio: Double, private val alpha: Set[C
 
   val initialStateWeights = Map( 0 -> 0.0);
 
-  def finalWeight(s: Int) = Math.log(1 - Math.exp(Math.log(totalChars) + insCost));
+  def finalWeight(s: Int) = math.log(1 - math.exp(math.log(totalChars) + insCost));
 
   override def allEdges:Seq[Arc] = (edgesMatching(0,(Sigma,Sigma))).toSeq;
 

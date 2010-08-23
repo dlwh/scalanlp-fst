@@ -45,7 +45,7 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
   def arb: Arbitrary[Elem] = Arbitrary(Gen.oneOf(compositeWeight,simpleWeight));
 
-  import Math.log;
+  import math.log;
 
   test("simple* works") {
     val enc = 'a';

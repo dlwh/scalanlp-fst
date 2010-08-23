@@ -53,8 +53,8 @@ object Semiring {
 
       override def closeTo(x: Double, y: Double) = {
         if(x == y) true
-        else if(x == 0) Math.abs(y)  < 1E-10;
-        else Math.abs( (x-y)/x)  < 1E-8;
+        else if(x == 0) math.abs(y)  < 1E-10;
+        else math.abs( (x-y)/x)  < 1E-8;
       }
 
       def closure(t: Double) = {
@@ -88,8 +88,8 @@ object Semiring {
       def times(t1: Double, t2: Double) = t1 + t2;
       override def closeTo(x: Double, y: Double) = {
         if(x == y) true
-        else if(x == 0) Math.abs(y)  < 1E-10;
-        else Math.abs( (x-y)/x)  < 1E-8;
+        else if(x == 0) math.abs(y)  < 1E-10;
+        else math.abs( (x-y)/x)  < 1E-8;
       }
       def closure(t: Double) = if(t >= 0.0) 0.0 else Double.NegativeInfinity;
       val one = 0.0;
@@ -110,8 +110,8 @@ object Semiring {
       val zero = Double.NegativeInfinity;
       override def closeTo(x: Double, y: Double) = {
         if(x == y) true
-        else if(x == 0) Math.abs(y)  < 1E-10;
-        else Math.abs( (x-y)/x)  < 1E-8;
+        else if(x == 0) math.abs(y)  < 1E-10;
+        else math.abs( (x-y)/x)  < 1E-8;
       }
       /**
       * p =&gt; 1/(1-p)
@@ -119,7 +119,7 @@ object Semiring {
       * t =&lt; log(1/(1-exp(t))) = -log(1-exp(t));
       */ 
       def closure(t: Double) = {
-        val t_* = -Math.log(1 - Math.exp(t));
+        val t_* = -math.log(1 - math.exp(t));
         assert(!t_*.isNaN,t + " gives NaN!");
         t_*
       }

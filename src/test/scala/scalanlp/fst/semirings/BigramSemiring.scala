@@ -46,7 +46,7 @@ class BigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
   def arb: Arbitrary[Elem] = Arbitrary(arbGen);
 
   test("simple* works") {
-    import Math.log;
+    import math.log;
     val w = promoteOnlyWeight(log(1/2.));
     val cl = closure(w);
     assert(cl.totalProb == log(2.0));

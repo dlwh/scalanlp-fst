@@ -49,7 +49,7 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
   def arb: Arbitrary[Elem] = Arbitrary(arbGen);
 
-  import Math.log;
+  import math.log;
 
   test("simple* works") {
     val enc = 'a';

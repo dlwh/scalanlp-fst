@@ -3,7 +3,7 @@ package scalanlp.fst;
 import scala.collection.mutable.ArrayBuffer;
 import scalanlp.collection.mutable._;
 import scalanlp.math._;
-import Math._;
+import math._;
 import Numerics._;
 
 object KLMinimize {
@@ -44,8 +44,8 @@ object KLMinimize {
 
   def computeKLDivergence[T](p1: EquivalenceInfo[Double,T], p2: EquivalenceInfo[Double,T]) = {
     // how much smoothing
-    val extraMass1 = try { p1.arcs.valuesIterator.toSeq.min/10 } catch { case _ => Math.log(1E-4) }
-    val extraMass2 = try { p2.arcs.valuesIterator.toSeq.min/10 } catch { case _ => Math.log(1E-4) };
+    val extraMass1 = try { p1.arcs.valuesIterator.toSeq.min/10 } catch { case _ => math.log(1E-4) }
+    val extraMass2 = try { p2.arcs.valuesIterator.toSeq.min/10 } catch { case _ => math.log(1E-4) };
 
     // how much total mass is there
     val p1Total = logSum(p1.finalWeight +: p1.arcs.valuesIterator.toSeq);
@@ -76,13 +76,13 @@ object KLMinimize {
       logProb1Smooth(w1) - logProb2Smooth(w2);
     }
 
-    var kl = Math.exp(logProb1(p1.finalWeight)) * logRatio(p1.finalWeight,p2.finalWeight);
-    var smoothedKL = Math.exp(logProb1Smooth(p1.finalWeight)) * logRatioSmooth(p1.finalWeight,p2.finalWeight);
+    var kl = math.exp(logProb1(p1.finalWeight)) * logRatio(p1.finalWeight,p2.finalWeight);
+    var smoothedKL = math.exp(logProb1Smooth(p1.finalWeight)) * logRatioSmooth(p1.finalWeight,p2.finalWeight);
     for( (tuple,w1) <- p1.arcs;
       w2 = p2.arcs.getOrElse(tuple,-1.0/0.0)
     ) {
-      kl += Math.exp(logProb1(w1)) * (logProb1(w1) - logProb2(w2));
-      smoothedKL += Math.exp(logProb1Smooth(w1)) * (logProb1Smooth(w1) - logProb2Smooth(w2));
+      kl += math.exp(logProb1(w1)) * (logProb1(w1) - logProb2(w2));
+      smoothedKL += math.exp(logProb1Smooth(w1)) * (logProb1Smooth(w1) - logProb2Smooth(w2));
     }
 
     println("LLL" + kl);

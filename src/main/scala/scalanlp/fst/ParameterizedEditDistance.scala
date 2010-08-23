@@ -44,7 +44,7 @@ class ParameterizedEditDistance(costFunction: (Char,Char)=>Double, alphabet: Set
   private val theFinalWeight = {
     val edges = edgesMatching(0,(Eps,Sigma)).map(_.weight).toSeq;
     val totalInsertMass = logSum(edges);
-    Math.log(1- Math.exp(totalInsertMass));
+    math.log(1- math.exp(totalInsertMass));
   }
   def finalWeight(s: Int) = theFinalWeight;
 
