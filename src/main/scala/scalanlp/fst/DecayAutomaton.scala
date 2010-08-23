@@ -14,8 +14,8 @@ class DecayAutomaton(val expectedLength:Double, chars: Set[Char], rhoSize: Int =
   require( expectedLength > 0);
   // E[|X|] = p / (1-p)
   // p = E[X] / (1+E[X])
-  val mass = Math.log(expectedLength / (1+expectedLength));
-  val stopProb = Math.log( 1 / (1+expectedLength));
+  val mass = math.log(expectedLength / (1+expectedLength));
+  val stopProb = math.log( 1 / (1+expectedLength));
 
   val arcCost = {
     val n = chars.size + rhoSize;
