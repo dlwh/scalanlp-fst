@@ -28,6 +28,7 @@ object Distance {
   * For suitable graphs, return the sum of all paths from the start states 
   * to each state.
   *
+
   * Implements Generic-Single-Source-Shortest-Distance described in Mohri(2002)
   * with extra support for doing closure operations on selfloops. Only works
   * for acyclic graphs, k-closed semirings, or grahs that are acyclic except
@@ -77,7 +78,6 @@ object Distance {
       for( (to,w) <- distances(from) if !closeTo(w,zero) && from != to) {
         val dt = d(to);
         val wRFrom = times(rFrom,w);
-        //val (dt_p_wRFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
         val (dt_p_wRFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
         if( !tooCloseToMatter ) {
           r(to) = maybe_+=(r(to),wRFrom)._1;

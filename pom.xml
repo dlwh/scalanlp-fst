@@ -50,6 +50,16 @@
     </dependency>
     <dependency>
       <groupId>org.scalanlp</groupId>
+      <artifactId>scalala_${scala.version}</artifactId>
+      <version>0.4.1-SNAPSHOT</version>
+    </dependency>
+    <dependency> <!-- sparse data structures with primitive types -->
+      <groupId>fastutil</groupId>
+      <artifactId>fastutil</artifactId>
+      <version>5.1.5</version>
+    </dependency>
+    <dependency>
+      <groupId>org.scalanlp</groupId>
       <artifactId>scalanlp-learn_${scala.version}</artifactId>
       <version>0.3.2-SNAPSHOT</version>
     </dependency>
@@ -124,6 +134,26 @@
             <classpathContainer>org.eclipse.jdt.launching.JRE_CONTAINER</classpathContainer>
             <classpathContainer>ch.epfl.lamp.sdt.launching.SCALA_CONTAINER</classpathContainer>
           </classpathContainers>
+        </configuration>
+      </plugin>
+      <plugin> <!-- for building the distributable jar -->
+        <artifactId>maven-assembly-plugin</artifactId>
+        <configuration>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+            <descriptorRef>src</descriptorRef>
+          </descriptorRefs>
+          <executions>
+            <execution>
+              <id>make-assembly</id> <!-- this is used for inheritance merges -->
+              <phase>package</phase> <!-- append to the packaging phase. -->
+              <goals>
+                <goal>single</goal> <!-- goals == mojos -->
+              </goals>
+            </execution>
+          </executions>
+          <archive>
+          </archive>
         </configuration>
       </plugin>
     </plugins>

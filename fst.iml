@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module org.jetbrains.idea.maven.project.MavenProjectsManager.isMavenModule="true" type="JAVA_MODULE" version="4">
   <component name="FacetManager">
+    <facet type="scala" name="Scala">
+      <configuration>
+        <option name="compilerLibraryLevel" value="Project" />
+        <option name="compilerLibraryName" value="Maven: org.scala-lang:scala-compiler-bundle:2.8.0" />
+        <option name="compilerOptions" value="-optimize -make:transitive" />
+        <option name="deprecationWarnings" value="true" />
+        <option name="uncheckedWarnings" value="true" />
+        <option name="vmOptions" value="" />
+      </configuration>
+    </facet>
     <facet type="Scala" name="Scala">
       <configuration>
         <option name="takeFromSettings" value="true" />
@@ -32,7 +42,7 @@
     <orderEntry type="library" name="Maven: fastutil:fastutil:5.1.5" level="project" />
     <orderEntry type="library" name="Maven: com.thoughtworks.paranamer:paranamer:2.2" level="project" />
     <orderEntry type="library" name="Maven: org.coconut.forkjoin:jsr166y:070108" level="project" />
-    <orderEntry type="module" module-name="scalala_2.8.0.RC7" />
+    <orderEntry type="module" module-name="scalala_2.8.0" />
     <orderEntry type="library" name="Maven: org.scala-lang:scala-compiler:2.8.0" level="project" />
     <orderEntry type="library" name="Maven: jline:jline:0.9.94" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: junit:junit:4.4" level="project" />

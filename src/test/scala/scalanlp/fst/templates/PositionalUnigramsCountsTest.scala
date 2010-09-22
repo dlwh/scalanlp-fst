@@ -1,7 +1,8 @@
 package scalanlp.fst.templates
 
 import scalanlp.fst._
-import scalanlp.math.Semiring;
+import scalanlp.math.Semiring
+import collection.mutable.HashMap;
 
 
 
@@ -28,12 +29,12 @@ class PositionalUnigramsCountsTest extends FunSuite with Checkers {
     val template = new PositionalUnigramModel('#', "Hello".toSet, 10);
     val counts = ExpectedCounts.counts(auto,template);
 
-    assert( counts(('H',0)) === 0.0);
-    assert( counts(('e',1)) === 0.0);
-    assert( counts(('l',2)) === 0.0);
-    assert( counts(('l',3)) === 0.0);
-    assert( counts(('o',4)) === 0.0);
-    assert( counts(('#',5)) === 0.0);
+    assert( counts((0,1,'H')) === 0.0);
+    assert( counts((1,2,'e')) === 0.0);
+    assert( counts((2,3,'l')) === 0.0);
+    assert( counts((3,4,'l')) === 0.0);
+    assert( counts((4,5,'o')) === 0.0);
+    assert( counts((5,-1,'\0')) === 0.0);
   }
 
   test("constant automaton length 3") {
@@ -44,11 +45,11 @@ class PositionalUnigramsCountsTest extends FunSuite with Checkers {
     val template = new PositionalUnigramModel('#', "Hello".toSet, 3);
     val counts = ExpectedCounts.counts(auto,template);
 
-    assert( counts(('H',0)) === 0.0);
-    assert( counts(('e',1)) === 0.0);
-    assert( counts(('l',2)) === doubleIsLogSpace.plus(0.0,0.0));
-    assert( counts(('o',2)) === 0.0);
-    assert( counts(('#',2)) === 0.0);
+    assert( counts((0,1,'H')) === 0.0);
+    assert( counts((1,2,'e')) === 0.0);
+    assert( counts((2, 2, 'l')) === doubleIsLogSpace.plus(0.0,0.0));
+    assert( counts((2, 2, 'o')) === 0.0);
+    assert( counts((2, -1, '\0')) === 0.0);
   }
 
 }
