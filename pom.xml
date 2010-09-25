@@ -50,6 +50,11 @@
     </dependency>
     <dependency>
       <groupId>org.scalanlp</groupId>
+      <artifactId>scalanlp-graphs_${scala.version}</artifactId>
+      <version>0.1-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.scalanlp</groupId>
       <artifactId>scalala_${scala.version}</artifactId>
       <version>0.4.1-SNAPSHOT</version>
     </dependency>
