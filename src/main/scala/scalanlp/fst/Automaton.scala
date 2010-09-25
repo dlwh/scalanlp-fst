@@ -535,11 +535,11 @@ object Automaton {
       def finalWeight(s: Int) = finalWeights.getOrElse(s,ring.zero);
       override val finalStateWeights = finalWeights withDefaultValue(ring.zero);
 
+
       override protected[fst] def makeMap[T](dflt: => T): ArrayMap[T] = {
         new ArrayMap[T] {
           override def default(k: Int) = {
             val result = dflt;
-            update(k,dflt);
             result;
           }
         }
