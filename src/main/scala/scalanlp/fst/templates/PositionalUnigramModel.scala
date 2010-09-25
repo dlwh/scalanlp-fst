@@ -47,7 +47,6 @@ object SpeedTest {
       val counts = ExpectedCounts.counts(auto, model);
     }
     println(score1);
-    System.gc();
 
   }
 

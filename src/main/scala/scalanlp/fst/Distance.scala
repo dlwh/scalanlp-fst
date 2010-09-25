@@ -1,6 +1,7 @@
 package scalanlp.fst
 
-import scalanlp.math._;
+import scalanlp.math._
+import collection.mutable.HashMap;
 
 object Distance {
 
@@ -74,7 +75,9 @@ object Distance {
 
       val rFrom = r(from);
       r -= from;
-      
+
+      //println(distances);
+      //new Exception() printStackTrace();
       for( (to,w) <- distances(from) if !closeTo(w,zero) && from != to) {
         val dt = d(to);
         val wRFrom = times(rFrom,w);
@@ -94,7 +97,6 @@ object Distance {
       d(s) = times(d(s),mass);
     }
 
-
     Map.empty ++ d;
   }
 
@@ -102,7 +104,7 @@ object Distance {
   * Returns the distances between individual pairs of states using
   * only one hop
   */
-  private def neighborDistances[@specialized(Double) W:Semiring,State, @specialized(Char) T](fst: Automaton[W,State,T]) = {
+  private def neighborDistances[W:Semiring,State, T](fst: Automaton[W,State,T]) = {
     val ring = implicitly[Semiring[W]];
     import ring._;
     import fst._;

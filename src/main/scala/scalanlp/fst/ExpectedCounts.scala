@@ -39,7 +39,9 @@ object ExpectedCounts {
       }
     }
 
-    val res = new HashMap[(S2,S2,T), W];
+    val res = new HashMap[(S2,S2,T), W] {
+      override def initialSize = 2 * templateIndex.size * templateIndex.size * 20;
+    }
     for(i <- 0 until templateIndex.size; j <- 0 until templateIndex.size) {
       val src = templateIndex.get(i);
       val sink = templateIndex.get(j);

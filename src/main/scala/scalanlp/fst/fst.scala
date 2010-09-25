@@ -37,11 +37,7 @@ package object fst {
 
         override protected[fst] def makeMap[T](dflt: => T): ArrayMap[T] = {
           new ArrayMap[T] {
-            override def default(k: Int) = {
-              val result = dflt;
-              update(k,dflt);
-              result;
-            }
+            override def defValue = dflt;
           }
         }
 
