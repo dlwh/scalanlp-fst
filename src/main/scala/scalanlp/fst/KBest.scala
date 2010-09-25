@@ -9,11 +9,10 @@ trait KBest {
   case class Derivation[W,State,T](str: ArrayBuffer[T], state: State, weight: W,  heuristic: W, atFinal: Boolean);
   implicit def orderDeriv[W:Ordering,State,T] = Ordering[W].on[Derivation[W,State,T]](_.heuristic);
 
-  protected def computeHeuristics[W:Semiring,State,T](auto: Automaton[W,State,T]): (State=>W);
+  protected def computeHeuristics[W:Semiring:ClassManifest,State,T](auto: Automaton[W,State,T]): (State=>W);
 
-  def extract[W,State,T](auto: Automaton[W,State,T])
-                        (implicit ring: Semiring[W], ord: Ordering[W], alphabet : Alphabet[T]):Iterator[(Seq[T],W)] = {
-    val heuristics = computeHeuristics(auto)(ring);
+  def extract[W:Semiring:Ordering:ClassManifest,State,T:Alphabet](auto: Automaton[W,State,T]) :Iterator[(Seq[T],W)] = {
+    val heuristics = computeHeuristics(auto);
 
     val pq = initialPQ(auto,heuristics);
 
@@ -34,9 +33,9 @@ trait KBest {
     kbest
   }
 
-  def extractList[W,State,T](auto: Automaton[W,State,T], num: Int)
-                            (implicit ring: Semiring[W], ord: Ordering[W], alphabet: Alphabet[T]):Seq[(Seq[T],W)] = {
-    val heuristics = computeHeuristics(auto)(ring);
+  def extractList[W:ClassManifest:Semiring:Ordering,State,T:Alphabet](auto: Automaton[W,State,T], num: Int)
+                            :Seq[(Seq[T],W)] = {
+    val heuristics = computeHeuristics(auto);
 
     val pq = initialPQ(auto,heuristics);
     val kbest = new ArrayBuffer[(Seq[T],W)];
@@ -88,13 +87,13 @@ trait KBest {
 
 object KBest extends KBest {
 
-  override protected def computeHeuristics[W:Semiring,State,T](auto: Automaton[W,State,T]) = {
+  override protected def computeHeuristics[W:Semiring:ClassManifest,State,T](auto: Automaton[W,State,T]) = {
     Distance.allPathDistances(auto.reverse) withDefaultValue implicitly[Semiring[W]].zero;
   }
 }
 
 object UniformCostKBest extends KBest {
-  override protected def computeHeuristics[W:Semiring,State,T](auto: Automaton[W,State,T]) = {
+  override protected def computeHeuristics[W:Semiring:ClassManifest,State,T](auto: Automaton[W,State,T]) = {
     { (s: State) => implicitly[Semiring[W]].zero }
   }
 }

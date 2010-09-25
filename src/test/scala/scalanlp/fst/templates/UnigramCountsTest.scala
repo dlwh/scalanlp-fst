@@ -26,7 +26,7 @@ class UnigramCountsTest extends FunSuite with Checkers {
     import Semiring.LogSpace.doubleIsLogSpace;
 
     val auto = constant("Hello",0.0);
-    val template = new UnigramModel('#', "Hello".toSet);
+    val template = new UnigramModel[Double,Char]('#', "Hello".toSet);
     val counts = ExpectedCounts.counts(auto,template);
     def state(c: Char, isFinished: Boolean = false) = (true,!isFinished,c);
 

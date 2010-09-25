@@ -32,8 +32,8 @@ object Minimizer {
   def minimize[W,State,T](trans: Automaton[W,State,T])
                               (implicit ring: Semiring[W],
                               partitioner: Partitioner[W,State,T],
-                              alphabet: Alphabet[T]) = {
-    new MinimizeWorker[W,State,T](trans)(partitioner,ring,alphabet).minimize;
+                              alphabet: Alphabet[T], man: ClassManifest[W]) = {
+    new MinimizeWorker[W,State,T](trans)(partitioner,ring,alphabet, man).minimize;
   }
   
 
@@ -41,7 +41,8 @@ object Minimizer {
   private class MinimizeWorker[W,State,T](trans: Automaton[W,State,T])
                                               (implicit partitioner: Partitioner[W,State,T],
                                                 ring: Semiring[W],
-                                                alpha: Alphabet[T]) {
+                                                alpha: Alphabet[T],
+                                                man: ClassManifest[W]) {
     private val edgesByOrigin = trans.allEdgesByOrigin;
 
     def minimize = {

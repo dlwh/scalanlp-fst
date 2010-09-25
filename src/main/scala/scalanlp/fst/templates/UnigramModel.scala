@@ -3,7 +3,7 @@ package scalanlp.fst.templates
 import scalanlp.math.Semiring
 import scalanlp.fst.{Arc, Automaton, Alphabet}
 
-class UnigramModel[W:Semiring,T:Alphabet](init: T, chars: Set[T]) extends Automaton[W,Boolean,T] {
+class UnigramModel[W:Semiring:ClassManifest,T:Alphabet](init: T, chars: Set[T]) extends Automaton[W,Boolean,T] {
   val initialStateWeights = Map( true -> ring.one);
 
   def finalWeight(s: Boolean) = if(s) ring.zero else ring.one

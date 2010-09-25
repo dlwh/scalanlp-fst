@@ -3,7 +3,7 @@ package scalanlp.fst.templates
 import scalanlp.math.Semiring
 import scalanlp.fst.{Arc, Automaton, Alphabet}
 
-class BigramModel[W:Semiring,T:Alphabet](init: T, chars: Set[T]) extends Automaton[W,T,T] {
+class BigramModel[W:Semiring:ClassManifest,T:Alphabet](init: T, chars: Set[T]) extends Automaton[W,T,T] {
   val initialStateWeights = Map( init -> ring.one);
 
   def finalWeight(s: T) = if (s == alphabet.epsilon) ring.one else ring.zero

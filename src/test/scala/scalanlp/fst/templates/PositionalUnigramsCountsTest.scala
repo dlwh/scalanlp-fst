@@ -26,7 +26,7 @@ class PositionalUnigramsCountsTest extends FunSuite with Checkers {
     import Semiring.LogSpace.doubleIsLogSpace;
 
     val auto = constant("Hello",0.0);
-    val template = new PositionalUnigramModel('#', "Hello".toSet, 10);
+    val template = new PositionalUnigramModel[Double,Char]('#', "Hello".toSet, 10);
     val counts = ExpectedCounts.counts(auto,template);
 
     assert( counts((0,1,'H')) === 0.0);
@@ -42,7 +42,7 @@ class PositionalUnigramsCountsTest extends FunSuite with Checkers {
     import Semiring.LogSpace.doubleIsLogSpace;
 
     val auto = constant("Hello",0.0);
-    val template = new PositionalUnigramModel('#', "Hello".toSet, 3);
+    val template = new PositionalUnigramModel[Double,Char]('#', "Hello".toSet, 3);
     val counts = ExpectedCounts.counts(auto,template);
 
     assert( counts((0,1,'H')) === 0.0);

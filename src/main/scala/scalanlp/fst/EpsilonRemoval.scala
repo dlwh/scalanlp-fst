@@ -3,7 +3,7 @@ package scalanlp.fst
 import scalanlp.math.Semiring
 
 object EpsilonRemoval {
-  def removeEpsilons[W:Semiring,S,T:Alphabet](a: Automaton[W,S,T]):Automaton[W,S,T] = {
+  def removeEpsilons[W:Semiring:ClassManifest,S,T:Alphabet](a: Automaton[W,S,T]):Automaton[W,S,T] = {
     val epsilon = implicitly[Alphabet[T]].epsilon;
     val ring = implicitly[Semiring[W]];
     import ring._;

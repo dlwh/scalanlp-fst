@@ -15,7 +15,7 @@ package object fst {
     /**
      * Creates a transducer with the given initial states, final states, and arcs.
      */
-    def intTransducer[W:Semiring,In:Alphabet,Out:Alphabet](initialStates: Map[Int,W], finalWeights: Map[Int,W])(arcs: Arc[W,Int,(In,Out)]*): Transducer[W,Int,In,Out] = {
+    def intTransducer[W:Semiring:ClassManifest,In:Alphabet,Out:Alphabet](initialStates: Map[Int,W], finalWeights: Map[Int,W])(arcs: Arc[W,Int,(In,Out)]*): Transducer[W,Int,In,Out] = {
       val inAlpha = implicitly[Alphabet[In]];
       val outAlpha = implicitly[Alphabet[Out]];
 
@@ -35,7 +35,7 @@ package object fst {
         def finalWeight(s: Int) = finalWeights.getOrElse(s,ring.zero);
         override val finalStateWeights = finalWeights withDefaultValue(ring.zero);
 
-        override protected[fst] def makeMap[T](dflt: => T): ArrayMap[T] = {
+        override protected[fst] def makeMap[T:ClassManifest](dflt: => T): ArrayMap[T] = {
           new ArrayMap[T] {
             override def defValue = dflt;
           }
@@ -60,7 +60,7 @@ package object fst {
      * Creates a transducer with the given initial states, final states, and arcs.
      */
     def transducer
-    [W:Semiring,S,In:Alphabet,Out:Alphabet]
+    [W:Semiring:ClassManifest,S,In:Alphabet,Out:Alphabet]
     (initialStates: Map[S,W], finalWeights: Map[S,W])
     (arcs: Arc[W,S,(In,Out)]*)
     : Transducer[W,S,In,Out] = {
@@ -103,7 +103,7 @@ package object fst {
      </code>
      *
      */
-    class DSL[S,W:Semiring,In:Alphabet,Out:Alphabet] {
+    class DSL[S,W:Semiring:ClassManifest,In:Alphabet,Out:Alphabet] {
       private val inEps = implicitly[Alphabet[In]].epsilon;
       private val outEps = implicitly[Alphabet[Out]].epsilon;
       class Extras(to: S) {
@@ -134,11 +134,11 @@ package object fst {
       );
     }
 
-    implicit def transducerExtras[W:Semiring,State,In:Alphabet,Out:Alphabet](t: Transducer[W,State,In,Out]) = new TransducerExtras(t);
+    implicit def transducerExtras[W:Semiring:ClassManifest,State,In:Alphabet,Out:Alphabet](t: Transducer[W,State,In,Out]) = new TransducerExtras(t);
   }
 
-  implicit def transducerExtras[W:Semiring,State,In:Alphabet,Out:Alphabet](t: Transducer[W,State,In,Out]) = new TransducerExtras(t);
-  class TransducerExtras[W:Semiring,State,In:Alphabet,Out:Alphabet](outer: Transducer[W,State,In,Out]) {
+  implicit def transducerExtras[W:Semiring:ClassManifest,State,In:Alphabet,Out:Alphabet](t: Transducer[W,State,In,Out]) = new TransducerExtras(t);
+  class TransducerExtras[W:Semiring:ClassManifest,State,In:Alphabet,Out:Alphabet](outer: Transducer[W,State,In,Out]) {
     private def ring = implicitly[Semiring[W]];
     private def inAlpha = implicitly[Alphabet[In]];
     private def outAlpha = implicitly[Alphabet[Out]];
@@ -154,7 +154,7 @@ package object fst {
       def edgesMatching(s: State, outin: (Out,In)) = outer.edgesMatching(s,outin.swap).map {
         case Arc(from,to,outin,w) => Arc(from,to,outin.swap,w);
       }
-      protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
+      protected[fst] override def makeMap[T:ClassManifest](default: =>T) = outer.makeMap(default);
     }
 
     /**
@@ -166,7 +166,7 @@ package object fst {
       def edgesMatching(a: State, trans: In) = outer.edgesMatching(a,(trans, outAlpha.sigma)).map {
         case Arc(from,to,(in,out),w) => Arc(from,to,in,w)
       }
-      protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
+      protected[fst] override def makeMap[T:ClassManifest](default: =>T) = outer.makeMap(default);
     }
 
     /**
@@ -178,7 +178,7 @@ package object fst {
       def edgesMatching(a: State, trans: Out) = outer.edgesMatching(a, (inAlpha.sigma, trans)).map {
         case Arc(from,to,(in,out),w) => Arc(from,to,out,w)
       }
-      protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
+      protected[fst] override def makeMap[T:ClassManifest](default: =>T) = outer.makeMap(default);
 
 
     }

@@ -18,16 +18,17 @@ package scalanlp.fst
 
 import scala.collection.immutable.IntMap
 import scala.collection.mutable.ArrayBuffer
-import scalanlp.collection.mutable.ArrayMap
 import scalanlp.math._
-import scalanlp.util.Index;
+import scalanlp.util.Index
+import scalanlp.collection.mutable.{SparseArrayMap, ArrayMap}
+
 
 import Transducer._;
 
 /**
  * A weighted automaton is just a transducer where the input label is the same as the output label.
  */
-abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char) T:Alphabet] { outer =>
+abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@specialized(Char) T:Alphabet] { outer =>
   import Automaton._;
   type Arc = scalanlp.fst.Arc[W,State,T];
   protected final def ring = implicitly[Semiring[W]];
@@ -99,7 +100,7 @@ abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char
     cost;
   }
 
-  protected[fst] def makeMap[T](dflt: =>T): collection.mutable.Map[State,T] = {
+  protected[fst] def makeMap[T:ClassManifest](dflt: =>T): collection.mutable.Map[State,T] = {
     new collection.mutable.HashMap[State,T] {
       override def default(k: State) = getOrElseUpdate(k,dflt);
     }
@@ -178,19 +179,19 @@ abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char
     val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,ring.times(f,v)) }
     def finalWeight(s: State) = outer.finalWeight(s);
     def edgesMatching(s: State, x: T) = outer.edgesMatching(s,x);
-    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
+    protected[fst] override def makeMap[T:ClassManifest](default: =>T) = outer.makeMap(default);
   }
 
   /**
    * Transforms the weights but otherwise returns the same automata.
    */
-  def reweight[W2:Semiring](f: Arc=>W2, initReweight: W=>W2): Automaton[W2,State,T] = new Automaton[W2,State,T] {
+  def reweight[W2:Semiring:ClassManifest](f: Arc=>W2, initReweight: W=>W2): Automaton[W2,State,T] = new Automaton[W2,State,T] {
     val initialStateWeights = outer.initialStateWeights.map { case(k,v) => (k,initReweight(v))}
     def finalWeight(s: State) = initReweight(outer.finalWeight(s));
     def edgesMatching(s: State, label: T) = outer.edgesMatching(s,label) map {
       case a@Arc(from,to,label,w) => Arc(from,to,label,f(a));
     }
-    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
+    protected[fst] override def makeMap[T:ClassManifest](default: =>T) = outer.makeMap(default);
   }
 
   /**
@@ -203,7 +204,7 @@ abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char
     override def allEdges = outer.allEdges filter f;
     // Need this because we might lose all states otherwise.
     override def allStates = outer.allStates;
-    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
+    protected[fst] override def makeMap[T:ClassManifest](default: =>T) = outer.makeMap(default);
   }
 
 
@@ -214,7 +215,7 @@ abstract class Automaton[@specialized(Double) W:Semiring,State,@specialized(Char
 
     val initialStateWeights = outer.initialStateWeights;
     def finalWeight(s: State) = outer.finalWeight(s);
-    protected[fst] override def makeMap[T](default: =>T) = outer.makeMap(default);
+    protected[fst] override def makeMap[T:ClassManifest](default: =>T) = outer.makeMap(default);
 
     def edgesMatching(s: State, t: T) = {
       // group edges by their follow, input and output arcs
@@ -481,7 +482,7 @@ object Automaton {
   /**
    * Create an automaton that accepts this word and only this word with the given weight.
    */
-  def constant[@specialized(Char) T:Alphabet,W:Semiring](x: Seq[T], w: W): Automaton[W,Int,T] = new Automaton[W,Int,T] {
+  def constant[@specialized(Char) T:Alphabet,W:Semiring:ClassManifest](x: Seq[T], w: W): Automaton[W,Int,T] = new Automaton[W,Int,T] {
     val initialStateWeights = Map(0 -> implicitly[Semiring[W]].one);
     def finalWeight(s: Int) = if(s == x.length) w else implicitly[Semiring[W]].zero;
 
@@ -498,9 +499,9 @@ object Automaton {
    * Factory method for automaton. Creates an automaton with the
    * given initial states, final weights, and arcs.
    */
-  def automaton[W:Semiring,S,T:Alphabet](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,T]*): Automaton[W,S,T] = {
+  def automaton[W:Semiring:ClassManifest,S,T:Alphabet](initialStates: Map[S,W], finalWeights: Map[S,W])(arcs: Arc[W,S,T]*): Automaton[W,S,T] = {
     val arcMap = arcs.groupBy(_.from);
-    new Automaton[W,S,T]()(implicitly[Semiring[W]], implicitly[Alphabet[T]]) {
+    new Automaton[W,S,T]() {
       val initialStateWeights = initialStates;
       def finalWeight(s: S) = finalWeights.getOrElse(s,ring.zero);
       def edgesMatching(s: S, l: T) = {
@@ -518,7 +519,7 @@ object Automaton {
 /**
    * Creates a transducer with the given initial states, final states, and arcs.
    */
-  def intAutomaton[W:Semiring,T:Alphabet](initialStates: Map[Int,W], finalWeights: Map[Int,W])(arcs: Arc[W,Int,T]*): Automaton[W,Int,T] = {
+  def intAutomaton[W:Semiring:ClassManifest,T:Alphabet](initialStates: Map[Int,W], finalWeights: Map[Int,W])(arcs: Arc[W,Int,T]*): Automaton[W,Int,T] = {
     val arcMap =  arcs.groupBy(_.from);
 
     val map = new ArrayMap[Seq[Arc[W,Int,T]]] {
@@ -536,13 +537,8 @@ object Automaton {
       override val finalStateWeights = finalWeights withDefaultValue(ring.zero);
 
 
-      override protected[fst] def makeMap[T](dflt: => T): ArrayMap[T] = {
-        new ArrayMap[T] {
-          override def default(k: Int) = {
-            val result = dflt;
-            result;
-          }
-        }
+      override protected[fst] def makeMap[T:ClassManifest](dflt: => T): SparseArrayMap[T] = {
+        new SparseArrayMap[T](dflt);
       }
 
       def edgesMatching(s: Int, t: T) = {
@@ -579,7 +575,7 @@ object Automaton {
    }
    * </code>
    */
-  class DSL[W:Semiring,T:Alphabet] {
+  class DSL[W:Semiring:ClassManifest,T:Alphabet] {
     private val epsilonT = implicitly[Alphabet[T]].epsilon;
     class Extras[S](to: S) {
       def apply(label: T, weight: W) = (to,(label),weight);

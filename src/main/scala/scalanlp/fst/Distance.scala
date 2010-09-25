@@ -10,7 +10,7 @@ object Distance {
   * Selects between singleSourceShortestDistance and allPairDistances
   * based on cyclicity
   */
-  def allPathDistances[@specialized(Double) W:Semiring,State,@specialized(Char) T](fst: Automaton[W,State,T]) = if(fst.isCyclic) {
+  def allPathDistances[@specialized(Double) W:Semiring:ClassManifest,State,@specialized(Char) T](fst: Automaton[W,State,T]) = if(fst.isCyclic) {
     val ring = implicitly[Semiring[W]];
 
     val allPairs = allPairDistances(fst);
@@ -35,7 +35,7 @@ object Distance {
   * for acyclic graphs, k-closed semirings, or grahs that are acyclic except
   * for self-loops
   */
-  def singleSourceShortestDistances[@specialized(Double) W:Semiring,State,@specialized(Char) T](fst: Automaton[W,State,T]):Map[State,W] = {
+  def singleSourceShortestDistances[@specialized(Double) W:Semiring:ClassManifest,State,@specialized(Char) T](fst: Automaton[W,State,T]):Map[State,W] = {
     val ring = implicitly[Semiring[W]];
     import ring._;
 
@@ -104,18 +104,18 @@ object Distance {
   * Returns the distances between individual pairs of states using
   * only one hop
   */
-  private def neighborDistances[W:Semiring,State, T](fst: Automaton[W,State,T]) = {
+  private def neighborDistances[W:Semiring:ClassManifest,State, T](fst: Automaton[W,State,T]) = {
     val ring = implicitly[Semiring[W]];
     import ring._;
     import fst._;
 
     val distances = makeMap(makeMap(zero));
-    val allStates = makeMap[State](null.asInstanceOf[State]); // XXX
+    val allStates = new collection.mutable.HashSet[State];
     allEdges.foreach { case Arc(from,to,_,w) =>
       val current = distances(from)(to);
       distances(from)(to) = maybe_+=(current,w)._1;
-      allStates(from) = from;
-      allStates(to) = to;
+      allStates += from;
+      allStates += to;
     }
     (distances,allStates)
   }
@@ -125,7 +125,7 @@ object Distance {
   * Finds all pair-wise distances between all points in O(n^3),
   * where n is the number of states. Works for any complete semiring.
   */
-  def allPairDistances[@specialized(Double) W:Semiring,State, @specialized(Char) T](fst: Automaton[W,State,T]) = {
+  def allPairDistances[@specialized(Double) W:Semiring:ClassManifest,State, @specialized(Char) T](fst: Automaton[W,State,T]) = {
     val ring = implicitly[Semiring[W]];
     import ring._;
     val (distances,allStates) = neighborDistances(fst);
@@ -134,7 +134,7 @@ object Distance {
    
 
     for {
-      k <- allStates.keysIterator
+      k <- allStates
     } {
       // cache some commonly used values
       val dkk = distances(k)(k);
@@ -143,8 +143,7 @@ object Distance {
       for {
         (j,dkj) <- distances(k).iterator
         if j != k && !closeTo(dkj,zero)
-        i <- allStates.keysIterator
-        if i != k
+        i <- allStates if i != k
         dik = distances(i)(k)
         if !closeTo(dik,zero)
       } {
@@ -153,7 +152,7 @@ object Distance {
         distances(i)(j) = maybe_+=(current,pathsThroughK)._1;
       }
 
-      for (i <- allStates.keysIterator if i != k) {
+      for (i <- allStates if i != k) {
         distances(k)(i) = times(dkkStar,distances(k)(i));
         distances(i)(k) = times(distances(i)(k),dkkStar);
       }

@@ -11,7 +11,7 @@ import collection.mutable.HashMap
  *  @author dlwh
  */
 object ExpectedCounts {
-  def counts[W:Semiring, S1,S2,T:Alphabet](weighted: Automaton[W,S1,T],
+  def counts[W:Semiring:ClassManifest, S1,S2,T:Alphabet](weighted: Automaton[W,S1,T],
                                                                 template: Automaton[W,S2,T]) = {
     import ApproximatePartitioner._;
     val (indexedTemplate,templateIndex) =  template.relabelWithIndex;

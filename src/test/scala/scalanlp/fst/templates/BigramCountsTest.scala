@@ -21,7 +21,7 @@ class BigramCountsTest extends FunSuite with Checkers {
     import Semiring.LogSpace.doubleIsLogSpace;
 
     val auto = constant("Hello",0.0);
-    val template = new BigramModel('#', "Hello".toSet);
+    val template = new BigramModel[Double,Char]('#', "Hello".toSet);
     val counts = ExpectedCounts.counts(auto,template);
 
     def state(ch1: Char, ch2: Char) = (ch1,ch2,ch2);
