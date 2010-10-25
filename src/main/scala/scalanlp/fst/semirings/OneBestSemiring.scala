@@ -2,6 +2,12 @@ package scalanlp.fst;
 
 import scalanlp.math.Semiring
 
+/**
+ * The one best semiirng will reweight an automaton to extract the one-best path through
+ * it.
+ *
+ * @author dlwh
+ */
 class OneBestSemiring[T,W](implicit wOrd: Ordering[W], wRing: Semiring[W], alphabet: Alphabet[T]) {
   case class Elem(str: Seq[T], weight: W);
   import wOrd.mkOrderingOps;

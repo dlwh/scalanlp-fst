@@ -10,6 +10,8 @@ import scalala.tensor.counters.LogCounters.{logSum => _, _};
 import scalanlp.util.Index;
 
 /**
+ * Encodes the sufficient statistics for a trigram model of an automaton.
+ * 
  *
  * @param acceptableChars : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.

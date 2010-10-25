@@ -1,4 +1,19 @@
 package scalanlp.fst
+/*
+ Copyright 2010 David Hall
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+*/
 
 /**
  * Handles the composition of automata and transducers
@@ -20,7 +35,7 @@ object Composition {
     compose(transA,transB,{(a:Option[Any],b:W1,c:W2) => composeW(b,c)});
   }
 
-/**
+  /**
    * Composition of two transducers in the general case.
    * Special handling for epsilons described in Mohri (2002). This supports an extension
    * where we can handle two distinct weight types as long as we have a way of composing them

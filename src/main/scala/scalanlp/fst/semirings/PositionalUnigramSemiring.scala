@@ -14,7 +14,8 @@ import scala.collection.mutable.{Seq=>MSeq};
 
 import scalanlp.util.Index;
 
-/**
+/*
+ * Encodes the sufficient statistics for an automaton that has p(character|position) up to some max length.
  *
  * @param acceptableTs : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.

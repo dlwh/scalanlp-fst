@@ -5,6 +5,12 @@ import scala.collection.mutable.ArrayBuffer;
 
 import scalanlp.math._;
 
+/**
+* Returns kbest derivations from an automaton. Naturally, the semiring involved needs to have an ordering.
+*
+*
+* @author dlwh
+*/
 trait KBest {
   case class Derivation[W,State,T](str: ArrayBuffer[T], state: State, weight: W,  heuristic: W, atFinal: Boolean);
   implicit def orderDeriv[W:Ordering,State,T] = Ordering[W].on[Derivation[W,State,T]](_.heuristic);
@@ -85,6 +91,9 @@ trait KBest {
   }
 }
 
+/**
+* Uses an A* heuristic to do the kbest list.
+*/
 object KBest extends KBest {
 
   override protected def computeHeuristics[W:Semiring:ClassManifest,State,T](auto: Automaton[W,State,T]) = {
@@ -92,6 +101,9 @@ object KBest extends KBest {
   }
 }
 
+/**
+* Uses no heuristic to do the kbest list.
+*/
 object UniformCostKBest extends KBest {
   override protected def computeHeuristics[W:Semiring:ClassManifest,State,T](auto: Automaton[W,State,T]) = {
     { (s: State) => implicitly[Semiring[W]].zero }

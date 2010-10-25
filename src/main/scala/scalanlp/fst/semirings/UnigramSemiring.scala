@@ -7,6 +7,9 @@ import scalanlp.math.Semiring
 import scalanlp.util.Index
 
 
+/**
+* Encodes the sufficient statistics for a unigram model of an automaton.
+*/
 class UnigramSemiring[@specialized(Char) T:Alphabet](chars: Set[T], beginningUnigram:T, cheatOnEquals:Boolean=false) {
 
   val charIndex = Index[T]();

@@ -6,6 +6,13 @@ import scalanlp.math._;
 import math._;
 import Numerics._;
 
+/**
+* KLMinimize will merge two states if the induced distribution of suffixes
+* starting at those states are similar. (Or rather, if the minimization
+* algorithm finds that they might be.)
+*
+* @author dlwh
+*/
 object KLMinimize {
   import Minimizer._;
 

@@ -7,8 +7,7 @@ import scalanlp.math.Numerics._;
  * Levhenstein transducer over sum of alignments (not viterbi
  * alignment) with the given parameters;
  *
- * The cost function must handle Epsilon, and Rho might be included 
- * in the alphabet, or not.
+ * The cost function must handle Epsilon.
  *
  * When composed with an input transducer that is markovian, will
  * produce a markovian marginal.

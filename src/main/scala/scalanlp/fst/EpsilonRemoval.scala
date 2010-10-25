@@ -2,6 +2,13 @@ package scalanlp.fst
 
 import scalanlp.math.Semiring
 
+/**
+* Epsilon-removal removes all epsilons from an automaton by essentially collapsing
+* epsilon paths onth the state. That is, if you could go from state 1 to state 2 via epsilon,
+* you just copy all the arcs from state 2 to state 1 (weighted by the weight of the epsilon arc).
+*
+* @author dlwh
+*/
 object EpsilonRemoval {
   def removeEpsilons[W:Semiring:ClassManifest,S,T:Alphabet](a: Automaton[W,S,T]):Automaton[W,S,T] = {
     val epsilon = implicitly[Alphabet[T]].epsilon;
@@ -10,7 +17,6 @@ object EpsilonRemoval {
 
     val epsilonsOnly = a.filterArcs(_.label == epsilon);
     val pairDistances = Distance.allPairDistances(epsilonsOnly);
-  //  val oldArcs = a.filterArcs(_.label != epsilon).allEdges;
 
     val newArcs = for {
       (p,distances) <- pairDistances.iterator

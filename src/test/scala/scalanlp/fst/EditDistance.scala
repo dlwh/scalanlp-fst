@@ -46,20 +46,6 @@ class EditDistanceTest extends FunSuite {
     assert( (ed >> abc).cost.abs < 1E-6, (ed >> abc) cost);
   }
 
-  test("matches,subs with rhos produces markovian transducer") {
-    import scalanlp.math.Semiring.LogSpace._;
-    val ed = new EditDistance(-2.0, Double.NegativeInfinity, Set('a','b','c'),3);
-    val abc = Automaton.constant("abc",0.0).asTransducer;
-    assert( (ed >> abc).cost.abs < 1E-6, (ed >> abc) cost);
-  }
-
-  test("matches,subs,dels with rhos produces markovian transducer") {
-    import scalanlp.math.Semiring.LogSpace._;
-    val ed = new EditDistance(-2.0, -3.0, Set('a','b','c'),3);
-    val abc = Automaton.constant("abc",0.0).asTransducer;
-    assert( (ed >> abc).cost.abs < 1E-6, (ed >> abc) cost);
-  }
-
   test("ed with a 0 cost automaton gives a distribution") {
     import scalanlp.math.Semiring.LogSpace._;
     val ed = new EditDistance(-3, -4, Set('a','b','c'));

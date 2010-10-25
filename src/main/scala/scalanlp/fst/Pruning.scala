@@ -2,6 +2,9 @@ package scalanlp.fst;
 
 import scalanlp.math._;
 
+/**
+* Used to remove arcs from automata.
+*/
 object Pruning {
   /**
    *
@@ -24,6 +27,9 @@ object Pruning {
     combined withDefaultValue ring.zero;
   }
 
+  /**
+  * prunes arcs that are below some posterior probability/weight of being visited.
+  */
   def prune[W:Semiring:ClassManifest,State,T:Alphabet](auto: Automaton[W,State,T], belowThreshold: W=>Boolean): Automaton[W,State,T] = {
     val zero = implicitly[Semiring[W]].zero;
 

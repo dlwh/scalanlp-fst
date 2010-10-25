@@ -25,10 +25,4 @@ class DecayAutomatonTest extends FunSuite {
     assert(cost.abs < 1E-10, cost + " to far from zero!");
   }
 
-  test("rho and nonRho are similar") {
-    val da = new DecayAutomaton(4,Set('a','b'));
-    val da2 = new DecayAutomaton(4,Set.empty,2);
-    assert( (da.cost - da2.cost).abs < 1E-6);
-  }
-
 }

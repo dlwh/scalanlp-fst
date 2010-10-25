@@ -12,7 +12,13 @@ import scalanlp.collection.mutable.SparseArray;
 import scalala.tensor.counters.LogCounters.{logSum=>_,_};
 
 import scalanlp.util.Index;
-/**
+/*
+ * This class contains code to convert fst arcs to use a bigram semiring.
+ * The bigram semiring allows you to compute sufficient statistics
+ * used to estimate a bigram model of an arbitrary transducer.
+ *
+ * See the unit tests for an example.
+ *
  *
  * @param acceptableChars : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.

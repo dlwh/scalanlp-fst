@@ -3,6 +3,10 @@ package scalanlp.fst
 import scalanlp.math._
 import collection.mutable.HashMap;
 
+/**
+ * Provides routines for computing the distance/score/costs of various
+ * paths through the automaton.
+ */
 object Distance {
 
   /**
@@ -76,8 +80,6 @@ object Distance {
       val rFrom = r(from);
       r -= from;
 
-      //println(distances);
-      //new Exception() printStackTrace();
       for( (to,w) <- distances(from) if !closeTo(w,zero) && from != to) {
         val dt = d(to);
         val wRFrom = times(rFrom,w);

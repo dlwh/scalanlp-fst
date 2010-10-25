@@ -21,9 +21,7 @@ package object fst {
 
       val arcMap =  arcs.groupBy(_.from);
 
-      val map = new ArrayMap[Seq[Arc[W,Int,(In,Out)]]] {
-        override def defValue = Seq.empty;
-      }
+      val map = new ArrayMap[Seq[Arc[W,Int,(In,Out)]]](Seq.empty);
       map ++= arcMap;
       for( (s,_) <- finalWeights.iterator if !map.contains(s)) {
         map(s) = Seq.empty;
@@ -36,9 +34,7 @@ package object fst {
         override val finalStateWeights = finalWeights withDefaultValue(ring.zero);
 
         override protected[fst] def makeMap[T:ClassManifest](dflt: => T): ArrayMap[T] = {
-          new ArrayMap[T] {
-            override def defValue = dflt;
-          }
+          new ArrayMap[T](dflt);
         }
 
         def edgesMatching(s: Int, inout: (In,Out)) = {
@@ -138,11 +134,17 @@ package object fst {
   }
 
   implicit def transducerExtras[W:Semiring:ClassManifest,State,In:Alphabet,Out:Alphabet](t: Transducer[W,State,In,Out]) = new TransducerExtras(t);
+  /**
+  * provides extra methods for transducers.
+  */
   class TransducerExtras[W:Semiring:ClassManifest,State,In:Alphabet,Out:Alphabet](outer: Transducer[W,State,In,Out]) {
     private def ring = implicitly[Semiring[W]];
     private def inAlpha = implicitly[Alphabet[In]];
     private def outAlpha = implicitly[Alphabet[Out]];
 
+    /**
+    * shorthand for composition
+    */
     def >>[S2,Out2:Alphabet](t2: Transducer[W,S2,Out,Out2]) = Composition.compose(outer,t2,ring.times _ )
 
     /**

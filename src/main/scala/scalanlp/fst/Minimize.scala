@@ -6,6 +6,11 @@ import scalanlp.collection.mutable.ArrayMap;
 
 import scalanlp.math._;
 
+/**
+* Minimization routines for automata.
+*
+* @author dlwh
+*/
 object Minimizer {
   // two states are potentially equivalent if they have the same follow set (nextStates)
   // and are equivalent if their final states are similar, and their individual
@@ -107,12 +112,8 @@ object Minimizer {
       */
 
 
-      val initWeights = new ArrayMap[W] {
-        override def defValue = ring.zero;
-      };
-      val newFinalWeights = new ArrayMap[W] {
-        override def defValue = ring.zero;
-      };
+      val initWeights = new ArrayMap[W](ring.zero);
+      val newFinalWeights = new ArrayMap[W](ring.zero);
       type NewArc = scalanlp.fst.Arc[W,Int,T];
       val arcs = new ArrayBuffer[NewArc];
 

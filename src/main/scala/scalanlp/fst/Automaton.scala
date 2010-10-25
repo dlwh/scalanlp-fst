@@ -71,6 +71,9 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
     m ++ statesWithoutEdges;
   }
 
+  /**
+  * Returns the set of all states in the automaton.
+  */
   def allStates = Set() ++ initialStateWeights.keysIterator ++ allEdges.iterator.map(_.to);
 
   /**
@@ -134,7 +137,11 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
   def &[S](that: Automaton[W,S,T]):Automaton[W,(State,S,scalanlp.fst.Composition.InboundEpsilon),T] = {
     (asTransducer >> that.asTransducer).outputProjection;
   }
-
+  
+  /**
+  * Projects this automaton to make it look like a transducer that maps a string to the
+  * same string with the same weight as the acceptance weight of this automaton.
+  */
   def asTransducer: Transducer[W,State,T,T] = new Transducer[W,State,T,T] {
     def edgesMatching(s: State, t: (T,T)) = if (t._1 == outer.alphabet.sigma || t._1 == t._2) {
       outer.edgesMatching(s,t._2) map { case Arc(s,to,l1,w) => Arc(s,to,(l1,l1),w) }
@@ -236,6 +243,9 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
     }
   }
 
+  /**
+  * Computes the reverse automaton.
+  */
   def reverse = {
     val buf = allEdges map { case Arc(from,to,label,w) => Arc(to,from,label,w) }
 
@@ -252,6 +262,10 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
     automaton(myInit,finalWeights)(buf:_*);
   }
 
+  /**
+  * pushWeights forces all weights at each internal state to sum to one and offloads all
+  * the mass to the beginning of the transducer (in the start state)
+  */
   def pushWeights(implicit r2: WLDSemiring[W]): Automaton[W,State,T] = {
     import r2._;
     require(r2.zero == ring.zero);
@@ -276,14 +290,18 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
     automaton(initWeights,finalWeights)(arcs:_*);
   }
 
-    /**
-   *  Relabels this transducer's states with integers. This is a strict algorithm.
-   */
+  /**
+  *  Relabels this transducer's states with integers. This is a strict algorithm.
+  */
   def relabel:Automaton[W,Int,T] = {
     relabelWithIndex._1
   } 
 
 
+  /*
+  * Relabels the automaton, giving an index that maps from the old states to the
+  * new dense integer states.
+  */
   def relabelWithIndex: (Automaton[W,Int,T], Index[State]) = {
     val index = Index[State]();
     
@@ -389,11 +407,9 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
 
     val Eps = alphabet.epsilon;
     val Sig = alphabet.sigma;
-    val Rho = alphabet.rho;
     def transform(c: T) = c match {
       case Eps => "&epsilon;"
       case Sig => "&sigma;"
-      case Rho => "&rho;"
       case x => x;
     }
 
@@ -435,7 +451,7 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
 
 
 
-/**
+  /**
    * True iff the graph contains a non self-loop cycle
    */
   lazy val isCyclic = {
@@ -522,9 +538,7 @@ object Automaton {
   def intAutomaton[W:Semiring:ClassManifest,T:Alphabet](initialStates: Map[Int,W], finalWeights: Map[Int,W])(arcs: Arc[W,Int,T]*): Automaton[W,Int,T] = {
     val arcMap =  arcs.groupBy(_.from);
 
-    val map = new ArrayMap[Seq[Arc[W,Int,T]]] {
-      override def defValue = Seq[Arc[W,Int,T]]();
-    }
+    val map = new ArrayMap[Seq[Arc[W,Int,T]]](Seq[Arc[W,Int,T]]());
     map ++= arcMap;
     for( (s,_) <- finalWeights.iterator if !map.contains(s)) {
       map(s) = Seq.empty;
