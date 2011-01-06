@@ -270,7 +270,7 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
       // X Y --> Z (bigram)
       for( (yc,yprob) <- y.leftUnigrams.activeElements;
           (xc,xprob) <- x.rightUnigrams.activeElements) {
-        newBigrams(xc)(yc) = logSum(newBigrams(xc)(yc), yprob + xprob);
+        newBigrams.getOrElseUpdate(xc)(yc) = logSum(newBigrams.getOrElseUpdate(xc)(yc), yprob + xprob);
       }
 
       // frontier:
@@ -301,7 +301,7 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
       if(x.bigramCounts != null) logAddInPlace2D(newBigrams,x.bigramCounts);
       for( (xc,xprob) <- x.rightUnigrams.activeElements;
           (yc,yprob) <- x.leftUnigrams.activeElements) {
-        newBigrams(xc)(yc) = logSum(newBigrams(xc)(yc), yprob + xprob);
+        newBigrams.getOrElseUpdate(xc)(yc) = logSum(newBigrams.getOrElseUpdate(xc)(yc), yprob + xprob);
       }
       val newBigrams2 = mkGramCharMap;
       logAddInPlace2D(newBigrams2,newBigrams,2 * p_*);
