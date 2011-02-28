@@ -39,11 +39,15 @@ class UnigramSemiring[@specialized(Char) T:Alphabet](chars: Set[T], beginningUni
 
   private def mnorm(x: SparseVector, y: SparseVector): Boolean = {
     var i = 0;
-    while(i < x.size) {
-      if(!Semiring.LogSpace.doubleIsLogSpace.closeTo(x(i),y(i))) return false
-      i += 1;
-    }
-    true
+    var ok = true;
+    //if(x.used != y.used) false
+    //else {
+      while(i < x.size && ok) {
+        if(!Semiring.LogSpace.doubleIsLogSpace.closeTo(x(i),y(i))) ok = false;
+        i += 1;
+      }
+      ok
+    //}
   }
 
   implicit val ring: Semiring[Elem] = new Semiring[Elem] {

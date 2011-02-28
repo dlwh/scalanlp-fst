@@ -72,12 +72,12 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
   }
 
   /**
-  * Returns the set of all states in the automaton.
+  * Returns the set of all states in the automaton. Not efficient.
   */
   def allStates = Set() ++ initialStateWeights.keysIterator ++ allEdges.iterator.map(_.to);
 
   /**
-   * Returns a map from states to its final weight. may expand all nodes.
+   * Returns a map from states to its final weight. may expand all nodes. Not efficient.
    */
   def finalStateWeights = Map.empty ++ allStates.map { s => (s,finalWeight(s)) }
 
@@ -307,13 +307,22 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
     
     val arcs = {
       val seqArcs = new collection.mutable.ArrayBuffer[scalanlp.fst.Arc[W,Int,T]];
+      val group = new SparseArrayMap[SparseArrayMap[collection.mutable.HashMap[T,W]]]( {
+        new SparseArrayMap((new collection.mutable.HashMap[T,W] {
+          override def default(k: T) = implicitly[Semiring[W]].zero;
+        }).asInstanceOf[collection.mutable.HashMap[T,W]])
+      })
+
       outer.breadthFirstSearch { case Arc(from,to,label,score) =>
         val newFrom = index.index(from);
         val newTo = index.index(to);
-        seqArcs += Arc(newFrom,newTo,label,score);
+        if(score != implicitly[Semiring[W]].zero)
+          group(newFrom)(newTo)(label) = implicitly[Semiring[W]].plus(group(newFrom)(newTo)(label),score)
       }
-      seqArcs
+      val newArcs = for( (from,map) <- group iterator; (to,map2) <- map iterator; (label,score) <- map2 iterator) yield Arc(from,to,label,score);
+      newArcs.toIndexedSeq;
     }
+
 
     val myFinalWeights = IntMap(index.pairs.map { case (s,u) =>
       (u, outer.finalWeight(s));
@@ -354,7 +363,7 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
       }
       
       // normalize by w
-      val arcs = for((label,newState) <- labeledStates.elements;
+      val arcs = for((label,newState) <- labeledStates.iterator;
                      w = labeledWeights(label)) yield {
         newState.transform { (innerState,v) =>
           wld.leftDivide(w,v);
@@ -366,7 +375,7 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
     }
 
     def finalWeight(map: Map[State,W]) = {
-      val weights = for( (state,v) <- map.elements;
+      val weights = for( (state,v) <- map.iterator;
                         fW = outer.finalWeight(state))
                           yield ring.times(v,fW);
       weights.foldLeft(ring.zero)(ring.plus _);

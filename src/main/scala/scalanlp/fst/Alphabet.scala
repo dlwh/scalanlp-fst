@@ -39,19 +39,23 @@ abstract class Alphabet[@specialized(Char) T] {
 }
 
 object Alphabet {
-  implicit val zeroEpsCharBet = new Alphabet[Char] {
+  def apply[T:Alphabet] = implicitly[Alphabet[T]];
+  implicit object zeroEpsCharBet extends Alphabet[Char] {
     val epsilon = '\0';
     val sigma = '\1';
     def matches(a: Char, b:Char) = (a == sigma) || (b == sigma) || a == b;
   }
 
-  implicit def tupleize[A:Alphabet,B:Alphabet] = new Alphabet[(A,B)] {
+  implicit def tupleize[A:Alphabet,B:Alphabet] = new TupleAlphabet[A,B];
+
+
+  final class TupleAlphabet[A:Alphabet,B:Alphabet] extends Alphabet[(A,B)] {
     val epsilon = (implicitly[Alphabet[A]].epsilon,implicitly[Alphabet[B]].epsilon);
     val sigma = (implicitly[Alphabet[A]].sigma,implicitly[Alphabet[B]].sigma);
-    private val aSig = sigma._1;
-    private val bSig = sigma._2;
+    private val aSigma = sigma._1;
+    private val bSigma = sigma._2;
     def matches(a: (A,B), b: (A,B)) = (
-      (a._1 == aSig || b._1 == aSig || b._1 == a._1) && (a._2 == bSig || b._2 == bSig || b._2 == a._2)
+      (a._1 == aSigma || b._1 == aSigma || b._1 == a._1) && (a._2 == bSigma || b._2 == bSigma || b._2 == a._2)
     );
   }
 }
