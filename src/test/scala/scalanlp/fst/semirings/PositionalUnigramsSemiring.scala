@@ -16,7 +16,7 @@ import org.scalacheck._;
 
 object PositionalUnigramSetup {
   val validChars = Set.empty ++ "Helloabcdem";
-  val tgring = new PositionalUnigramSemiring[Char](10,validChars,'#');
+  val tgring = new PositionalUnigramSemiring(10,validChars,'#');
 }
 import PositionalUnigramSetup._;
 import tgring._;

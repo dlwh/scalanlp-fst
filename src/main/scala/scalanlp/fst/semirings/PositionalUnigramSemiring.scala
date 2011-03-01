@@ -25,9 +25,37 @@ import scalala.tensor.dense._;
 import scalanlp.collection.mutable.ArrayMap;
 import scalala.tensor.counters.LogCounters.{logSum=>_,_};
 import java.util.Arrays
-import scala.collection.mutable.{Seq=>MSeq};
 
-import scalanlp.util.Index;
+
+import scalanlp.util.Index
+import it.unimi.dsi.fastutil.chars.Char2IntOpenHashMap
+import collection.mutable.{ArrayBuffer, Seq => MSeq}
+
+class CharIndex(beginningUnigram: Char, chars:Set[Char]) extends Index[Char] {
+  val map = new Char2IntOpenHashMap(chars.size + 1);
+  map.defaultReturnValue(-1);
+  val objects = new ArrayBuffer[Char](chars.size + 1);
+  var _size = 0;
+  map.put(beginningUnigram, _size);
+  objects += beginningUnigram;
+  _size += 1;
+  for(c <- chars) {
+    if(map.put(c, _size) == -1) {
+      objects += c
+      _size += 1;
+    }
+  }
+
+  override def size = _size;
+
+  def iterator = objects.iterator
+
+  def pairs = (objects zipWithIndex).iterator
+
+  def unapply(i: Int) = Some(objects(i));
+
+  def apply(t: Char) = map.get(t);
+}
 
 /*
  * Encodes the sufficient statistics for an automaton that has p(character|position) up to some max length.
@@ -35,19 +63,18 @@ import scalanlp.util.Index;
  * @param acceptableTs : only learn bigram histories that contain (only) these chars
  * @param acceptableBigrams: only learn bigrams histories that are these bigrams.
  */
-class PositionalUnigramSemiring[@specialized(Char) T](maxPosition: Int, chars: Set[T], beginningUnigram: T, cheatOnEquals: Boolean=false)
-                                                       (implicit alpha: Alphabet[T], man: OptManifest[T]) {
+class PositionalUnigramSemiring(maxPosition: Int, chars: Set[Char], beginningUnigram: Char, cheatOnEquals: Boolean=false)
+                                                       (implicit alpha: Alphabet[Char], man: OptManifest[Char]) {
 
   case class Elem(counts: MSeq[AdaptiveVector], positionScores: Array[Double], totalProb: Double) {
-    def decode: Seq[LogDoubleCounter[T]] = {
+    def decode: Seq[LogDoubleCounter[Char]] = {
       val result = counts.map { v => aggregate(v.activeElements.map { (iv:(Int,Double)) => (charIndex.get(iv._1),iv._2) } )};
       result;
     }
   }
 
-  val charIndex = Index[T]();
-  val beginningUnigramId = charIndex.index(beginningUnigram)
-  for( ch <- chars) { charIndex.index(ch) }
+  val charIndex = new CharIndex(beginningUnigram, chars);
+  val beginningUnigramId = 0;
 
   private def mkAdaptiveVector = {
     val r = new AdaptiveVector(charIndex.size);
@@ -232,11 +259,11 @@ class PositionalUnigramSemiring[@specialized(Char) T](maxPosition: Int, chars: S
     val zero = Elem(new Array[AdaptiveVector](maxPosition),Array.fill(maxPosition)(Double.NegativeInfinity),-1.0/0.0);
   }
 
-  def promote[S](a: Arc[Double,S,T]) = {
+  def promote[S](a: Arc[Double,S,Char]) = {
     val counts = new Array[AdaptiveVector](maxPosition);
     val posScores = new Array[Double](maxPosition);
     Arrays.fill(posScores,Double.NegativeInfinity);
-    if (a.label != implicitly[Alphabet[T]].epsilon) {
+    if (a.label != implicitly[Alphabet[Char]].epsilon) {
       counts(0) = mkAdaptiveVector;
       counts(0)(charIndex(a.label)) = a.weight;
       posScores(1) = a.weight;
