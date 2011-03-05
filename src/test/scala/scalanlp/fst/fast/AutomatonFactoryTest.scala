@@ -19,7 +19,6 @@ import scalanlp.util.Index;
 class AutomatonFactoryTest extends FunSuite {
   val factory = new AutomatonFactory[Char](Index( Set() ++ ('a' to 'g') + implicitly[Alphabet[Char]].epsilon));
   import factory._;
-  val eps = implicitly[Alphabet[Char]].epsilon;
 
   test("basics") {
     val a = automaton("abc",1.0);
@@ -30,24 +29,32 @@ class AutomatonFactoryTest extends FunSuite {
   }
 
 
-  /*
   test("Mohri hwa fig 7 epsilon-full composition") {
-    val dsl = new Transducer.DSL[Int,Boolean,Char,Char]();
     import dsl._;
-    val t1 = transducer( Map(0->true), Map(4->true))(
-      0 -> (1)('a','a',true),
-      1 -> 2 ('b',eps,true),
-      2 -> 3 ('c',eps,true),
-      3 -> (4)('d','d',true)
+    val t1 = transducer( 0->1.0, Map(4->1.0))(
+      0 -> (1)('a','a',1.0),
+      1 -> 2 ('b',eps,1.0),
+      2 -> 3 ('c',eps,1.0),
+      3 -> (4)('d','d',1.0)
     );
-    val t2 = transducer( Map(0->true), Map(3->true))(
-      0 -> (1)  ('a','d',true),
-      1 -> 2 (eps,'e',true),
-      2 -> (3)  ('d','a',true)
+    val t2 = transducer( 0->1.0, Map(3->1.0))(
+      0 -> (1)  ('a','d',1.0),
+      1 -> 2 (eps,'e',1.0),
+      2 -> (3)  ('d','a',1.0)
     );
+    val comps = compose(t1,t2);
+    assert(comps.arcsFrom(destination(t1.numStates,0,0,NoEps))(index('a'))(index('d'))(destination(t1.numStates,1,1,NoEps)) === 1.0);
+    assert(comps.arcsFrom(destination(t1.numStates,0,0,NoEps),index('a'),index('d'))(destination(t1.numStates,1,1,NoEps)) === 1.0);
+    assert(comps.arcsFrom(destination(t1.numStates,1,1,NoEps))(index('b'))(epsilonIndex)(destination(t1.numStates,2,1,LeftEps)) === 1.0);
+    assert(comps.arcsFrom(destination(t1.numStates,1,1,NoEps),index('b'),epsilonIndex)(destination(t1.numStates,2,1,LeftEps)) === 1.0);
+    assert(comps.arcsFrom(destination(t1.numStates,1,1,NoEps))(index('b'))(index('e'))(destination(t1.numStates,2,2,NoEps)) === 1.0);
+    assert(comps.arcsFrom(destination(t1.numStates,1,1,NoEps))(epsilonIndex)(index('e'))(destination(t1.numStates,1,2,RightEps)) === 1.0);
+    assert(comps.arcsFrom(destination(t1.numStates,2,1,LeftEps))(index('c'))(epsilonIndex)(destination(t1.numStates,3,1,LeftEps)) === 1.0);
+    assert(comps.arcsFrom(destination(t1.numStates,2,2,NoEps))(index('c'))(epsilonIndex)(destination(t1.numStates,3,2,LeftEps)) === 1.0);
+    assert(comps.arcsFrom(destination(t1.numStates,3,2,LeftEps))(index('d'))(index('a'))(destination(t1.numStates,4,3,NoEps)) === 1.0);
 
+    /*
     val result = {
-      import Composition._;
       val dsl = new DSL[(Int,Int,InboundEpsilon),Boolean,Char,Char]();
       import dsl._;
       transducer(Map((0,0,NoEps:InboundEpsilon)->true),Map( (4,3,NoEps:InboundEpsilon)-> true))( 
@@ -61,8 +68,10 @@ class AutomatonFactoryTest extends FunSuite {
       )
     };
     assert(result === (t1 >> t2))
+    */
   }
 
+  /*
   test("cost of a one-arc system is correct") {
     import Semiring.LogSpace._;
     val fst = Transducer.transducer[Double,Int,Char,Char](Map(0->0.0),Map(1->0.0))(Arc(0,1,('a','b'),0.0));
