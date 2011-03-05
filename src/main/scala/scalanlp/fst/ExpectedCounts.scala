@@ -56,15 +56,13 @@ object ExpectedCounts {
       }
     }
 
-    val res = new HashMap[(S2,S2,T), W] {
-      override def initialSize = 2 * templateIndex.size * templateIndex.size * 20;
-    }
+    val res = template.makeMap(template.makeMap(new HashMap[T,W]))
+
     for(i <- 0 until templateIndex.size; j <- 0 until templateIndex.size) {
       val src = templateIndex.get(i);
+      val srcMap = res(src);
       val sink = templateIndex.get(j);
-      val map = scores(i)(j);
-      for( (t,w) <- map)
-        res((src,sink,t)) = w;
+      srcMap(sink) = scores(i)(j);
     }
 
     res;

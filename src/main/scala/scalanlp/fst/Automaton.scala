@@ -74,7 +74,7 @@ abstract class Automaton[@specialized(Double) W:Semiring:ClassManifest,State,@sp
   /**
   * Returns the set of all states in the automaton. Not efficient.
   */
-  def allStates = Set() ++ initialStateWeights.keysIterator ++ allEdges.iterator.map(_.to);
+  def allStates:Set[State] = Set() ++ initialStateWeights.keysIterator ++ allEdges.iterator.map(_.to);
 
   /**
    * Returns a map from states to its final weight. may expand all nodes. Not efficient.
@@ -541,7 +541,7 @@ object Automaton {
     }
   }
 
-/**
+  /**
    * Creates a transducer with the given initial states, final states, and arcs.
    */
   def intAutomaton[W:Semiring:ClassManifest,T:Alphabet](initialStates: Map[Int,W], finalWeights: Map[Int,W])(arcs: Arc[W,Int,T]*): Automaton[W,Int,T] = {
@@ -566,9 +566,9 @@ object Automaton {
 
       def edgesMatching(s: Int, t: T) = {
         if(t == alphabet.sigma) {
-          arcMap.getOrElse(s,Seq.empty).iterator
+          map.getOrElse(s,Seq.empty).iterator
         } else {
-          arcMap.getOrElse(s,Seq.empty).iterator filter { arc =>
+          map.getOrElse(s,Seq.empty).iterator filter { arc =>
             arc.label == t || alphabet.matches(arc.label,t);
           };
         }

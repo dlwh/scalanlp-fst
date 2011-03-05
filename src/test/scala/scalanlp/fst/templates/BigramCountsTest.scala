@@ -24,14 +24,12 @@ class BigramCountsTest extends FunSuite with Checkers {
     val template = new BigramModel[Double,Char]('#', "Hello".toSet);
     val counts = ExpectedCounts.counts(auto,template);
 
-    def state(ch1: Char, ch2: Char) = (ch1,ch2,ch2);
-
-    assert( counts(state('#','H')) === 0.0);
-    assert( counts(state('H','e')) === 0.0);
-    assert( counts(state('e','l')) === 0.0);
-    assert( counts(state('l','l')) === 0.0);
-    assert( counts(state('l','o')) === 0.0);
-    assert( counts(state('o','\0')) === 0.0);
+    assert( counts('#')('H')('H') === 0.0);
+    assert( counts('H')('e')('e') === 0.0);
+    assert( counts('e')('l')('l') === 0.0);
+    assert( counts('l')('l')('l')=== 0.0);
+    assert( counts('l')('o')('o') === 0.0);
+    assert( counts('o')('\0')('\0') === 0.0);
   }
 
 }

@@ -29,12 +29,12 @@ class PositionalUnigramsCountsTest extends FunSuite with Checkers {
     val template = new PositionalUnigramModel[Double,Char]('#', "Hello".toSet, 10);
     val counts = ExpectedCounts.counts(auto,template);
 
-    assert( counts((0,1,'H')) === 0.0);
-    assert( counts((1,2,'e')) === 0.0);
-    assert( counts((2,3,'l')) === 0.0);
-    assert( counts((3,4,'l')) === 0.0);
-    assert( counts((4,5,'o')) === 0.0);
-    assert( counts((5,-1,'\0')) === 0.0);
+    assert( counts(0)(1)('H') === 0.0);
+    assert( counts(1)(2)('e') === 0.0);
+    assert( counts(2)(3)('l') === 0.0);
+    assert( counts(3)(4)('l') === 0.0);
+    assert( counts(4)(5)('o') === 0.0);
+    assert( counts(5)(-1)('\0') === 0.0);
   }
 
   test("constant automaton length 3") {
@@ -45,11 +45,11 @@ class PositionalUnigramsCountsTest extends FunSuite with Checkers {
     val template = new PositionalUnigramModel[Double,Char]('#', "Hello".toSet, 3);
     val counts = ExpectedCounts.counts(auto,template);
 
-    assert( counts((0,1,'H')) === 0.0);
-    assert( counts((1,2,'e')) === 0.0);
-    assert( counts((2, 2, 'l')) === doubleIsLogSpace.plus(0.0,0.0));
-    assert( counts((2, 2, 'o')) === 0.0);
-    assert( counts((2, -1, '\0')) === 0.0);
+    assert( counts(0)(1)('H') === 0.0);
+    assert( counts(1)(2)('e') === 0.0);
+    assert( counts(2)(2)('l') === doubleIsLogSpace.plus(0.0,0.0));
+    assert( counts(2)(2)('o') === 0.0);
+    assert( counts(2)(-1)('\0') === 0.0);
   }
 
 }

@@ -1,4 +1,5 @@
-package scalanlp.fst
+package scalanlp.fst.fast
+
 /*
  Copyright 2010 David Hall
 
@@ -20,8 +21,10 @@ package scalanlp.fst
  */
 import scala.collection.mutable.ArrayBuffer
 import scalanlp.math.Semiring
+import scalanlp.collection.mutable.SparseArray
+import scalala.tensor.sparse.SparseVector
 
-object Composition {
+trait Composition[T] { this: AutomatonFactory[T] =>
 
   /**
    * Composition of two transducers in the general case.
@@ -29,13 +32,144 @@ object Composition {
    * where we can handle two distinct weight types as long as we have a way of composing them
    * into a composite weight. In normal composition, this is just product.
    */
-  def compose[W1:Semiring,W2:Semiring,S1,S2,In:Alphabet,Mid:Alphabet,Out:Alphabet,W3:Semiring:ClassManifest]
-            (transA: Transducer[W1,S1,In,Mid], transB: Transducer[W2,S2,Mid,Out], composeW: (W1,W2)=>W3)
-            :Transducer[W3,(S1,S2,InboundEpsilon),In,Out] = {
-    compose(transA,transB,{(a:Option[Any],b:W1,c:W2) => composeW(b,c)});
+  def intersect(transA: Automaton, transB: Automaton):Automaton = {
+    def destination(a:Int, b: Int, eps: InboundEpsilon) = eps.num + 3 * (a + b * transA.numStates)
+
+    new Automaton {
+      val initialState = destination(0,0,NoEps)
+      val initialWeight = ring.times(transA.initialWeight,transB.initialWeight);
+
+      lazy val finalWeights = {
+        Array.tabulate(numStates) { i =>
+          finalWeight(i);
+        }
+      }
+
+      override def finalWeight(s: Int) = {
+        val a = (s / 3)%transA.numStates;
+        val b = (s / 3) / transA.numStates;
+        ring.times(transA.finalWeight(a),transB.finalWeight(b));
+      }
+
+      def numStates = 3 * transA.numStates * transB.numStates;
+
+      def arcsFrom(s: Int, ch: Int) = {
+        val a = (s / 3)%transA.numStates;
+        val b = (s / 3) / transA.numStates;
+        val eps = (s % 3) match {
+          case 0 => NoEps
+          case 1 => LeftEps
+          case 2 => RightEps
+        }
+        val arcs = new SparseVector(numStates);
+        arcs.default = ring.zero;
+        // non-eps arcs
+        if(ch != epsilonIndex) {
+          for {
+            (aTarget,aWeight) <- transA.arcsFrom(a,ch).activeElements
+            (bTarget,bWeight) <- transB.arcsFrom(b,ch).activeElements
+          } {
+            val target = destination(aTarget,bTarget,NoEps);
+            val weight = ring.times(aWeight,bWeight);
+            arcs(target) = weight;
+          }
+        } else if(epsilonIndex >= 0) {
+          // eps arcs:
+          if(eps != RightEps) {
+            for {
+              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
+            } {
+              val target = destination(aTarget,b,LeftEps);
+              val weight = ring.times(aWeight,ring.one);
+              arcs(target) = weight;
+            }
+          }
+          if(eps != LeftEps) {
+            for {
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
+            } {
+              val target = destination(a,bTarget,RightEps);
+              val weight = ring.times(ring.one,bWeight);
+              arcs(target) = weight;
+            }
+          }
+          if(eps == NoEps) {
+            for {
+              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
+            } {
+              val target = destination(aTarget,bTarget,NoEps);
+              val weight = ring.times(aWeight,bWeight);
+              arcs(target) = weight;
+            }
+          }
+        }
+        arcs
+      }
+
+      def arcsFrom(s: Int) = {
+        val a = (s / 3)%transA.numStates;
+        val b = (s / 3) / transA.numStates;
+        val eps = (s % 3) match {
+          case 0 => NoEps
+          case 1 => LeftEps
+          case 2 => RightEps
+        }
+        val arcs = encoder.fillSparseArray{
+          val sp = new SparseVector(numStates);
+          sp.default = ring.zero;
+          sp
+        }
+        // non-eps arcs
+        for {
+          (aCh, aTargets) <- transA.arcsFrom(a) if aCh != epsilonIndex
+          (aTarget,aWeight) <- aTargets.activeElements
+          (bTarget,bWeight) <- transB.arcsFrom(b,aCh).activeElements
+        } {
+          val target = destination(aTarget,bTarget,NoEps);
+          val weight = ring.times(aWeight,bWeight);
+          arcs(aCh)(target) = weight;
+        }
+        // eps arcs:
+        if(epsilonIndex >= 0)  {
+          if(eps != RightEps) {
+            for {
+              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
+            } {
+              val target = destination(aTarget,b,LeftEps);
+              val weight = ring.times(aWeight,ring.one);
+              arcs(epsilonIndex)(target) = weight;
+            }
+          }
+          if(eps != LeftEps) {
+            for {
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
+            } {
+              val target = destination(a,bTarget,RightEps);
+              val weight = ring.times(ring.one,bWeight);
+              arcs(epsilonIndex)(target) = weight;
+            }
+          }
+          if(eps == NoEps) {
+            for {
+              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
+            } {
+              val target = destination(aTarget,bTarget,NoEps);
+              val weight = ring.times(aWeight,bWeight);
+              arcs(epsilonIndex)(target) = weight;
+            }
+          }
+        }
+
+        arcs
+
+      }
+    };
+
   }
 
-
+/*
   /**
    * Composition of two transducers in the general case.
    * Special handling for epsilons described in Mohri (2002). This supports an extension
@@ -116,6 +250,7 @@ object Composition {
     }
   };
 
+  */
 
   /**
    * These classes represent bookkeeping states for doing composition
