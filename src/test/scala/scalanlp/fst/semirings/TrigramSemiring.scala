@@ -14,6 +14,7 @@ import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
 import org.scalacheck._;
 
+/*
 object TrigramSetup {
   val validChars = Seq('a','b','c','d','H','e','l','o');
   val validBasicBigrams = (validChars.drop(1) zip validChars.take(validChars.length -1)) ++ validChars.zip(validChars);
@@ -111,3 +112,4 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
   
 }
+*/

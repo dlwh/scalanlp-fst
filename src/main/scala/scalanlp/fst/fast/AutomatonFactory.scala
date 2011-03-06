@@ -74,7 +74,7 @@ class AutomatonFactory[T](val index: Index[T])
     lazy val cost = if(false) { //if(isCyclic) {
       val costs = allPairDistances(this);
       var cost = ring.zero;
-      for( (to,pathWeight) <- costs(initialState)) {
+      for( (to,pathWeight) <- costs(initialState).activeElements) {
         cost = ring.plus(cost,ring.times(initialWeight,ring.times(pathWeight,finalWeight(to))));
       }
       cost;
