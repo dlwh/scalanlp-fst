@@ -127,11 +127,16 @@ trait Distance[T] { this: AutomatonFactory[T] =>
     }
     for {
       from <- 0 until fst.numStates;
-      (_,targets) <- fst.arcsFrom(from);
-      (to,weight) <- targets.activeElements
+      (_,targets) <- fst.arcsFrom(from)
     } {
-      val current = distances(from)(to);
-      distances(from)(to) = plus(current,weight)
+      var tIndex = 0;
+      while(tIndex < targets.used) {
+        val to = targets.index(tIndex);
+        val weight = targets.data(tIndex);
+        tIndex += 1;
+        val current = distances(from)(to);
+        distances(from)(to) = plus(current,weight)
+      }
     }
     distances
   }

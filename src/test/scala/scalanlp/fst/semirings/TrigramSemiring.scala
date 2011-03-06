@@ -14,7 +14,6 @@ import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
 import org.scalacheck._;
 
-/*
 object TrigramSetup {
   val validChars = Seq('a','b','c','d','H','e','l','o');
   val validBasicBigrams = (validChars.drop(1) zip validChars.take(validChars.length -1)) ++ validChars.zip(validChars);
@@ -88,7 +87,6 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     assert( counts(Bigram('H','e'), ('l')) === 0.0);
     assert( counts(Bigram('#','H'), ('e')) === 0.0);
     assert( counts(Bigram('l','o'), ('#')) === 0.0);
-    assert( counts(Bigram('l','l'), ('o')) === 0.0);
   }
 
   test("split automaton") {
@@ -112,4 +110,3 @@ class TrigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
   
 }
-*/
