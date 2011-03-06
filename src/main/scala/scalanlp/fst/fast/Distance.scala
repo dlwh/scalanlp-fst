@@ -18,8 +18,8 @@ package scalanlp.fst.fast
 
 
 import scalanlp.math._
-import scalala.tensor.sparse.SparseVector
-
+import scalala.tensor.sparse.{SparseHashVector, SparseVector}
+import scalala.tensor.Vector
 
 /**
  * Provides routines for computing the distance/score/costs of various
@@ -114,11 +114,11 @@ trait Distance[T] { this: AutomatonFactory[T] =>
   * Returns the distances between individual pairs of states using
   * only one hop
   */
-  private def neighborDistances(fst: Automaton): Array[SparseVector] = {
+  private def neighborDistances(fst: Automaton): Array[_ <: Vector] = {
     import ring._;
 
     val distances = Array.fill(fst.numStates){
-      val r = new SparseVector(fst.numStates);
+      val r = new SparseHashVector(fst.numStates);
       r.default = ring.zero;
       r;
     }
@@ -128,7 +128,7 @@ trait Distance[T] { this: AutomatonFactory[T] =>
       (to,weight) <- targets.activeElements
     } {
       val current = distances(from)(to);
-      distances(from)(to) = maybe_+=(current,weight)._1;
+      distances(from)(to) = plus(current,weight)
     }
     distances
   }

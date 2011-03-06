@@ -59,13 +59,12 @@ trait EditDistanceFactory[T] { this: AutomatonFactory[T] =>
     val finalWeights = Array(math.log(1 - math.exp(math.log(totalChars) + insCost)));
     def numStates = 1;
     val arcs = encoder.fillSparseArray(encoder.fillSparseArray(mkSparseVector(1)));
-    for(i <- 0 until index.size; j <- 0 until index.size) {
-      arcs.getOrElseUpdate(i).getOrElseUpdate(j)(0) = costOf(i,j)
+    for(i <- 0 until index.size;  aI = arcs.getOrElseUpdate(i); j <- 0 until index.size) {
+      aI.getOrElseUpdate(j)(0) = costOf(i,j)
     }
     def arcsFrom(s: Int) = {
       arcs
     }
-
 
     // symmetric
     def arcsWithOutput(s: Int, outCh: Int) = {
@@ -140,7 +139,7 @@ object SpeedTest {
          {
       val factory = new AutomatonFactory[Char](Index( allChars + implicitly[Alphabet[Char]].epsilon));
       import factory._;
-      val result1 = Profiling.time(10000) { () =>
+      val result1 = Profiling.time(50000) { () =>
         val ed = new EditDistance(-3,-4);
         val x = constant("abcdef",0.0);
         val rr = compose(x.asTransducer,ed).outputProjection;
@@ -150,7 +149,7 @@ object SpeedTest {
     }
     {
       import scalanlp.fst._;
-      val result2 = Profiling.time(10000) { () =>
+      val result2 = Profiling.time(50000) { () =>
         val ed = new EditDistance(-3,-4, allChars);
         val x = Automaton.constant("abcdef",0.0);
         val rr = (x.asTransducer >> ed).outputProjection.relabel;

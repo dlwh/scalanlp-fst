@@ -21,8 +21,8 @@ package scalanlp.fst.fast
  */
 import scala.collection.mutable.ArrayBuffer
 import scalanlp.math.Semiring
-import scalanlp.collection.mutable.SparseArray
 import scalala.tensor.sparse.SparseVector
+import scalanlp.collection.mutable.{ArrayMap, SparseArray}
 
 trait Composition[T] { this: AutomatonFactory[T] =>
   def destination(numStates:Int,a:Int, b: Int, eps: InboundEpsilon) = eps.num + 3 * (a + b * numStates)
@@ -169,6 +169,70 @@ trait Composition[T] { this: AutomatonFactory[T] =>
 
   }
 
+  def compose(transA: Transducer, transB: Transducer):Transducer = {
+    val lt = lazyCompose(transA,transB);
+    val stateMap = new ArrayMap[Int](-1); // old state -> newState
+    val states = new ArrayBuffer[Int](); // new state -> old state
+    def getNewDest(oldDest: Int) = {
+      val index = stateMap(oldDest)
+      if(index < 0) {
+        states += oldDest;
+        val r = states.size - 1;
+        stateMap(oldDest) = r;
+        r
+      } else {
+        index;
+      }
+
+    }
+
+    states += lt.initialState;
+    stateMap(lt.initialState) = 0;
+
+    // newState -> inch -> outch -> dest -> weight
+    val allArcs = new ArrayBuffer[SparseArray[SparseArray[SparseVector]]];
+
+    var nextIndex = 0;
+    while(nextIndex < states.size) {
+      val oldState = states(nextIndex);
+      val newState = nextIndex;
+      val arcs = encoder.fillSparseArray(encoder.fillSparseArray(mkSparseVector(lt.numStates)));
+      allArcs += arcs;
+      nextIndex += 1;
+      // ch1 -> ch2 -> old destinations -> score
+      val oldArcs: SparseArray[SparseArray[SparseVector]] = lt.arcsFrom(oldState);
+      var ch1Index = 0;
+      while(ch1Index < oldArcs.used) {
+        val ch1 = oldArcs.indexAt(ch1Index);
+        val outs = oldArcs.valueAt(ch1Index);
+        ch1Index += 1;
+        val ch1Arcs = arcs.getOrElseUpdate(ch1);
+        var ch2Index = 0;
+        while(ch2Index < outs.used) {
+          val ch2 = outs.indexAt(ch2Index);
+          val weights = outs.valueAt(ch2Index);
+          val newWeights = new SparseVector(lt.numStates,weights.used);
+          newWeights.default = ring.zero
+          ch1Arcs(ch2) = newWeights;
+          ch2Index += 1;
+          var oldDestIndex = 0;
+          while(oldDestIndex < weights.used) {
+            val oldDest = weights.index(oldDestIndex);
+            val weight = weights.data(oldDestIndex);
+            oldDestIndex += 1;
+            // will enqueue:
+            val newDest = getNewDest(oldDest);
+            newWeights(newDest) = weight;
+          }
+        }
+      }
+    }
+
+    val newFinalWeights = states.toArray.map(lt.finalWeight _);
+
+    transducer(allArcs.toArray, newFinalWeights, startState = 0, startWeight = lt.initialWeight);
+  }
+
 
   /**
    * Composition of two transducers in the general case.
@@ -176,7 +240,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
    * where we can handle two distinct weight types as long as we have a way of composing them
    * into a composite weight. In normal composition, this is just product.
    */
-  def compose(transA: Transducer, transB: Transducer):Transducer = {
+  def lazyCompose(transA: Transducer, transB: Transducer):Transducer = {
 
     new Transducer {
       val initialState = destination(transA.numStates,0,0,NoEps)

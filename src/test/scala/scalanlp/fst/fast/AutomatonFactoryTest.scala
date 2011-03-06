@@ -43,15 +43,33 @@ class AutomatonFactoryTest extends FunSuite {
       2 -> (3)  ('d','a',1.0)
     );
     val comps = compose(t1,t2);
-    assert(comps.arcsFrom(destination(t1.numStates,0,0,NoEps))(index('a'))(index('d'))(destination(t1.numStates,1,1,NoEps)) === 1.0);
-    assert(comps.arcsFrom(destination(t1.numStates,0,0,NoEps),index('a'),index('d'))(destination(t1.numStates,1,1,NoEps)) === 1.0);
-    assert(comps.arcsFrom(destination(t1.numStates,1,1,NoEps))(index('b'))(epsilonIndex)(destination(t1.numStates,2,1,LeftEps)) === 1.0);
-    assert(comps.arcsFrom(destination(t1.numStates,1,1,NoEps),index('b'),epsilonIndex)(destination(t1.numStates,2,1,LeftEps)) === 1.0);
-    assert(comps.arcsFrom(destination(t1.numStates,1,1,NoEps))(index('b'))(index('e'))(destination(t1.numStates,2,2,NoEps)) === 1.0);
-    assert(comps.arcsFrom(destination(t1.numStates,1,1,NoEps))(epsilonIndex)(index('e'))(destination(t1.numStates,1,2,RightEps)) === 1.0);
-    assert(comps.arcsFrom(destination(t1.numStates,2,1,LeftEps))(index('c'))(epsilonIndex)(destination(t1.numStates,3,1,LeftEps)) === 1.0);
-    assert(comps.arcsFrom(destination(t1.numStates,2,2,NoEps))(index('c'))(epsilonIndex)(destination(t1.numStates,3,2,LeftEps)) === 1.0);
-    assert(comps.arcsFrom(destination(t1.numStates,3,2,LeftEps))(index('d'))(index('a'))(destination(t1.numStates,4,3,NoEps)) === 1.0);
+    /*
+    digraph A {
+    "0"->"1"[ label="a:d/1.0"]
+    "1"->"2"[ label="&epsilon;:e/1.0"]
+    "1"->"3"[ label="b:e/1.0"]
+    "1"->"4"[ label="b:&epsilon;/1.0"]
+    "3"->"5"[ label="c:&epsilon;/1.0"]
+    "4"->"6"[ label="c:&epsilon;/1.0"]
+    "5"->"7"[ label="d:a/1.0"]
+    "0"[ label="0 0.0"]
+    "1"[ label="1 0.0"]
+    "2"[ label="2 0.0"]
+    "3"[ label="3 0.0"]
+    "4"[ label="4 0.0"]
+    "5"[ label="5 0.0"]
+    "6"[ label="6 0.0"]
+    "7"[ label="7 1.0"]
+     }
+     */
+    assert(comps.arcsFrom(0,index('a'),index('d'))(1) === 1.0,"01");
+    assert(comps.arcsFrom(1,index('b'),epsilonIndex)(4) === 1.0, "14");
+    assert(comps.arcsFrom(1,index('b'),index('e'))(3) === 1.0, "13");
+    assert(comps.arcsFrom(1,epsilonIndex,index('e'))(2) === 1.0, "12");
+    assert(comps.arcsFrom(3,index('c'),epsilonIndex)(5) === 1.0, "35");
+    assert(comps.arcsFrom(4,index('c'),epsilonIndex)(6) === 1.0, "46");
+    assert(comps.arcsFrom(5,index('d'),index('a'))(7) === 1.0, "47");
+    assert(comps.finalWeight(7) === 1.);
 
     /*
     val result = {
