@@ -28,6 +28,14 @@ class AutomatonFactoryTest extends FunSuite {
     assert(intersect(a,a).cost === 1.0);
   }
 
+  test("reverse works nicely") {
+    val a = constant("abcd",1.0);
+    val rev = reverse(a);
+    assert(rev.arcsFrom(5,epsilonIndex)(4) === 1);
+    assert(rev.arcsFrom(4,index('d'))(3) === 1);
+    assert(rev.cost == a.cost)
+  }
+
 
   test("Mohri hwa fig 7 epsilon-full composition") {
     import dsl._;
@@ -104,16 +112,7 @@ class AutomatonFactoryTest extends FunSuite {
     assert(fst.cost === trueCost);
   }
 
-  test("reverse works nicely") {
-    import Semiring.LogSpace._;
-    import Automaton._;
-    val fst = automaton[Double,Int,Char](Map(0->0.0),Map(2->0.0))( Arc(0,1,'\0',-1.0),
-        Arc(1,0,'\0',-2.0), Arc(1,2,('3'),-3.0), Arc(2,0,'4',-5.0));
-    val myRevd = automaton[Double,Int,Char](Map(2->0.0),Map(0->0.0))( Arc(1,0,'\0',-1.0),
-        Arc(0,1,'\0',-2.0), Arc(2,1,('3'),-3.0), Arc(0,2,('4'),-5.0));
-    assert(myRevd.initialStateWeights === fst.reverse.initialStateWeights);
-    assert(myRevd === fst.reverse);
-  }
+
 
   test("Mohri hwa fig12a weight pushing") {
     import Semiring.Tropical._;

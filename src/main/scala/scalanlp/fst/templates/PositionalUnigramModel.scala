@@ -46,7 +46,7 @@ object SpeedTest {
   import scalanlp.util.Profiling;
   def main(args: Array[String]) {
     import scalanlp.math.Semiring.LogSpace._;
-    val alphabet:Set[Char] = ("helloworld").toSet;
+    val alphabet:Set[Char] = ("helloworld").toSet ++ ('a' to 'z');
     val ed = new EditDistance(-3,-4,alphabet);
     val base = Automaton.constant("helloworld",0.0);
     val auto = (base.asTransducer >> ed).outputProjection.relabel;

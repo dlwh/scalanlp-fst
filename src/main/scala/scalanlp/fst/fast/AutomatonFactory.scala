@@ -8,6 +8,8 @@ import scalanlp.util.{Encoder, Index, DenseIntIndex}
 import scalala.tensor.sparse.SparseVector
 import scalanlp.collection.mutable.SparseArray
 import collection.immutable.BitSet
+import templates.BigramModelFactory
+import templates.PositionalUnigramModelFactory
 
 
 /**
@@ -18,7 +20,9 @@ import collection.immutable.BitSet
 class AutomatonFactory[T](val index: Index[T])
                           (implicit protected val ring: Semiring[Double],
                            protected val alphabet: Alphabet[T]) extends Distance[T]
-                           with Composition[T] with DSL[T] with EditDistanceFactory[T] {
+                           with Composition[T] with DSL[T] with EditDistanceFactory[T]
+                           with BigramModelFactory[T] with PositionalUnigramModelFactory[T]
+                           with ExpectedCounts[T] { factory =>
   val encoder = Encoder.fromIndex(index);
   val epsilonIndex = index(alphabet.epsilon);
 
@@ -64,6 +68,8 @@ class AutomatonFactory[T](val index: Index[T])
       sb ++= "}";
       sb.toString;
     }
+
+    def reverse = factory.reverse(this);
 
     lazy val cost = if(false) { //if(isCyclic) {
       val costs = allPairDistances(this);
@@ -137,6 +143,8 @@ class AutomatonFactory[T](val index: Index[T])
     def finalWeights: Array[Double];
     def finalWeight(s: Int) = finalWeights(s);
     def allStates = 0 until numStates;
+
+    def >>(b: Transducer) = compose(this,b);
 
     def inputProjection:Automaton = {
       val arcs = Array.tabulate(numStates){ s =>
@@ -272,6 +280,34 @@ class AutomatonFactory[T](val index: Index[T])
 
   }
 
+  def reverse(a: Automaton):Automaton = {
+    val underlyingNumStates = a.numStates + 1;
+    val oldInitialState = a.initialState;
+    val oldInitialWeight = a.initialWeight;
+
+    val newArcs = Array.fill(underlyingNumStates)(encoder.fillSparseArray(mkSparseVector(underlyingNumStates)));
+    for ( s <- 0 until (underlyingNumStates - 1);
+         (ch,weights) <- a.arcsFrom(s)) {
+      var weightIndex = 0;
+      while(weightIndex < weights.used) {
+        val target = weights.index(weightIndex);
+        val weight = weights.data(weightIndex);
+        weightIndex += 1;
+        newArcs(target).getOrElseUpdate(ch)(s) = weight;
+      }
+    }
+
+    val initialArcs = newArcs(underlyingNumStates - 1).getOrElseUpdate(epsilonIndex);
+    for( (fw,s) <- a.finalWeights.zipWithIndex) {
+      initialArcs(s) = fw;
+    }
+
+    val finalWeights = Array.fill(underlyingNumStates)(ring.zero);
+    finalWeights(oldInitialState) = oldInitialWeight;
+
+    automaton(newArcs, finalWeights, startState = underlyingNumStates - 1, startWeight = ring.one);
+  }
+
 
   implicit def asNormalAutomaton(a: Automaton): fst.Automaton[Double,Int,T] = new fst.Automaton[Double,Int,T] {
     import a._;
@@ -323,6 +359,25 @@ class AutomatonFactory[T](val index: Index[T])
     override def relabelWithIndex = (a:fst.Automaton[Double,Int,T],new DenseIntIndex(numStates));
 
 
+  }
+
+  // In -> Out -> Label -> Weight
+  def breadthFirstSearch(a: Automaton)(func: (Int,Int,Int,Double)=>Unit) = {
+    val beenQueued = new collection.mutable.BitSet();
+    val queue = new collection.mutable.Queue[Int]();
+    beenQueued += a.initialState;
+    queue += a.initialState;
+
+    while(!queue.isEmpty) {
+      val s = queue.dequeue();
+      for( (ch,targets) <- a.arcsFrom(s); (to,weight) <- targets.activeElements) {
+        func(s,to,ch,weight);
+        if(!beenQueued(to)){
+          beenQueued += to;
+          queue += to;
+        }
+      }
+    }
   }
 
   protected def mkSparseVector(numStates: Int): SparseVector = {

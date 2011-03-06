@@ -88,16 +88,16 @@ trait Distance[T] { this: AutomatonFactory[T] =>
       val rFrom = r(from);
       r(from) = zero;
 
-      for( (to,w) <- distances(from) if !closeTo(w,zero) && from != to) {
+      for( (to,w) <- distances(from).activeElements if !closeTo(w,zero) && from != to) {
         val dt = d(to);
         val wRFrom = times(rFrom,w);
-        val (dt_p_wRFrom,tooCloseToMatter) = maybe_+=(dt,wRFrom);
-        if( !tooCloseToMatter ) {
-          r(to) = maybe_+=(r(to),wRFrom)._1;
+        val dt_p_wRFrom = plus(dt,wRFrom);
+        if( !closeTo(dt,dt_p_wRFrom) ) {
+          r(to) = plus(r(to),wRFrom);
           d(to) = dt_p_wRFrom;
           if(!enqueued(to)) {
             S += to;
-            enqueued(to) = true
+            enqueued += to;
           }
         }
       }

@@ -24,20 +24,48 @@ import scalanlp.math.Semiring
 import scalala.tensor.sparse.SparseVector
 import scalanlp.collection.mutable.{ArrayMap, SparseArray}
 
+/**
+ * Composition of two transducers in the general case.
+ * Special handling for epsilons described in Mohri (2002).
+ *
+ * @author dlwh
+ */
 trait Composition[T] { this: AutomatonFactory[T] =>
-  def destination(numStates:Int,a:Int, b: Int, eps: InboundEpsilon) = eps.num + 3 * (a + b * numStates)
 
-  /**
-   * Composition of two transducers in the general case.
-   * Special handling for epsilons described in Mohri (2002). This supports an extension
-   * where we can handle two distinct weight types as long as we have a way of composing them
-   * into a composite weight. In normal composition, this is just product.
-   */
-  def intersect(transA: Automaton, transB: Automaton):Automaton = {
+  trait Composed {
+    def underlyingLeftState(state: Int):Int
+    def underlyingRightState(state: Int):Int
+    def underlyingEpsilonStatus(state: Int):InboundEpsilon
+    def stateFor(a: Int, b: Int, eps: InboundEpsilon):Int;
+  }
 
-    new Automaton {
-      val initialState = destination(transA.numStates,0,0,NoEps)
+  protected trait IntegerComposed extends Composed {
+    protected val leftStates: Int
+
+    final def stateFor(a:Int, b: Int, eps: InboundEpsilon) = eps.num + 3 * (a + b * leftStates);
+
+    final def underlyingEpsilonStatus(s: Int) =  (s % 3) match {
+      case 0 => NoEps
+      case 1 => LeftEps
+      case 2 => RightEps
+    }
+
+    final def underlyingRightState(s: Int) = {
+      s / 3 / leftStates
+    }
+
+    final def underlyingLeftState(s: Int) = {
+      (s/3)%leftStates;
+    }
+  }
+
+  def intersect(transA: Automaton, transB: Automaton):Automaton with Composed = {
+
+    new Automaton with IntegerComposed {
+      val initialState = stateFor(0,0,NoEps)
       val initialWeight = ring.times(transA.initialWeight,transB.initialWeight);
+
+      val leftStates = transA.numStates;
 
       lazy val finalWeights = {
         Array.tabulate(numStates) { i =>
@@ -46,21 +74,17 @@ trait Composition[T] { this: AutomatonFactory[T] =>
       }
 
       override def finalWeight(s: Int) = {
-        val a = (s / 3)%transA.numStates;
-        val b = (s / 3) / transA.numStates;
+        val a = underlyingLeftState(s);
+        val b = underlyingRightState(s);
         ring.times(transA.finalWeight(a),transB.finalWeight(b));
       }
 
       def numStates = 3 * transA.numStates * transB.numStates;
 
       def arcsFrom(s: Int, ch: Int) = {
-        val a = (s / 3)%transA.numStates;
-        val b = (s / 3) / transA.numStates;
-        val eps = (s % 3) match {
-          case 0 => NoEps
-          case 1 => LeftEps
-          case 2 => RightEps
-        }
+        val a = underlyingLeftState(s)
+        val b = underlyingRightState(s);
+        val eps = underlyingEpsilonStatus(s);
         val arcs = new SparseVector(numStates);
         arcs.default = ring.zero;
         // non-eps arcs
@@ -69,7 +93,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             (aTarget,aWeight) <- transA.arcsFrom(a,ch).activeElements
             (bTarget,bWeight) <- transB.arcsFrom(b,ch).activeElements
           } {
-            val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+            val target = stateFor(aTarget,bTarget,NoEps);
             val weight = ring.times(aWeight,bWeight);
             arcs(target) = weight;
           }
@@ -79,7 +103,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             for {
               (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
             } {
-              val target = destination(transA.numStates,aTarget,b,LeftEps);
+              val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
               arcs(target) = weight;
             }
@@ -88,7 +112,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             for {
               (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
             } {
-              val target = destination(transA.numStates,a,bTarget,RightEps);
+              val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
               arcs(target) = weight;
             }
@@ -98,7 +122,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
               (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
             } {
-              val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+              val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
               arcs(target) = weight;
             }
@@ -126,7 +150,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           (aTarget,aWeight) <- aTargets.activeElements
           (bTarget,bWeight) <- transB.arcsFrom(b,aCh).activeElements
         } {
-          val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+          val target = stateFor(aTarget,bTarget,NoEps);
           val weight = ring.times(aWeight,bWeight);
           arcs.getOrElseUpdate(aCh)(target) = weight;
         }
@@ -136,7 +160,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             for {
               (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
             } {
-              val target = destination(transA.numStates,aTarget,b,LeftEps);
+              val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
               arcs.getOrElseUpdate(epsilonIndex)(target) = weight;
             }
@@ -145,7 +169,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             for {
               (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
             } {
-              val target = destination(transA.numStates,a,bTarget,RightEps);
+              val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
               arcs.getOrElseUpdate(epsilonIndex)(target) = weight;
             }
@@ -155,7 +179,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
               (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
             } {
-              val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+              val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
               arcs.getOrElseUpdate(epsilonIndex)(target) = weight;
             }
@@ -240,10 +264,11 @@ trait Composition[T] { this: AutomatonFactory[T] =>
    * where we can handle two distinct weight types as long as we have a way of composing them
    * into a composite weight. In normal composition, this is just product.
    */
-  def lazyCompose(transA: Transducer, transB: Transducer):Transducer = {
+  def lazyCompose(transA: Transducer, transB: Transducer):Transducer with Composed = {
 
-    new Transducer {
-      val initialState = destination(transA.numStates,0,0,NoEps)
+    new Transducer with IntegerComposed {
+      val leftStates = transA.numStates;
+      val initialState = stateFor(0,0,NoEps)
       val initialWeight = ring.times(transA.initialWeight,transB.initialWeight);
 
       lazy val finalWeights = {
@@ -275,7 +300,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           (bTarget,bWeight) <- transB.arcsFrom(b,midCh,ch2).activeElements
           (aTarget,aWeight) <- targets.activeElements
         } {
-          val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+          val target = stateFor(aTarget,bTarget,NoEps);
           val weight = ring.times(aWeight,bWeight);
           arcs(target) = ring.plus(arcs(target),weight);
         }
@@ -285,7 +310,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             for {
               (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeElements
             } {
-              val target = destination(transA.numStates,aTarget,b,LeftEps);
+              val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
               arcs(target) = weight;
             }
@@ -293,7 +318,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             for {
               (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex,ch2).activeElements
             } {
-              val target = destination(transA.numStates,a,bTarget,RightEps);
+              val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
               arcs(target) = weight;
             }
@@ -303,7 +328,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeElements
               (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex,ch2).activeElements
             } {
-              val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+              val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
               arcs(target) = weight;
             }
@@ -331,7 +356,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           (ch1,targets) <- transA.arcsWithOutput(a,midCh)
           (aTarget,aWeight) <- targets.activeElements
         } {
-          val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+          val target = stateFor(aTarget,bTarget,NoEps);
           val weight = ring.times(aWeight,bWeight);
           arcs.getOrElseUpdate(ch1)(target) = ring.plus(arcs.getOrElseUpdate(ch1)(target),weight);
         }
@@ -342,7 +367,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (inCh,targets) <- transA.arcsWithOutput(a,epsilonIndex);
               (aTarget,aWeight) <- targets.activeElements
             } {
-              val target = destination(transA.numStates,aTarget,b,LeftEps);
+              val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
               arcs.getOrElseUpdate(inCh)(target) = weight;
             }
@@ -350,7 +375,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             for {
               (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex, ch2)
             } {
-              val target = destination(transA.numStates,a,bTarget,RightEps);
+              val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
               arcs.getOrElseUpdate(epsilonIndex)(target) = weight;
             }
@@ -361,7 +386,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (inCh,aTargets) <- transA.arcsWithOutput(a,epsilonIndex)
               (aTarget,aWeight) <- aTargets.activeElements
             } {
-              val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+              val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
               arcs.getOrElseUpdate(inCh)(target) = weight;
             }
@@ -419,7 +444,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
                     // new arc: ((a,b),ch1,ch2,(aTarget,bTarget)
                     val aTarget = aTargets.index(aTargetIndex);
                     val aWeight = aTargets.data(aTargetIndex);
-                    val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+                    val target = stateFor(aTarget,bTarget,NoEps);
                     val weight = ring.times(aWeight,bWeight);
                     arcs.getOrElseUpdate(ch1).getOrElseUpdate(ch2)(target) = ring.plus(arcs.getOrElseUpdate(ch1).getOrElseUpdate(ch2)(target),weight);
                     aTargetIndex += 1;
@@ -437,7 +462,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (inCh,targets) <- transA.arcsWithOutput(a,epsilonIndex);
               (aTarget,aWeight) <- targets.activeElements
             } {
-              val target = destination(transA.numStates,aTarget,b,LeftEps);
+              val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
               arcs.getOrElseUpdate(inCh).getOrElseUpdate(epsilonIndex)(target) = weight;
             }
@@ -446,7 +471,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (outCh,bTargets) <- transB.arcsWithInput(b,epsilonIndex);
               (bTarget,bWeight) <- bTargets.activeElements
             } {
-              val target = destination(transA.numStates,a,bTarget,RightEps);
+              val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
               arcs.getOrElseUpdate(epsilonIndex).getOrElseUpdate(outCh)(target) = weight;
             }
@@ -458,7 +483,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (aTarget,aWeight) <- aTargets.activeElements
               (bTarget,bWeight) <- bTargets.activeElements
             } {
-              val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+              val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
               arcs.getOrElseUpdate(inCh).getOrElseUpdate(outCh)(target) = weight;
             }
@@ -486,7 +511,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           (bTarget,bWeight) <- bTargets.activeElements;
           (aTarget,aWeight) <- targets.activeElements
         } {
-          val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+          val target = stateFor(aTarget,bTarget,NoEps);
           val weight = ring.times(aWeight,bWeight);
           arcs.getOrElseUpdate(ch2)(target) = ring.plus(arcs.getOrElseUpdate(ch2)(target),weight);
         }
@@ -496,7 +521,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             for {
               (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeElements
             } {
-              val target = destination(transA.numStates,aTarget,b,LeftEps);
+              val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
               arcs.getOrElseUpdate(epsilonIndex)(target) = weight;
             }
@@ -505,7 +530,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (outCh,bTargets) <- transB.arcsWithInput(b,epsilonIndex);
               (bTarget,bWeight) <- bTargets.activeElements
             } {
-              val target = destination(transA.numStates,a,bTarget,RightEps);
+              val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
               arcs.getOrElseUpdate(outCh)(target) = weight;
             }
@@ -516,7 +541,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               (outCh,bTargets) <- transB.arcsWithInput(b,epsilonIndex)
               (bTarget,bWeight) <- bTargets.activeElements
             } {
-              val target = destination(transA.numStates,aTarget,bTarget,NoEps);
+              val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
               arcs.getOrElseUpdate(outCh)(target) = weight;
             }

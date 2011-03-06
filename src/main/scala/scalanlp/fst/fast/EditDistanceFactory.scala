@@ -34,11 +34,12 @@ import scalanlp.util.Index
  * @author dlwh
  */
 trait EditDistanceFactory[T] { this: AutomatonFactory[T] =>
-  class EditDistance(subRatio: Double, insRatio: Double) extends Transducer {
+  class EditDistance(subRatio: Double, insRatio: Double, chars: Set[T] = (index.toSet - alphabet.epsilon)) extends Transducer {
     require(subRatio < 0);
     require(insRatio < 0);
 
-    private def totalChars = index.size - 1; // -1 for epsilon
+    private def totalChars = chars.size;
+    private val charIndices = (chars + alphabet.epsilon).toIndexedSeq.map(index);
     /**
      * Costs for each kind of parameter.
      */
@@ -59,7 +60,7 @@ trait EditDistanceFactory[T] { this: AutomatonFactory[T] =>
     val finalWeights = Array(math.log(1 - math.exp(math.log(totalChars) + insCost)));
     def numStates = 1;
     val arcs = encoder.fillSparseArray(encoder.fillSparseArray(mkSparseVector(1)));
-    for(i <- 0 until index.size;  aI = arcs.getOrElseUpdate(i); j <- 0 until index.size) {
+    for(i <- charIndices;  aI = arcs.getOrElseUpdate(i); j <- charIndices) {
       aI.getOrElseUpdate(j)(0) = costOf(i,j)
     }
     def arcsFrom(s: Int) = {
@@ -136,7 +137,7 @@ object SpeedTest {
       println(result2);
     }
 
-         {
+    {
       val factory = new AutomatonFactory[Char](Index( allChars + implicitly[Alphabet[Char]].epsilon));
       import factory._;
       val result1 = Profiling.time(50000) { () =>
