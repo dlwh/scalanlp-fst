@@ -21,7 +21,7 @@ object BigramSetup {
 import BigramSetup._;
 import BigramSetup.bgr._;
 
-
+/*
 @RunWith(classOf[JUnitRunner])
 class BigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
   import ring._;
@@ -96,3 +96,4 @@ class BigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
   
 }
+*/

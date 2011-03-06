@@ -55,6 +55,7 @@ object SpeedTest {
     val score2 = Profiling.time(1000) { () =>
       import posuni._;
       val cost = auto.reweight(posuni.promote _, posuni.promoteOnlyWeight _).cost;
+      cost.decode;
     }
     println(score2);
     val model = new PositionalUnigramModel[Double,Char]('#',alphabet,10);

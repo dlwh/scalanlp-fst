@@ -60,6 +60,92 @@ trait Composition[T] { this: AutomatonFactory[T] =>
   }
 
   def intersect(transA: Automaton, transB: Automaton):Automaton with Composed = {
+    val lt = lazyIntersect(transA,transB);
+    val stateMap = new ArrayMap[Int](-1); // old state -> newState
+    val states = new ArrayBuffer[Int](); // new state -> old state
+    def getNewDest(oldDest: Int) = {
+      val index = stateMap(oldDest)
+      if(index < 0) {
+        states += oldDest;
+        val r = states.size - 1;
+        stateMap(oldDest) = r;
+        r
+      } else {
+        index;
+      }
+
+    }
+
+    states += lt.initialState;
+    stateMap(lt.initialState) = 0;
+
+    // newState -> inch -> outch -> dest -> weight
+    val allArcs = new ArrayBuffer[SparseArray[SparseVector]];
+
+    var nextIndex = 0;
+    while(nextIndex < states.size) {
+      val oldState = states(nextIndex);
+      val newState = nextIndex;
+      val arcs = encoder.fillSparseArray(mkSparseVector(lt.numStates));
+      allArcs += arcs;
+      nextIndex += 1;
+      // ch1 -> old destinations -> score
+      val oldArcs: SparseArray[SparseVector] = lt.arcsFrom(oldState);
+      var ch1Index = 0;
+      while(ch1Index < oldArcs.used) {
+        val ch1 = oldArcs.indexAt(ch1Index);
+        val weights = oldArcs.valueAt(ch1Index);
+        ch1Index += 1;
+        val newWeights = new SparseVector(lt.numStates,weights.used);
+        newWeights.default = ring.zero
+        arcs(ch1) = newWeights;
+        var oldDestIndex = 0;
+        while(oldDestIndex < weights.used) {
+          val oldDest = weights.index(oldDestIndex);
+          val weight = weights.data(oldDestIndex);
+          oldDestIndex += 1;
+          // will enqueue:
+          val newDest = getNewDest(oldDest);
+          newWeights(newDest) = weight;
+        }
+      }
+    }
+
+    val newFinalWeights = states.toArray.map(lt.finalWeight _);
+    val leftStates = states.map(lt.underlyingLeftState _);
+    val rightStates = states.map(lt.underlyingRightState _);
+    val epsStates = states.map(lt.underlyingEpsilonStatus _);
+    val startState = lt.initialState;
+    val startWeight = lt.initialWeight;
+    new Automaton with Composed {
+      def numStates = allArcs.length;
+      def arcsFrom(s:Int) = allArcs(s);
+      def arcsFrom(s:Int, ch: Int) = allArcs(s)(ch);
+      def initialState = startState
+      def initialWeight: Double = startWeight;
+      def finalWeights = newFinalWeights;
+
+      def stateFor(a: Int, b: Int, eps: InboundEpsilon) = {
+        // TODO
+        error("not implemented");
+      }
+
+      def underlyingEpsilonStatus(state: Int) = {
+        epsStates(state);
+      }
+
+      def underlyingRightState(state: Int): Int = {
+        rightStates(state);
+      }
+
+      def underlyingLeftState(state: Int) = {
+        leftStates(state);
+      }
+    }
+
+  }
+
+  def lazyIntersect(transA: Automaton, transB: Automaton):Automaton with Composed = {
 
     new Automaton with IntegerComposed {
       val initialState = stateFor(0,0,NoEps)
@@ -145,14 +231,30 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           sp
         }
         // non-eps arcs
-        for {
-          (aCh, aTargets) <- transA.arcsFrom(a) if aCh != epsilonIndex
-          (aTarget,aWeight) <- aTargets.activeElements
-          (bTarget,bWeight) <- transB.arcsFrom(b,aCh).activeElements
-        } {
-          val target = stateFor(aTarget,bTarget,NoEps);
-          val weight = ring.times(aWeight,bWeight);
-          arcs.getOrElseUpdate(aCh)(target) = weight;
+        var aChIndex = 0;
+        val arcsA = transA.arcsFrom(a);
+        while(aChIndex < arcsA.used) {
+          val aCh = arcsA.indexAt(aChIndex);
+          val aTargets = arcsA.valueAt(aChIndex);
+          aChIndex += 1;
+          if(aCh != epsilonIndex) {
+            var aIndex = 0;
+            val bTargets = transB.arcsFrom(b,aCh)
+            while(aIndex < aTargets.used) {
+              val aTarget = aTargets.index(aIndex);
+              val aWeight = aTargets.data(aIndex);
+              aIndex += 1;
+              var bIndex = 0
+              while(bIndex < bTargets.used) {
+                val bTarget = bTargets.index(bIndex);
+                val bWeight = bTargets.data(bIndex);
+                bIndex += 1;
+                val target = stateFor(aTarget,bTarget,NoEps);
+                val weight = ring.times(aWeight,bWeight);
+                arcs.getOrElseUpdate(aCh)(target) = weight;
+              }
+            }
+          }
         }
         // eps arcs:
         if(epsilonIndex >= 0)  {

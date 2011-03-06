@@ -88,16 +88,19 @@ trait Distance[T] { this: AutomatonFactory[T] =>
       val rFrom = r(from);
       r(from) = zero;
 
-      for( (to,w) <- distances(from).activeElements if !closeTo(w,zero) && from != to) {
-        val dt = d(to);
-        val wRFrom = times(rFrom,w);
-        val dt_p_wRFrom = plus(dt,wRFrom);
-        if( !closeTo(dt,dt_p_wRFrom) ) {
-          r(to) = plus(r(to),wRFrom);
-          d(to) = dt_p_wRFrom;
-          if(!enqueued(to)) {
-            S += to;
-            enqueued += to;
+      for( to <- distances(from).activeKeys ) {
+        val w = distances(from)(to);
+        if(!closeTo(w,zero) && from != to) {
+          val dt = d(to);
+          val wRFrom = times(rFrom,w);
+          val dt_p_wRFrom = plus(dt,wRFrom);
+          if( !closeTo(dt,dt_p_wRFrom) ) {
+            r(to) = plus(r(to),wRFrom);
+            d(to) = dt_p_wRFrom;
+            if(!enqueued(to)) {
+              S += to;
+              enqueued += to;
+            }
           }
         }
       }
@@ -114,7 +117,7 @@ trait Distance[T] { this: AutomatonFactory[T] =>
   * Returns the distances between individual pairs of states using
   * only one hop
   */
-  private def neighborDistances(fst: Automaton): Array[_ <: Vector] = {
+  private def neighborDistances(fst: Automaton): Array[SparseHashVector] = {
     import ring._;
 
     val distances = Array.fill(fst.numStates){
