@@ -35,7 +35,7 @@ trait ExpectedCounts[T] { this: AutomatonFactory[T] =>
     val forward = allPathDistances(inter);
     val backward = allPathDistances(inter.reverse)
 
-    val scores = Array.fill(template.numStates, template.numStates)(encoder.mkSparseVector(ring.zero));
+    val scores = Array.fill(template.numStates, template.numStates)(encoder.mkSparseHashVector(ring.zero));
 
     breadthFirstSearch(inter) { (from, to, label, weight) =>
       val srcIndex = inter.underlyingRightState(from);
