@@ -39,6 +39,8 @@ class AutomatonFactory[T](val index: Index[T])
 
     def &(a: Automaton) = intersect(this,a);
 
+    lazy val isCyclic = factory.isCyclic(this);
+
     override def toString = {
 
       val Eps = alphabet.epsilon;
@@ -306,6 +308,39 @@ class AutomatonFactory[T](val index: Index[T])
     finalWeights(oldInitialState) = oldInitialWeight;
 
     automaton(newArcs, finalWeights, startState = underlyingNumStates - 1, startWeight = ring.one);
+  }
+
+  /**
+   * True iff the graph contains a non self-loop cycle
+   */
+   def isCyclic(a: Automaton):Boolean = {
+    val WHITE = 0
+    val GREY = 1
+    val BLACK = 2
+    val visited: Array[Int] = new Array[Int](a.numStates); // all White
+    var cyclic = false;
+    import scala.util.control.Breaks._;
+
+    def visit(p: Int) {
+      assert(visited(p) != GREY);
+      visited(p) = GREY;
+      for( (ch,targets) <- a.arcsFrom(p); q <- targets.activeKeys if q != p) {
+        if(visited(q) == GREY) {
+          cyclic = true;
+          break;
+        } else if(visited(q) == WHITE) {
+          visit(q);
+        }
+      }
+      visited(p) = BLACK;
+    }
+
+
+    breakable {
+      visit(a.initialState);
+    }
+
+    cyclic;
   }
 
 

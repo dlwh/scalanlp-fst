@@ -240,6 +240,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           if(aCh != epsilonIndex) {
             var aIndex = 0;
             val bTargets = transB.arcsFrom(b,aCh)
+            val newArcsA = arcs.getOrElseUpdate(aCh);
             while(aIndex < aTargets.used) {
               val aTarget = aTargets.index(aIndex);
               val aWeight = aTargets.data(aIndex);
@@ -251,7 +252,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
                 bIndex += 1;
                 val target = stateFor(aTarget,bTarget,NoEps);
                 val weight = ring.times(aWeight,bWeight);
-                arcs.getOrElseUpdate(aCh)(target) = weight;
+                newArcsA(target) = weight;
               }
             }
           }
