@@ -22,7 +22,7 @@ class AutomatonFactory[T](val index: Index[T])
                            protected val alphabet: Alphabet[T]) extends Distance[T]
                            with Composition[T] with DSL[T] with EditDistanceFactory[T]
                            with BigramModelFactory[T] with PositionalUnigramModelFactory[T]
-                           with ExpectedCounts[T] { factory =>
+                           with ExpectedCounts[T] with DecayAutomatonFactory[T] { factory =>
   val encoder = Encoder.fromIndex(index);
   val epsilonIndex = index(alphabet.epsilon);
 
@@ -446,11 +446,22 @@ class AutomatonFactory[T](val index: Index[T])
 
     while(!queue.isEmpty) {
       val s = queue.dequeue();
-      for( (ch,targets) <- a.arcsFrom(s); (to,weight) <- targets.activeElements) {
-        func(s,to,ch,weight);
-        if(!beenQueued(to)){
-          beenQueued += to;
-          queue += to;
+      val arcs = a.arcsFrom(s);
+      var aIndex = 0;
+      while(aIndex < arcs.used) {
+        val ch = arcs.indexAt(aIndex);
+        val targets = arcs.valueAt(aIndex);
+        aIndex += 1;
+        var toIndex = 0;
+        while(toIndex < targets.used) {
+          val to = targets.index(toIndex);
+          val weight = targets.data(toIndex);
+          toIndex += 1;
+          func(s,to,ch,weight);
+          if(!beenQueued(to)){
+            beenQueued += to;
+            queue += to;
+          }
         }
       }
     }

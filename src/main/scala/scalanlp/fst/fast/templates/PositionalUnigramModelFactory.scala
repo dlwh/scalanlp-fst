@@ -22,21 +22,21 @@ import scalanlp.util.Index
 import scalanlp.fst.Alphabet
 
 trait PositionalUnigramModelFactory[T] { this: AutomatonFactory[T] =>
-  class PositionalUnigramModel(init: T, maxLength: Int) extends Automaton {
+  final class PositionalUnigramModel(maxLength: Int) extends Automaton {
     val initialState = 0;
     def initialWeight = ring.one;
 
     override def finalWeight(s: Int) = ring.one
 
-    private def next(s: Int) = (s+1) min (maxLength-1);
+    private def next(s: Int) = (s+1) min (numStates-1);
 
     lazy val finalWeights = Array.fill(numStates)(ring.one);
 
-    def numStates = maxLength + 1;
+    val numStates = maxLength;
 
     val arcs = Array.tabulate(numStates) { i =>
        val arr = encoder.fillSparseArray(mkSparseVector(numStates));
-       if(i < maxLength)
+       if(i < numStates)
          for(ch <- 0 until index.size if ch != epsilonIndex) {
            arr.getOrElseUpdate(ch)(next(i)) = ring.one;
          }
@@ -65,7 +65,7 @@ object PSpeedTest {
     val base = constant("helloworld",0.0);
     val auto = compose(base.asTransducer,ed).outputProjection;
 
-    val model = new PositionalUnigramModel('#',10);
+    val model = new PositionalUnigramModel(10);
     val score1 = Profiling.time(1000) { () =>
       val counts = expectedCounts(auto, model);
     }

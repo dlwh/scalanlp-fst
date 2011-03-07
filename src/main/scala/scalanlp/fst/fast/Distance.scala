@@ -32,7 +32,7 @@ trait Distance[T] { this: AutomatonFactory[T] =>
   * Selects between singleSourceShortestDistance and allPairDistances
   * based on cyclicity
   */
-  def allPathDistances(fst: Automaton) = if(fst.isCyclic) {
+  def allPathDistances(fst: Automaton) = if(false) {//if(fst.isCyclic) {
     val allPairs = allPairDistances(fst);
 
     val paths = Array.fill(fst.numStates)(ring.zero);
@@ -117,11 +117,11 @@ trait Distance[T] { this: AutomatonFactory[T] =>
   * Returns the distances between individual pairs of states using
   * only one hop
   */
-  private def neighborDistances(fst: Automaton): Array[SparseHashVector] = {
+  private def neighborDistances(fst: Automaton) = {
     import ring._;
 
     val distances = Array.fill(fst.numStates){
-      val r = new SparseHashVector(fst.numStates);
+      val r = new SparseVector(fst.numStates);
       r.default = ring.zero;
       r;
     }
@@ -162,12 +162,13 @@ trait Distance[T] { this: AutomatonFactory[T] =>
         (j,dkj) <- distances(k).iterator
         if j != k && !closeTo(dkj,zero)
         i <- allStates if i != k
-        dik = distances(i)(k)
-        if !closeTo(dik,zero)
       } {
-        val current = distances(i)(j);
-        val pathsThroughK = times(dik,times(dkkStar,dkj));
-        distances(i)(j) = plus(current,pathsThroughK)
+        val dik = distances(i)(k)
+        if(!closeTo(dik,zero)) {
+          val current = distances(i)(j);
+          val pathsThroughK = times(dik,times(dkkStar,dkj));
+          distances(i)(j) = plus(current,pathsThroughK)
+        }
       }
 
       for (i <- allStates if i != k) {

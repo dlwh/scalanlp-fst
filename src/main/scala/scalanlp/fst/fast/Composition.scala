@@ -519,6 +519,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
         while(ch1Index < arcsA.used) {
           val ch1 = arcsA.indexAt(ch1Index);
           val mids = arcsA.valueAt(ch1Index);
+          val ac1 = arcs.getOrElseUpdate(ch1);
           ch1Index += 1;
           var midChIndex = 0;
           // for each (output 'mid',destination pair) in A
@@ -527,11 +528,12 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             val aTargets = mids.valueAt(midChIndex)
             midChIndex += 1;
             if(midCh != epsilonIndex) {
-              // for each (output, arc pair) in B with input matching mid
+              // for each (ch2, arc pair) in B with input matching mid
               val arcsB = transB.arcsWithInput(b,midCh);
               var ch2Index = 0;
               while(ch2Index < arcsB.used) {
                 val ch2 = arcsB.indexAt(ch2Index);
+                val ac2 = ac1.getOrElseUpdate(ch2);
                 val bTargets = arcsB.valueAt(ch2Index);
                 ch2Index += 1;
                 var bTargetIndex = 0;
@@ -548,7 +550,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
                     val aWeight = aTargets.data(aTargetIndex);
                     val target = stateFor(aTarget,bTarget,NoEps);
                     val weight = ring.times(aWeight,bWeight);
-                    arcs.getOrElseUpdate(ch1).getOrElseUpdate(ch2)(target) = ring.plus(arcs.getOrElseUpdate(ch1).getOrElseUpdate(ch2)(target),weight);
+                    ac2(target) = ring.plus(ac2(target),weight);
                     aTargetIndex += 1;
                   }
                 }

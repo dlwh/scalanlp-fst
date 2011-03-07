@@ -23,7 +23,7 @@ class PositionalUnigramsCountsTest extends FunSuite with Checkers {
 
   test("constant automaton length 10") {
     val auto = constant("Hello",0.0);
-    val template = new PositionalUnigramModel('#', 10);
+    val template = new PositionalUnigramModel(10);
     val (counts,totals,finalWeights) = expectedCounts(auto,template);
 
     assert( counts(0)(index('H'))(1) === 0.0,'H');
@@ -36,7 +36,7 @@ class PositionalUnigramsCountsTest extends FunSuite with Checkers {
 
   test("constant automaton length 3") {
     val auto = constant("Hello",0.0);
-    val template = new PositionalUnigramModel('#', 3);
+    val template = new PositionalUnigramModel(3);
     val (counts,totals, finalWeights) = expectedCounts(auto,template);
 
     assert( counts(0)(index('H'))(1)=== 0.0);

@@ -49,10 +49,12 @@ trait ExpectedCounts[T] { this: AutomatonFactory[T] =>
       val sinkIndex = inter.underlyingRightState(to);
       val fScore = forward(from)
       val bScore = backward(to)
-      val posterior = ring.times(fScore,ring.times(weight,bScore));
-      if(posterior != ring.zero) {
-        scores(srcIndex)(label)(sinkIndex) = ring.plus(scores(srcIndex)(label)(sinkIndex), posterior);
-        totals(srcIndex) = ring.plus(totals(srcIndex),posterior);
+      if(label != epsilonIndex) {
+        val posterior = ring.times(fScore,ring.times(weight,bScore));
+        if(posterior != ring.zero) {
+          scores(srcIndex)(label)(sinkIndex) = ring.plus(scores(srcIndex)(label)(sinkIndex), posterior);
+          totals(srcIndex) = ring.plus(totals(srcIndex),posterior);
+        }
       }
     }
 
