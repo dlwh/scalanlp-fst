@@ -20,6 +20,7 @@ package scalanlp.fst.fast
 
 import scalanlp.math.Semiring
 import collection.mutable.HashMap
+import scalala.tensor.sparse.{SparseVector, SparseHashVector}
 
 /**
  * Given a weighted automaton, computes the expected number of visits to states in another unweighted automaton.
@@ -35,19 +36,25 @@ trait ExpectedCounts[T] { this: AutomatonFactory[T] =>
     val forward = allPathDistances(inter);
     val backward = allPathDistances(inter.reverse)
 
-    val scores = Array.fill(template.numStates, template.numStates)(encoder.mkSparseHashVector(ring.zero));
+    val scores = Array.fill(template.numStates,encoder.index.size){
+      val r = new SparseVector(template.numStates,1);
+      r.default = ring.zero
+      r
+    }
+    val totals = Array.fill(template.numStates)(ring.zero);
 
     breadthFirstSearch(inter) { (from, to, label, weight) =>
       val srcIndex = inter.underlyingRightState(from);
       val sinkIndex = inter.underlyingRightState(to);
       val fScore = forward(from)
       val bScore = backward(to)
-      if(weight != ring.zero && fScore != ring.zero && bScore != ring.zero) {
-        val posterior = ring.times(fScore,ring.times(weight,bScore));
-        scores(srcIndex)(sinkIndex)(label) = ring.plus(scores(srcIndex)(sinkIndex)(label), posterior);
+      val posterior = ring.times(fScore,ring.times(weight,bScore));
+      if(posterior != ring.zero) {
+        scores(srcIndex)(label)(sinkIndex) = ring.plus(scores(srcIndex)(label)(sinkIndex), posterior);
+        totals(srcIndex) = ring.plus(totals(srcIndex),posterior);
       }
     }
 
-    scores;
+    (scores,totals);
   }
 }

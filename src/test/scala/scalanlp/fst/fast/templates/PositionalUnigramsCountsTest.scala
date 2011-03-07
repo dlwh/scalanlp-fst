@@ -24,26 +24,26 @@ class PositionalUnigramsCountsTest extends FunSuite with Checkers {
   test("constant automaton length 10") {
     val auto = constant("Hello",0.0);
     val template = new PositionalUnigramModel('#', 10);
-    val counts = expectedCounts(auto,template);
+    val (counts,totals) = expectedCounts(auto,template);
 
-    assert( counts(0)(1)(index('H')) === 0.0);
-    assert( counts(1)(2)(index('e')) === 0.0);
-    assert( counts(2)(3)(index('l')) === 0.0);
-    assert( counts(3)(4)(index('l')) === 0.0);
-    assert( counts(4)(5)(index('o')) === 0.0);
-    assert( counts(5)(10)(epsilonIndex) === 0.0);
+    assert( counts(0)(index('H'))(1) === 0.0,'H');
+    assert( counts(1)(index('e'))(2) === 0.0,'e');
+    assert( counts(2)(index('l'))(3) === 0.0,'l');
+    assert( counts(3)(index('l'))(4) === 0.0,"l2");
+    assert( counts(4)(index('o'))(5) === 0.0, "o");
+    assert( counts(5)(epsilonIndex)(10) === 0.0, "eps");
   }
 
   test("constant automaton length 3") {
     val auto = constant("Hello",0.0);
     val template = new PositionalUnigramModel('#', 3);
-    val counts = expectedCounts(auto,template);
+    val (counts,totals) = expectedCounts(auto,template);
 
-    assert( counts(0)(1)(index('H'))=== 0.0);
-    assert( counts(1)(2)(index('e')) === 0.0);
-    assert( counts(2)(2)(index('l')) === doubleIsLogSpace.plus(0.0,0.0));
-    assert( counts(2)(2)(index('o')) === 0.0);
-    assert( counts(2)(3)(epsilonIndex) === 0.0);
+    assert( counts(0)(index('H'))(1)=== 0.0);
+    assert( counts(1)(index('e'))(2) === 0.0);
+    assert( counts(2)(index('l'))(2) === doubleIsLogSpace.plus(0.0,0.0));
+    assert( counts(2)(index('o'))(2) === 0.0);
+    assert( counts(2)(epsilonIndex)(3) === 0.0);
   }
 
 }

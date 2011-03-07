@@ -24,7 +24,7 @@ trait BigramModelFactory[T] { this: AutomatonFactory[T]  =>
 
     lazy val finalWeights = Array.tabulate(numStates) {finalWeight(_)};
 
-    def initialWeight = 0.0
+    def initialWeight = ring.one
 
     def initialState = index(init);
 

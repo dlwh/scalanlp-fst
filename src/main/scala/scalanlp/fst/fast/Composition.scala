@@ -115,7 +115,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
     val leftStates = states.map(lt.underlyingLeftState _);
     val rightStates = states.map(lt.underlyingRightState _);
     val epsStates = states.map(lt.underlyingEpsilonStatus _);
-    val startState = lt.initialState;
+    val startState = stateMap(lt.initialState);
     val startWeight = lt.initialWeight;
     new Automaton with Composed {
       def numStates = allArcs.length;
@@ -148,10 +148,9 @@ trait Composition[T] { this: AutomatonFactory[T] =>
   def lazyIntersect(transA: Automaton, transB: Automaton):Automaton with Composed = {
 
     new Automaton with IntegerComposed {
-      val initialState = stateFor(0,0,NoEps)
-      val initialWeight = ring.times(transA.initialWeight,transB.initialWeight);
-
       val leftStates = transA.numStates;
+      val initialState = stateFor(transA.initialState,transB.initialState,NoEps)
+      val initialWeight = ring.times(transA.initialWeight,transB.initialWeight);
 
       lazy val finalWeights = {
         Array.tabulate(numStates) { i =>

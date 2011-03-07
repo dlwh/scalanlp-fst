@@ -38,8 +38,11 @@ class AutomatonFactory[T](val index: Index[T])
     def allStates = 0 until numStates;
 
     def &(a: Automaton) = intersect(this,a);
-
     lazy val isCyclic = factory.isCyclic(this);
+    def reverse = factory.reverse(this);
+
+    def transformWeights(trans: Double=>Double) = factory.transformWeights(this,trans);
+    def scaleInitialWeight(scale: Double) = factory.scaleInitialWeight(this,scale);
 
     override def toString = {
 
@@ -71,7 +74,6 @@ class AutomatonFactory[T](val index: Index[T])
       sb.toString;
     }
 
-    def reverse = factory.reverse(this);
 
     lazy val cost = if(false) { //if(isCyclic) {
       val costs = allPairDistances(this);
@@ -310,6 +312,45 @@ class AutomatonFactory[T](val index: Index[T])
     automaton(newArcs, finalWeights, startState = underlyingNumStates - 1, startWeight = ring.one);
   }
 
+  def transformWeights(a: Automaton, trans: Double=>Double):Automaton = new Automaton {
+    lazy val finalWeights = a.finalWeights.map(trans);
+
+    val initialWeight = trans(a.initialWeight);
+
+    def initialState = a.initialState
+
+    def numStates = a.numStates;
+
+    def arcsFrom(s: Int, ch: Int) = {
+      val inner = a.arcsFrom(s,ch);
+      val r = new SparseVector(inner.size);
+      r.data = inner.data.take(inner.used).map(trans);
+      r.index = inner.index.take(inner.used);
+      r.used = inner.used;
+      r
+    }
+
+    def arcsFrom(s: Int) = {
+      val arr = a.arcsFrom(s);
+      arr.map { inner =>
+        val r = new SparseVector(inner.size);
+        r.data = inner.data.take(inner.used).map(trans);
+        r.index = inner.index.take(inner.used);
+        r.used = inner.used;
+        r
+      }
+    }
+  }
+
+  def scaleInitialWeight(a: Automaton, scale: Double):Automaton = new Automaton {
+    def finalWeights = a.finalWeights
+    val initialWeight = ring.times(scale,a.initialWeight);
+    def initialState = a.initialState
+    def numStates = a.numStates;
+    def arcsFrom(s: Int, ch: Int) = a.arcsFrom(s,ch)
+    def arcsFrom(s: Int) = a.arcsFrom(s);
+  }
+
   /**
    * True iff the graph contains a non self-loop cycle
    */
@@ -415,7 +456,7 @@ class AutomatonFactory[T](val index: Index[T])
     }
   }
 
-  protected def mkSparseVector(numStates: Int): SparseVector = {
+  def mkSparseVector(numStates: Int): SparseVector = {
      val sp = new SparseVector(numStates);
      sp.default = ring.zero;
      sp
