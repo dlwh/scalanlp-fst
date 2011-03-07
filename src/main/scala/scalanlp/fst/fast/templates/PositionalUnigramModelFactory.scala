@@ -26,20 +26,19 @@ trait PositionalUnigramModelFactory[T] { this: AutomatonFactory[T] =>
     val initialState = 0;
     def initialWeight = ring.one;
 
-    override def finalWeight(s: Int) = if(s == maxLength) ring.one else ring.zero
+    override def finalWeight(s: Int) = ring.one
 
     private def next(s: Int) = (s+1) min (maxLength-1);
 
-    lazy val finalWeights = Array.tabulate(numStates)(finalWeight _);
+    lazy val finalWeights = Array.fill(numStates)(ring.one);
 
     def numStates = maxLength + 1;
 
     val arcs = Array.tabulate(numStates) { i =>
        val arr = encoder.fillSparseArray(mkSparseVector(numStates));
        if(i < maxLength)
-         for(ch <- 0 until index.size) {
-           if(ch == epsilonIndex) arr.getOrElseUpdate(ch)(maxLength) = ring.one;
-           else arr.getOrElseUpdate(ch)(next(i)) = ring.one;
+         for(ch <- 0 until index.size if ch != epsilonIndex) {
+           arr.getOrElseUpdate(ch)(next(i)) = ring.one;
          }
        arr
     }

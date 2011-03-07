@@ -20,9 +20,9 @@ package templates
 trait BigramModelFactory[T] { this: AutomatonFactory[T]  =>
 
   class BigramModel(init: T) extends Automaton {
-    override def finalWeight(s: Int) = if (s == epsilonIndex) ring.one else ring.zero
+    override def finalWeight(s: Int) = ring.one
 
-    lazy val finalWeights = Array.tabulate(numStates) {finalWeight(_)};
+    lazy val finalWeights = Array.fill(numStates) {ring.one}
 
     def initialWeight = ring.one
 
@@ -31,16 +31,15 @@ trait BigramModelFactory[T] { this: AutomatonFactory[T]  =>
     def numStates = index.size;
 
     val theArcs = encoder.fillSparseArray(mkSparseVector(numStates));
-    val endArcs = encoder.fillSparseArray(mkSparseVector(numStates));
-    for(i <- 0 until index.size) {
+    for(i <- 0 until index.size if i != epsilonIndex) {
       theArcs.getOrElseUpdate(i)(i) = ring.one;
     }
 
-    def arcsFrom(s: Int, ch: Int) = if(s == epsilonIndex) endArcs(ch) else {
+    def arcsFrom(s: Int, ch: Int) = {
       theArcs(ch);
     }
 
-    def arcsFrom(s: Int) = if(s == epsilonIndex) endArcs else {
+    def arcsFrom(s: Int) = {
       theArcs;
     }
 

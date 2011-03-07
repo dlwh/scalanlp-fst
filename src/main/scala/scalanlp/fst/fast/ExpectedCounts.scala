@@ -42,6 +42,7 @@ trait ExpectedCounts[T] { this: AutomatonFactory[T] =>
       r
     }
     val totals = Array.fill(template.numStates)(ring.zero);
+    val finalWeights = Array.fill(template.numStates)(ring.zero);
 
     breadthFirstSearch(inter) { (from, to, label, weight) =>
       val srcIndex = inter.underlyingRightState(from);
@@ -55,6 +56,15 @@ trait ExpectedCounts[T] { this: AutomatonFactory[T] =>
       }
     }
 
-    (scores,totals);
+    for(i <- 0 until inter.numStates) {
+      val underlying = inter.underlyingRightState(i);
+      val fScore = forward(i);
+      val finalScore = inter.finalWeight(i)
+      val posterior = ring.times(fScore,finalScore);
+      totals(underlying) = ring.plus(totals(underlying),posterior)
+      finalWeights(underlying) = ring.plus(finalWeights(underlying),posterior);
+    }
+
+    (scores,totals,finalWeights);
   }
 }
