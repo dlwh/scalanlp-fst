@@ -22,6 +22,37 @@ import scalanlp.util.Index
 import scalanlp.fst.Alphabet
 
 trait PositionalUnigramModelFactory[T] { this: AutomatonFactory[T] =>
+
+  final class MaxLengthAutomaton(maxLength: Int) extends Automaton {
+    val initialState = 0;
+    def initialWeight = ring.one;
+
+    override def finalWeight(s: Int) = ring.one
+
+    private def next(s: Int) = (s+1) min (numStates-1);
+
+    lazy val finalWeights = Array.fill(numStates)(ring.one);
+
+    val numStates = maxLength;
+
+    val arcs = Array.tabulate(numStates) { i =>
+       val arr = encoder.fillSparseArray(mkSparseVector(numStates));
+       if(i < numStates - 1)
+         for(ch <- 0 until index.size if ch != epsilonIndex) {
+           arr.getOrElseUpdate(ch)(next(i)) = ring.one;
+         }
+       arr
+    }
+
+    def arcsFrom(s: Int, ch: Int) = {
+      arcs(s)(ch);
+    }
+
+    def arcsFrom(s: Int) = {
+      arcs(s);
+    }
+  }
+
   final class PositionalUnigramModel(maxLength: Int) extends Automaton {
     val initialState = 0;
     def initialWeight = ring.one;

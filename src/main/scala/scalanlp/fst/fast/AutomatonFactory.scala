@@ -2,7 +2,7 @@ package scalanlp.fst.fast
 
 import scalanlp.fst;
 
-import fst.Alphabet
+import fst.{Arc, Alphabet}
 import scalanlp.math.Semiring
 import scalanlp.util.{Encoder, Index, DenseIntIndex}
 import scalala.tensor.sparse.SparseVector
@@ -22,10 +22,12 @@ class AutomatonFactory[T](val index: Index[T])
                            protected val alphabet: Alphabet[T]) extends Distance[T]
                            with Composition[T] with DSL[T] with EditDistanceFactory[T]
                            with BigramModelFactory[T] with PositionalUnigramModelFactory[T]
-                           with ExpectedCounts[T] with DecayAutomatonFactory[T] { factory =>
+                           with ExpectedCounts[T] with DecayAutomatonFactory[T]
+                          with UnigramModelFactory[T] { factory =>
   val encoder = Encoder.fromIndex(index);
   val epsilonIndex = index(alphabet.epsilon);
 
+  @serializable
   trait Automaton { outer =>
     // source -> character -> target -> weight
     def arcsFrom(s: Int):SparseArray[SparseVector]
@@ -133,6 +135,7 @@ class AutomatonFactory[T](val index: Index[T])
     }
   }
 
+  @serializable
   trait Transducer {
     // source -> inCh -> outCh -> -> target -> weight
     def arcsFrom(s: Int):SparseArray[SparseArray[SparseVector]]
@@ -431,9 +434,48 @@ class AutomatonFactory[T](val index: Index[T])
     }
 
     override def collapseEdges = (a:fst.Automaton[Double,Int,T]);
-    override def relabel = (a:fst.Automaton[Double,Int,T]);
-    override def relabelWithIndex = (a:fst.Automaton[Double,Int,T],new DenseIntIndex(numStates));
+  }
 
+  implicit def asNormalTransducer(a: Transducer): fst.Transducer[Double,Int,T,T] = new fst.Automaton[Double,Int,(T,T)] {
+    import a._;
+    val initialStateWeights = Map(a.initialState -> a.initialWeight);
+    def finalWeight(s: Int) = a.finalWeight(s);
+    def edgesMatching(s: Int, l: (T,T)) = {
+      for {
+        (ch1,ch2s) <- a.arcsFrom(s).iterator;
+        (ch2,targets) <- ch2s.iterator if implicitly[Alphabet[(T,T)]].matches(l,(index.get(ch1),index.get(ch2)));
+        (target,w) <- targets.activeElements
+      } yield Arc(s,target,index.get(ch1)->index.get(ch2),w);
+    };
+
+    override lazy val allEdges = {
+      for {
+        s <- 0 until numStates iterator;
+        (ch1,ch2s) <- a.arcsFrom(s) iterator;
+        (ch2,targets) <- ch2s.iterator;
+        (sink,weight) <- targets.activeElements
+      } yield new Arc(s,sink,index.get(ch1) -> index.get(ch2),weight)
+    } toIndexedSeq
+
+    override def allStates:Set[Int] = new Set[Int] {
+      def iterator = (0 until numStates).iterator
+
+      def -(elem: Int) = if(!contains(elem)) this else {
+        BitSet.empty ++ (0 until numStates) - elem;
+      }
+
+      def +(elem: Int) = if(contains(elem)) this else {
+        BitSet.empty ++ (0 until numStates) + elem;
+      }
+
+      def contains(elem: Int) = {
+        0 <= elem && elem < numStates;
+      }
+
+      override def size = numStates;
+
+      override def toIndexedSeq[B >: Int] = 0 until numStates;
+    }
 
   }
 
