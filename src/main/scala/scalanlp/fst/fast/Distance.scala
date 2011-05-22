@@ -18,8 +18,9 @@ package scalanlp.fst.fast
 
 
 import scalanlp.math._
-import scalala.tensor.sparse.{SparseHashVector, SparseVector}
+import scalala.tensor.sparse.{SparseVector}
 import scalala.tensor.Vector
+import scalanlp.tensor.sparse.OldSparseVector
 
 /**
  * Provides routines for computing the distance/score/costs of various
@@ -36,7 +37,7 @@ trait Distance[T] { this: AutomatonFactory[T] =>
     val allPairs = allPairDistances(fst);
 
     val paths = Array.fill(fst.numStates)(ring.zero);
-    for( (to,pathWeight) <- allPairs(fst.initialState).activeElements) {
+    for( (to,pathWeight) <- allPairs(fst.initialState).activeIterator) {
       paths(to) = ring.times(fst.initialWeight,pathWeight);
     }
     paths;
@@ -121,18 +122,16 @@ trait Distance[T] { this: AutomatonFactory[T] =>
     import ring._;
 
     val distances = Array.fill(fst.numStates){
-      val r = new SparseVector(fst.numStates);
-      r.default = ring.zero;
-      r;
+      new OldSparseVector(fst.numStates,ring.zero);
     }
     for {
       from <- 0 until fst.numStates;
       (_,targets) <- fst.arcsFrom(from)
     } {
       var tIndex = 0;
-      while(tIndex < targets.used) {
-        val to = targets.index(tIndex);
-        val weight = targets.data(tIndex);
+      while(tIndex < targets.activeSize) {
+        val to = targets.indexAt(tIndex);
+        val weight = targets.valueAt(tIndex);
         tIndex += 1;
         val current = distances(from)(to);
         distances(from)(to) = plus(current,weight)
@@ -159,7 +158,7 @@ trait Distance[T] { this: AutomatonFactory[T] =>
       val dkkStar = closure(dkk);
 
       for {
-        (j,dkj) <- distances(k).iterator
+        (dkj,j) <- distances(k).iterator.zipWithIndex
         if j != k && !closeTo(dkj,zero)
         i <- allStates if i != k
       } {

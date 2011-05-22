@@ -20,7 +20,9 @@ package scalanlp.fst;
 import scala.collection.mutable.PriorityQueue;
 import scala.collection.mutable.ArrayBuffer;
 
-import scalanlp.math._;
+import scalanlp.math._
+import scalala.collection.sparse.DefaultArrayValue
+;
 
 /**
 * Returns kbest derivations from an automaton. Naturally, the semiring involved needs to have an ordering.
@@ -32,9 +34,9 @@ trait KBest {
   case class Derivation[W,State,T](str: ArrayBuffer[T], state: State, weight: W,  heuristic: W, atFinal: Boolean);
   implicit def orderDeriv[W:Ordering,State,T] = Ordering[W].on[Derivation[W,State,T]](_.heuristic);
 
-  protected def computeHeuristics[W:Semiring:ClassManifest,State,T](auto: Automaton[W,State,T]): (State=>W);
+  protected def computeHeuristics[W:Semiring:ClassManifest:DefaultArrayValue,State,T](auto: Automaton[W,State,T]): (State=>W);
 
-  def extract[W:Semiring:Ordering:ClassManifest,State,T:Alphabet](auto: Automaton[W,State,T]) :Iterator[(Seq[T],W)] = {
+  def extract[W:Semiring:Ordering:ClassManifest:DefaultArrayValue,State,T:Alphabet](auto: Automaton[W,State,T]) :Iterator[(Seq[T],W)] = {
     val heuristics = computeHeuristics(auto);
 
     val pq = initialPQ(auto,heuristics);
@@ -56,7 +58,7 @@ trait KBest {
     kbest
   }
 
-  def extractList[W:ClassManifest:Semiring:Ordering,State,T:Alphabet](auto: Automaton[W,State,T], num: Int)
+  def extractList[W:ClassManifest:Semiring:Ordering:DefaultArrayValue,State,T:Alphabet](auto: Automaton[W,State,T], num: Int)
                             :Seq[(Seq[T],W)] = {
     val heuristics = computeHeuristics(auto);
 
@@ -113,7 +115,7 @@ trait KBest {
 */
 object KBest extends KBest {
 
-  override protected def computeHeuristics[W:Semiring:ClassManifest,State,T](auto: Automaton[W,State,T]) = {
+  override protected def computeHeuristics[W:Semiring:ClassManifest:DefaultArrayValue,State,T](auto: Automaton[W,State,T]) = {
     Distance.allPathDistances(auto.reverse) withDefaultValue implicitly[Semiring[W]].zero;
   }
 }
@@ -122,7 +124,7 @@ object KBest extends KBest {
 * Uses no heuristic to do the kbest list.
 */
 object UniformCostKBest extends KBest {
-  override protected def computeHeuristics[W:Semiring:ClassManifest,State,T](auto: Automaton[W,State,T]) = {
+  override protected def computeHeuristics[W:Semiring:ClassManifest:DefaultArrayValue,State,T](auto: Automaton[W,State,T]) = {
     { (s: State) => implicitly[Semiring[W]].zero }
   }
 }

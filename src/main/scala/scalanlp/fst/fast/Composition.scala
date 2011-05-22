@@ -21,8 +21,9 @@ package scalanlp.fst.fast
  */
 import scala.collection.mutable.ArrayBuffer
 import scalanlp.math.Semiring
-import scalala.tensor.sparse.SparseVector
-import scalanlp.collection.mutable.{ArrayMap, SparseArray}
+import scalala.collection.sparse.SparseArray
+import scalanlp.tensor.sparse.OldSparseVector
+import scalanlp.collection.mutable.{SparseArrayMap, ArrayMap}
 
 /**
  * Composition of two transducers in the general case.
@@ -80,29 +81,29 @@ trait Composition[T] { this: AutomatonFactory[T] =>
     stateMap(lt.initialState) = 0;
 
     // newState -> inch -> outch -> dest -> weight
-    val allArcs = new ArrayBuffer[SparseArray[SparseVector]];
+    val allArcs = new ArrayBuffer[SparseArrayMap[OldSparseVector]];
 
     var nextIndex = 0;
     while(nextIndex < states.size) {
       val oldState = states(nextIndex);
       val newState = nextIndex;
-      val arcs = encoder.fillSparseArray(mkSparseVector(lt.numStates));
+      val arcs = encoder.fillSparseArrayMap(mkSparseVector(lt.numStates));
       allArcs += arcs;
       nextIndex += 1;
       // ch1 -> old destinations -> score
-      val oldArcs: SparseArray[SparseVector] = lt.arcsFrom(oldState);
+      val oldArcs = lt.arcsFrom(oldState);
       var ch1Index = 0;
-      while(ch1Index < oldArcs.used) {
+      while(ch1Index < oldArcs.activeSize) {
         val ch1 = oldArcs.indexAt(ch1Index);
         val weights = oldArcs.valueAt(ch1Index);
         ch1Index += 1;
-        val newWeights = new SparseVector(lt.numStates,weights.used);
+        val newWeights = new OldSparseVector(lt.numStates,weights.activeSize);
         newWeights.default = ring.zero
         arcs(ch1) = newWeights;
         var oldDestIndex = 0;
-        while(oldDestIndex < weights.used) {
-          val oldDest = weights.index(oldDestIndex);
-          val weight = weights.data(oldDestIndex);
+        while(oldDestIndex < weights.activeSize) {
+          val oldDest = weights.indexAt(oldDestIndex);
+          val weight = weights.valueAt(oldDestIndex);
           oldDestIndex += 1;
           // will enqueue:
           val newDest = getNewDest(oldDest);
@@ -127,7 +128,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
 
       def stateFor(a: Int, b: Int, eps: InboundEpsilon) = {
         // TODO
-        error("not implemented");
+        sys.error("not implemented");
       }
 
       def underlyingEpsilonStatus(state: Int) = {
@@ -170,13 +171,13 @@ trait Composition[T] { this: AutomatonFactory[T] =>
         val a = underlyingLeftState(s)
         val b = underlyingRightState(s);
         val eps = underlyingEpsilonStatus(s);
-        val arcs = new SparseVector(numStates);
+        val arcs = new OldSparseVector(numStates);
         arcs.default = ring.zero;
         // non-eps arcs
         if(ch != epsilonIndex) {
           for {
-            (aTarget,aWeight) <- transA.arcsFrom(a,ch).activeElements
-            (bTarget,bWeight) <- transB.arcsFrom(b,ch).activeElements
+            (aTarget,aWeight) <- transA.arcsFrom(a,ch).activeIterator
+            (bTarget,bWeight) <- transB.arcsFrom(b,ch).activeIterator
           } {
             val target = stateFor(aTarget,bTarget,NoEps);
             val weight = ring.times(aWeight,bWeight);
@@ -186,7 +187,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           // eps arcs:
           if(eps != RightEps) {
             for {
-              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
+              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeIterator
             } {
               val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
@@ -195,7 +196,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           }
           if(eps != LeftEps) {
             for {
-              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeIterator
             } {
               val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
@@ -204,8 +205,8 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           }
           if(eps == NoEps) {
             for {
-              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
-              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
+              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeIterator
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeIterator
             } {
               val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
@@ -224,15 +225,15 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           case 1 => LeftEps
           case 2 => RightEps
         }
-        val arcs = encoder.fillSparseArray{
-          val sp = new SparseVector(numStates);
+        val arcs = encoder.fillSparseArrayMap{
+          val sp = new OldSparseVector(numStates);
           sp.default = ring.zero;
           sp
         }
         // non-eps arcs
         var aChIndex = 0;
         val arcsA = transA.arcsFrom(a);
-        while(aChIndex < arcsA.used) {
+        while(aChIndex < arcsA.activeSize) {
           val aCh = arcsA.indexAt(aChIndex);
           val aTargets = arcsA.valueAt(aChIndex);
           aChIndex += 1;
@@ -240,14 +241,14 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             var aIndex = 0;
             val bTargets = transB.arcsFrom(b,aCh)
             val newArcsA = arcs.getOrElseUpdate(aCh);
-            while(aIndex < aTargets.used) {
-              val aTarget = aTargets.index(aIndex);
-              val aWeight = aTargets.data(aIndex);
+            while(aIndex < aTargets.activeSize) {
+              val aTarget = aTargets.indexAt(aIndex);
+              val aWeight = aTargets.valueAt(aIndex);
               aIndex += 1;
               var bIndex = 0
-              while(bIndex < bTargets.used) {
-                val bTarget = bTargets.index(bIndex);
-                val bWeight = bTargets.data(bIndex);
+              while(bIndex < bTargets.activeSize) {
+                val bTarget = bTargets.indexAt(bIndex);
+                val bWeight = bTargets.valueAt(bIndex);
                 bIndex += 1;
                 val target = stateFor(aTarget,bTarget,NoEps);
                 val weight = ring.times(aWeight,bWeight);
@@ -260,7 +261,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
         if(epsilonIndex >= 0)  {
           if(eps != RightEps) {
             for {
-              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
+              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeIterator
             } {
               val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
@@ -269,7 +270,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           }
           if(eps != LeftEps) {
             for {
-              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeIterator
             } {
               val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
@@ -278,8 +279,8 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           }
           if(eps == NoEps) {
             for {
-              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeElements
-              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeElements
+              (aTarget,aWeight) <- transA.arcsFrom(a,epsilonIndex).activeIterator
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex).activeIterator
             } {
               val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
@@ -316,35 +317,34 @@ trait Composition[T] { this: AutomatonFactory[T] =>
     stateMap(lt.initialState) = 0;
 
     // newState -> inch -> outch -> dest -> weight
-    val allArcs = new ArrayBuffer[SparseArray[SparseArray[SparseVector]]];
+    val allArcs = new ArrayBuffer[SparseArrayMap[SparseArrayMap[OldSparseVector]]];
 
     var nextIndex = 0;
     while(nextIndex < states.size) {
       val oldState = states(nextIndex);
       val newState = nextIndex;
-      val arcs = encoder.fillSparseArray(encoder.fillSparseArray(mkSparseVector(lt.numStates)));
+      val arcs = encoder.fillSparseArrayMap(encoder.fillSparseArrayMap(mkSparseVector(lt.numStates)));
       allArcs += arcs;
       nextIndex += 1;
       // ch1 -> ch2 -> old destinations -> score
-      val oldArcs: SparseArray[SparseArray[SparseVector]] = lt.arcsFrom(oldState);
+      val oldArcs: SparseArrayMap[SparseArrayMap[OldSparseVector]] = lt.arcsFrom(oldState);
       var ch1Index = 0;
-      while(ch1Index < oldArcs.used) {
+      while(ch1Index < oldArcs.activeSize) {
         val ch1 = oldArcs.indexAt(ch1Index);
         val outs = oldArcs.valueAt(ch1Index);
         ch1Index += 1;
         val ch1Arcs = arcs.getOrElseUpdate(ch1);
         var ch2Index = 0;
-        while(ch2Index < outs.used) {
+        while(ch2Index < outs.activeSize) {
           val ch2 = outs.indexAt(ch2Index);
           val weights = outs.valueAt(ch2Index);
-          val newWeights = new SparseVector(lt.numStates,weights.used);
-          newWeights.default = ring.zero
+          val newWeights = new OldSparseVector(lt.numStates,weights.default,weights.activeSize);
           ch1Arcs(ch2) = newWeights;
           ch2Index += 1;
           var oldDestIndex = 0;
-          while(oldDestIndex < weights.used) {
-            val oldDest = weights.index(oldDestIndex);
-            val weight = weights.data(oldDestIndex);
+          while(oldDestIndex < weights.activeSize) {
+            val oldDest = weights.indexAt(oldDestIndex);
+            val weight = weights.valueAt(oldDestIndex);
             oldDestIndex += 1;
             // will enqueue:
             val newDest = getNewDest(oldDest);
@@ -395,12 +395,12 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           case 1 => LeftEps
           case 2 => RightEps
         }
-        val arcs = new SparseVector(numStates);
+        val arcs = new OldSparseVector(numStates);
         arcs.default = ring.zero;
         for {
           (midCh,targets) <- transA.arcsWithInput(a,ch1) if midCh != epsilonIndex
-          (bTarget,bWeight) <- transB.arcsFrom(b,midCh,ch2).activeElements
-          (aTarget,aWeight) <- targets.activeElements
+          (bTarget,bWeight) <- transB.arcsFrom(b,midCh,ch2).activeIterator
+          (aTarget,aWeight) <- targets.activeIterator
         } {
           val target = stateFor(aTarget,bTarget,NoEps);
           val weight = ring.times(aWeight,bWeight);
@@ -410,7 +410,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           // eps arcs:
           if(eps != RightEps && ch2 == epsilonIndex)
             for {
-              (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeElements
+              (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeIterator
             } {
               val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
@@ -418,7 +418,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             }
           if(eps != LeftEps && ch1 == epsilonIndex) {
             for {
-              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex,ch2).activeElements
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex,ch2).activeIterator
             } {
               val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
@@ -427,8 +427,8 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           }
           if(eps == NoEps) {
             for {
-              (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeElements
-              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex,ch2).activeElements
+              (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeIterator
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex,ch2).activeIterator
             } {
               val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
@@ -447,16 +447,16 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           case 1 => LeftEps
           case 2 => RightEps
         }
-        val arcs = encoder.fillSparseArray{
-          val sp = new SparseVector(numStates);
+        val arcs = encoder.fillSparseArrayMap{
+          val sp = new OldSparseVector(numStates);
           sp.default = ring.zero;
           sp
         };
         for {
           (midCh,bTargets) <- transB.arcsWithOutput(b,ch2)if midCh != epsilonIndex
-          (bTarget,bWeight) <- bTargets.activeElements;
+          (bTarget,bWeight) <- bTargets.activeIterator;
           (ch1,targets) <- transA.arcsWithOutput(a,midCh)
-          (aTarget,aWeight) <- targets.activeElements
+          (aTarget,aWeight) <- targets.activeIterator
         } {
           val target = stateFor(aTarget,bTarget,NoEps);
           val weight = ring.times(aWeight,bWeight);
@@ -467,7 +467,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           if(eps != RightEps && ch2 == epsilonIndex)
             for {
               (inCh,targets) <- transA.arcsWithOutput(a,epsilonIndex);
-              (aTarget,aWeight) <- targets.activeElements
+              (aTarget,aWeight) <- targets.activeIterator
             } {
               val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
@@ -475,7 +475,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             }
           if(eps != LeftEps) {
             for {
-              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex, ch2)
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex, ch2).activeIterator
             } {
               val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
@@ -484,9 +484,9 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           }
           if(eps == NoEps) {
             for {
-              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex, ch2).activeElements
+              (bTarget,bWeight) <- transB.arcsFrom(b,epsilonIndex, ch2).activeIterator
               (inCh,aTargets) <- transA.arcsWithOutput(a,epsilonIndex)
-              (aTarget,aWeight) <- aTargets.activeElements
+              (aTarget,aWeight) <- aTargets.activeIterator
             } {
               val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
@@ -507,8 +507,8 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           case 1 => LeftEps
           case 2 => RightEps
         }
-        val arcs = encoder.fillSparseArray(encoder.fillSparseArray{
-          val sp = new SparseVector(numStates);
+        val arcs = encoder.fillSparseArrayMap(encoder.fillSparseArrayMap{
+          val sp = new OldSparseVector(numStates);
           sp.default = ring.zero;
           sp
         });
@@ -516,14 +516,14 @@ trait Composition[T] { this: AutomatonFactory[T] =>
         var ch1Index = 0;
         val arcsA = transA.arcsFrom(a);
         // for each (input,arc pair) in A
-        while(ch1Index < arcsA.used) {
+        while(ch1Index < arcsA.activeSize) {
           val ch1 = arcsA.indexAt(ch1Index);
           val mids = arcsA.valueAt(ch1Index);
           val ac1 = arcs.getOrElseUpdate(ch1);
           ch1Index += 1;
           var midChIndex = 0;
           // for each (output 'mid',destination pair) in A
-          while(midChIndex < mids.used) {
+          while(midChIndex < mids.activeSize) {
             val midCh = mids.indexAt(midChIndex);
             val aTargets = mids.valueAt(midChIndex)
             midChIndex += 1;
@@ -531,23 +531,23 @@ trait Composition[T] { this: AutomatonFactory[T] =>
               // for each (ch2, arc pair) in B with input matching mid
               val arcsB = transB.arcsWithInput(b,midCh);
               var ch2Index = 0;
-              while(ch2Index < arcsB.used) {
+              while(ch2Index < arcsB.activeSize) {
                 val ch2 = arcsB.indexAt(ch2Index);
                 val ac2 = ac1.getOrElseUpdate(ch2);
                 val bTargets = arcsB.valueAt(ch2Index);
                 ch2Index += 1;
                 var bTargetIndex = 0;
-                while(bTargetIndex < bTargets.used) {
+                while(bTargetIndex < bTargets.activeSize) {
                   // for each (bTarget, weight)
-                  val bTarget = bTargets.index(bTargetIndex);
-                  val bWeight = bTargets.data(bTargetIndex);
+                  val bTarget = bTargets.indexAt(bTargetIndex);
+                  val bWeight = bTargets.valueAt(bTargetIndex);
                   bTargetIndex += 1;
                   var aTargetIndex = 0
                   // for each (aTarget, weight)
-                  while(aTargetIndex < aTargets.used) {
+                  while(aTargetIndex < aTargets.activeSize) {
                     // new arc: ((a,b),ch1,ch2,(aTarget,bTarget)
-                    val aTarget = aTargets.index(aTargetIndex);
-                    val aWeight = aTargets.data(aTargetIndex);
+                    val aTarget = aTargets.indexAt(aTargetIndex);
+                    val aWeight = aTargets.valueAt(aTargetIndex);
                     val target = stateFor(aTarget,bTarget,NoEps);
                     val weight = ring.times(aWeight,bWeight);
                     ac2(target) = ring.plus(ac2(target),weight);
@@ -564,7 +564,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           if(eps != RightEps)
             for {
               (inCh,targets) <- transA.arcsWithOutput(a,epsilonIndex);
-              (aTarget,aWeight) <- targets.activeElements
+              (aTarget,aWeight) <- targets.activeIterator
             } {
               val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
@@ -573,7 +573,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           if(eps != LeftEps) {
             for {
               (outCh,bTargets) <- transB.arcsWithInput(b,epsilonIndex);
-              (bTarget,bWeight) <- bTargets.activeElements
+              (bTarget,bWeight) <- bTargets.activeIterator
             } {
               val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
@@ -584,8 +584,8 @@ trait Composition[T] { this: AutomatonFactory[T] =>
             for {
               (inCh,aTargets) <- transA.arcsWithOutput(a,epsilonIndex)
               (outCh,bTargets) <- transB.arcsWithInput(b,epsilonIndex)
-              (aTarget,aWeight) <- aTargets.activeElements
-              (bTarget,bWeight) <- bTargets.activeElements
+              (aTarget,aWeight) <- aTargets.activeIterator
+              (bTarget,bWeight) <- bTargets.activeIterator
             } {
               val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);
@@ -604,16 +604,16 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           case 1 => LeftEps
           case 2 => RightEps
         }
-        val arcs = encoder.fillSparseArray{
-          val sp = new SparseVector(numStates);
+        val arcs = encoder.fillSparseArrayMap{
+          val sp = new OldSparseVector(numStates);
           sp.default = ring.zero;
           sp
         };
         for {
           (midCh,targets) <- transA.arcsWithInput(a,ch1) if midCh != epsilonIndex
           (ch2,bTargets) <- transB.arcsWithInput(b,midCh)
-          (bTarget,bWeight) <- bTargets.activeElements;
-          (aTarget,aWeight) <- targets.activeElements
+          (bTarget,bWeight) <- bTargets.activeIterator;
+          (aTarget,aWeight) <- targets.activeIterator
         } {
           val target = stateFor(aTarget,bTarget,NoEps);
           val weight = ring.times(aWeight,bWeight);
@@ -623,7 +623,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           // eps arcs:
           if(eps != RightEps)
             for {
-              (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeElements
+              (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeIterator
             } {
               val target = stateFor(aTarget,b,LeftEps);
               val weight = ring.times(aWeight,ring.one);
@@ -632,7 +632,7 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           if(eps != LeftEps && ch1 == epsilonIndex) {
             for {
               (outCh,bTargets) <- transB.arcsWithInput(b,epsilonIndex);
-              (bTarget,bWeight) <- bTargets.activeElements
+              (bTarget,bWeight) <- bTargets.activeIterator
             } {
               val target = stateFor(a,bTarget,RightEps);
               val weight = ring.times(ring.one,bWeight);
@@ -641,9 +641,9 @@ trait Composition[T] { this: AutomatonFactory[T] =>
           }
           if(eps == NoEps) {
             for {
-              (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeElements
+              (aTarget,aWeight) <- transA.arcsFrom(a,ch1,epsilonIndex).activeIterator
               (outCh,bTargets) <- transB.arcsWithInput(b,epsilonIndex)
-              (bTarget,bWeight) <- bTargets.activeElements
+              (bTarget,bWeight) <- bTargets.activeIterator
             } {
               val target = stateFor(aTarget,bTarget,NoEps);
               val weight = ring.times(aWeight,bWeight);

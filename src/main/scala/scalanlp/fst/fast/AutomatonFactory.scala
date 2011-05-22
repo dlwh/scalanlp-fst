@@ -5,18 +5,17 @@ import scalanlp.fst;
 import fst.{Arc, Alphabet}
 import scalanlp.math.Semiring
 import scalanlp.util.{Encoder, Index, DenseIntIndex}
-import scalala.tensor.sparse.SparseVector
-import scalanlp.collection.mutable.SparseArray
 import collection.immutable.BitSet
 import templates.BigramModelFactory
 import templates.PositionalUnigramModelFactory
+import scalanlp.tensor.sparse.OldSparseVector
+import scalanlp.collection.mutable.SparseArrayMap
 
 
 /**
  * 
  * @author dlwh
  */
-
 class AutomatonFactory[T](val index: Index[T])
                           (implicit protected val ring: Semiring[Double],
                            protected val alphabet: Alphabet[T]) extends Distance[T]
@@ -27,11 +26,10 @@ class AutomatonFactory[T](val index: Index[T])
   val encoder = Encoder.fromIndex(index);
   val epsilonIndex = index(alphabet.epsilon);
 
-  @serializable
-  trait Automaton { outer =>
+  trait Automaton extends Serializable { outer =>
     // source -> character -> target -> weight
-    def arcsFrom(s: Int):SparseArray[SparseVector]
-    def arcsFrom(s:Int, ch: Int):SparseVector
+    def arcsFrom(s: Int):SparseArrayMap[OldSparseVector]
+    def arcsFrom(s:Int, ch: Int):OldSparseVector
     def numStates:Int
     def initialState: Int;
     def initialWeight: Double;
@@ -62,7 +60,7 @@ class AutomatonFactory[T](val index: Index[T])
       for {
         s <- 0 until numStates iterator;
         (idx,targets) <- arcsFrom(s) iterator;
-        (sink,weight) <- targets.activeElements
+        (sink,weight) <- targets.activeIterator
       } {
         sb ++= "    \"" + s + "\"->\"" + sink +"\"";
         sb ++= "[ label=\""+transform(index.get(idx))+"/" + weight +"\"]\n";
@@ -80,7 +78,7 @@ class AutomatonFactory[T](val index: Index[T])
     lazy val cost = if(false) { //if(isCyclic) {
       val costs = allPairDistances(this);
       var cost = ring.zero;
-      for( (to,pathWeight) <- costs(initialState).activeElements) {
+      for( (to,pathWeight) <- costs(initialState).activeIterator) {
         cost = ring.plus(cost,ring.times(initialWeight,ring.times(pathWeight,finalWeight(to))));
       }
       cost;
@@ -97,7 +95,7 @@ class AutomatonFactory[T](val index: Index[T])
       def numStates = outer.numStates;
       def arcsFrom(s: Int) = {
         val arcs = outer.arcsFrom(s)
-        val r = encoder.fillSparseArray(encoder.fillSparseArray(mkSparseVector(numStates)))
+        val r = encoder.fillSparseArrayMap(encoder.fillSparseArrayMap(mkSparseVector(numStates)))
         for( (ch,weights) <- arcs) {
           r.getOrElseUpdate(ch).update(ch,weights);
         }
@@ -113,14 +111,14 @@ class AutomatonFactory[T](val index: Index[T])
       }
 
       def arcsWithInput(s: Int, inCh: Int) = {
-        val r = encoder.fillSparseArray(mkSparseVector(numStates));
+        val r = encoder.fillSparseArrayMap(mkSparseVector(numStates));
         val arcs = outer.arcsFrom(s,inCh);
         r(inCh) = arcs;
         r
       }
 
       def arcsWithOutput(s: Int, outCh: Int) = {
-        val r = encoder.fillSparseArray(mkSparseVector(numStates));
+        val r = encoder.fillSparseArrayMap(mkSparseVector(numStates));
         val arcs = outer.arcsFrom(s,outCh);
         r(outCh) = arcs;
         r
@@ -135,15 +133,14 @@ class AutomatonFactory[T](val index: Index[T])
     }
   }
 
-  @serializable
-  trait Transducer {
+  trait Transducer extends Serializable {
     // source -> inCh -> outCh -> -> target -> weight
-    def arcsFrom(s: Int):SparseArray[SparseArray[SparseVector]]
-    def arcsFrom(s:Int, ch1: Int, ch2: Int):SparseVector
+    def arcsFrom(s: Int):SparseArrayMap[SparseArrayMap[OldSparseVector]]
+    def arcsFrom(s:Int, ch1: Int, ch2: Int):OldSparseVector
     // outCh -> target
-    def arcsWithInput(s: Int, inCh: Int):SparseArray[SparseVector];
+    def arcsWithInput(s: Int, inCh: Int):SparseArrayMap[OldSparseVector];
     // inputCh -> target
-    def arcsWithOutput(s: Int, outCh: Int):SparseArray[SparseVector];
+    def arcsWithOutput(s: Int, outCh: Int):SparseArrayMap[OldSparseVector];
     def numStates:Int
     def initialState: Int;
     def initialWeight: Double;
@@ -155,12 +152,12 @@ class AutomatonFactory[T](val index: Index[T])
 
     def inputProjection:Automaton = {
       val arcs = Array.tabulate(numStates){ s =>
-        val r = encoder.fillSparseArray(mkSparseVector(numStates));
+        val r = encoder.fillSparseArrayMap(mkSparseVector(numStates));
         for( (inCh,outs) <- arcsFrom(s); (outCh,weights) <- outs) {
           var i = 0;
           val dest = r.getOrElseUpdate(inCh);
-          while(i < weights.used) {
-            dest(weights.index(i)) = ring.plus(dest(weights.index(i)),weights.data(i));
+          while(i < weights.activeSize) {
+            dest(weights.indexAt(i)) = ring.plus(dest(weights.indexAt(i)),weights.valueAt(i));
             i+=1;
           }
         }
@@ -173,12 +170,12 @@ class AutomatonFactory[T](val index: Index[T])
 
     def outputProjection:Automaton = {
       val arcs = Array.tabulate(numStates){ s =>
-        val r = encoder.fillSparseArray(mkSparseVector(numStates));
+        val r = encoder.fillSparseArrayMap(mkSparseVector(numStates));
         for( (inCh,outs) <- arcsFrom(s); (outCh,weights) <- outs) {
           var i = 0;
           val dest = r.getOrElseUpdate(outCh);
-          while(i < weights.used) {
-            dest(weights.index(i)) = ring.plus(dest(weights.index(i)),weights.data(i));
+          while(i < weights.activeSize) {
+            dest(weights.indexAt(i)) = ring.plus(dest(weights.indexAt(i)),weights.valueAt(i));
             i+=1;
           }
         }
@@ -206,7 +203,7 @@ class AutomatonFactory[T](val index: Index[T])
         s <- 0 until numStates iterator;
         (inIdx,outputs) <- arcsFrom(s) iterator;
         (outIdx,targets) <- outputs;
-        (sink,weight) <- targets.activeElements
+        (sink,weight) <- targets.activeIterator
       } {
         sb ++= "    \"" + s + "\"->\"" + sink +"\"";
         sb ++= "[ label=\""+transform(index.get(inIdx))+":" + transform(index.get(outIdx)) + "/" + weight +"\"]\n";
@@ -227,7 +224,7 @@ class AutomatonFactory[T](val index: Index[T])
 
   def automaton(seq: Seq[T], weight: Double):Automaton = {
     val numStates = seq.length + 1;
-    val arcs = Array.fill(numStates)(encoder.fillSparseArray {
+    val arcs = Array.fill(numStates)(encoder.fillSparseArrayMap {
       mkSparseVector(numStates)
     });
     for((ch,i) <- seq.zipWithIndex) {
@@ -238,7 +235,7 @@ class AutomatonFactory[T](val index: Index[T])
     automaton(arcs, finalWeights, startWeight = weight);
   }
 
-  def automaton(arcs: Array[SparseArray[SparseVector]], endWeights: Array[Double],
+  def automaton(arcs: Array[SparseArrayMap[OldSparseVector]], endWeights: Array[Double],
                startState: Int = 0, startWeight: Double = ring.one):Automaton = new Automaton {
     def allArcs = arcs;
     def numStates = arcs.length;
@@ -250,14 +247,14 @@ class AutomatonFactory[T](val index: Index[T])
   }
 
 
-  def transducer(arcs: Array[SparseArray[SparseArray[SparseVector]]],
+  def transducer(arcs: Array[SparseArrayMap[SparseArrayMap[OldSparseVector]]],
                  endWeights: Array[Double],
                  startState:Int =0,
                  startWeight: Double = ring.one):Transducer = {
-    lazy val arcsByOutput: Array[SparseArray[SparseArray[SparseVector]]] = arcs.map { arcs =>
+    lazy val arcsByOutput: Array[SparseArrayMap[SparseArrayMap[OldSparseVector]]] = arcs.map { arcs =>
       // this is basically an elaborate transpose operation
-      val result = encoder.fillSparseArray(encoder.fillSparseArray{
-        val vec = new SparseVector(arcs.length);
+      val result = encoder.fillSparseArrayMap(encoder.fillSparseArrayMap{
+        val vec = new OldSparseVector(arcs.length);
         vec.default = ring.zero
         vec
       });
@@ -292,13 +289,13 @@ class AutomatonFactory[T](val index: Index[T])
     val oldInitialState = a.initialState;
     val oldInitialWeight = a.initialWeight;
 
-    val newArcs = Array.fill(underlyingNumStates)(encoder.fillSparseArray(mkSparseVector(underlyingNumStates)));
+    val newArcs = Array.fill(underlyingNumStates)(encoder.fillSparseArrayMap(mkSparseVector(underlyingNumStates)));
     for ( s <- 0 until (underlyingNumStates - 1);
          (ch,weights) <- a.arcsFrom(s)) {
       var weightIndex = 0;
-      while(weightIndex < weights.used) {
-        val target = weights.index(weightIndex);
-        val weight = weights.data(weightIndex);
+      while(weightIndex < weights.activeSize) {
+        val target = weights.indexAt(weightIndex);
+        val weight = weights.valueAt(weightIndex);
         weightIndex += 1;
         newArcs(target).getOrElseUpdate(ch)(s) = weight;
       }
@@ -326,21 +323,14 @@ class AutomatonFactory[T](val index: Index[T])
 
     def arcsFrom(s: Int, ch: Int) = {
       val inner = a.arcsFrom(s,ch);
-      val r = new SparseVector(inner.size);
-      r.data = inner.data.take(inner.used).map(trans);
-      r.index = inner.index.take(inner.used);
-      r.used = inner.used;
+      val r = inner.mapValues(trans);
       r
     }
 
     def arcsFrom(s: Int) = {
       val arr = a.arcsFrom(s);
-      arr.map { inner =>
-        val r = new SparseVector(inner.size);
-        r.data = inner.data.take(inner.used).map(trans);
-        r.index = inner.index.take(inner.used);
-        r.used = inner.used;
-        r
+      arr.map { case (i,inner) =>
+        i -> inner.mapValues(trans);
       }
     }
   }
@@ -395,12 +385,12 @@ class AutomatonFactory[T](val index: Index[T])
     def edgesMatching(s: Int, l: T) = {
       if(l == alphabet.sigma) {
         for {
-          (idx,targets) <- a.arcsFrom(s)
-          (sink,weight) <- targets.activeElements
+          (idx,targets) <- a.arcsFrom(s).iterator
+          (sink,weight) <- targets.activeIterator
         } yield new Arc(s,sink,index.get(idx),weight)
       } else {
         for {
-          (sink,weight) <- a.arcsFrom(s)(index(l)).activeElements
+          (sink,weight) <- a.arcsFrom(s)(index(l)).activeIterator
         } yield new Arc(s,sink,l,weight)
       }
     };
@@ -409,7 +399,7 @@ class AutomatonFactory[T](val index: Index[T])
       for {
         s <- 0 until numStates iterator;
         (idx,targets) <- a.arcsFrom(s) iterator;
-        (sink,weight) <- targets.activeElements
+        (sink,weight) <- targets.activeIterator
       } yield new Arc(s,sink,index.get(idx),weight)
     } toIndexedSeq
 
@@ -444,7 +434,7 @@ class AutomatonFactory[T](val index: Index[T])
       for {
         (ch1,ch2s) <- a.arcsFrom(s).iterator;
         (ch2,targets) <- ch2s.iterator if implicitly[Alphabet[(T,T)]].matches(l,(index.get(ch1),index.get(ch2)));
-        (target,w) <- targets.activeElements
+        (target,w) <- targets.activeIterator
       } yield Arc(s,target,index.get(ch1)->index.get(ch2),w);
     };
 
@@ -453,7 +443,7 @@ class AutomatonFactory[T](val index: Index[T])
         s <- 0 until numStates iterator;
         (ch1,ch2s) <- a.arcsFrom(s) iterator;
         (ch2,targets) <- ch2s.iterator;
-        (sink,weight) <- targets.activeElements
+        (sink,weight) <- targets.activeIterator
       } yield new Arc(s,sink,index.get(ch1) -> index.get(ch2),weight)
     } toIndexedSeq
 
@@ -490,14 +480,14 @@ class AutomatonFactory[T](val index: Index[T])
       val s = queue.dequeue();
       val arcs = a.arcsFrom(s);
       var aIndex = 0;
-      while(aIndex < arcs.used) {
+      while(aIndex < arcs.activeSize) {
         val ch = arcs.indexAt(aIndex);
         val targets = arcs.valueAt(aIndex);
         aIndex += 1;
         var toIndex = 0;
-        while(toIndex < targets.used) {
-          val to = targets.index(toIndex);
-          val weight = targets.data(toIndex);
+        while(toIndex < targets.activeSize) {
+          val to = targets.indexAt(toIndex);
+          val weight = targets.valueAt(toIndex);
           toIndex += 1;
           func(s,to,ch,weight);
           if(!beenQueued(to)){
@@ -509,8 +499,8 @@ class AutomatonFactory[T](val index: Index[T])
     }
   }
 
-  def mkSparseVector(numStates: Int): SparseVector = {
-     val sp = new SparseVector(numStates);
+  def mkSparseVector(numStates: Int): OldSparseVector = {
+     val sp = new OldSparseVector(numStates);
      sp.default = ring.zero;
      sp
    }

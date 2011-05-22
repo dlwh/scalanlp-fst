@@ -19,6 +19,7 @@ package scalanlp.fst
 
 import scalanlp.math.Semiring
 import collection.mutable.HashMap
+import scalala.collection.sparse.DefaultArrayValue
 
 /**
  * Given a weighted automaton, computes the expected number of visits to states in another unweighted automaton.
@@ -28,14 +29,16 @@ import collection.mutable.HashMap
  *  @author dlwh
  */
 object ExpectedCounts {
-  def counts[W:Semiring:ClassManifest, S1,S2,T:Alphabet](weighted: Automaton[W,S1,T],
+  def counts[W:Semiring:ClassManifest:DefaultArrayValue, S1,S2,T:Alphabet](weighted: Automaton[W,S1,T],
                                                                 template: Automaton[W,S2,T]) = {
     import ApproximatePartitioner._;
     val (indexedTemplate,templateIndex) =  template.relabelWithIndex;
     val (inter, index) = (Minimizer.minimize(weighted) & indexedTemplate).relabelWithIndex;
     // compute posterior probability of being in any given state.
     val forward = Distance.allPathDistances(inter);
+    println("fwd:" + forward);
     val backward = Distance.allPathDistances(inter.reverse)
+    println("back:" + forward);
     val ring = implicitly[Semiring[W]];
 
     val scores = Array.fill(templateIndex.size, templateIndex.size)(new HashMap[T,W] {
@@ -60,7 +63,7 @@ object ExpectedCounts {
 
     for(i <- 0 until templateIndex.size; j <- 0 until templateIndex.size) {
       val src = templateIndex.get(i);
-      val srcMap = res(src);
+      val srcMap = res.getOrElseUpdate(src, template.makeMap(new HashMap[T,W]));
       val sink = templateIndex.get(j);
       srcMap(sink) = scores(i)(j);
     }

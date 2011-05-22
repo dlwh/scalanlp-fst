@@ -17,7 +17,7 @@ trait UnigramModelFactory[T] { this: AutomatonFactory[T] =>
 
     def numStates = 1;
 
-    val theArcs = encoder.fillSparseArray(mkSparseVector(numStates));
+    val theArcs = encoder.fillSparseArrayMap(mkSparseVector(numStates));
     for(i <- 0 until index.size if i != epsilonIndex) {
       theArcs.getOrElseUpdate(i)(0) = ring.one;
     }

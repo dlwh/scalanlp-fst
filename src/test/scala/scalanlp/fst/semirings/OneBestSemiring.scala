@@ -1,4 +1,5 @@
-package scalanlp.fst;
+package scalanlp.fst
+package semirings
 
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.FunSuite
@@ -7,13 +8,15 @@ import org.junit.runner.RunWith
 import org.junit.Before
 
 
-import scalanlp.math._;
+import scalala.library.Numerics
 import Numerics._;
 import scala.collection.Traversable;
 import scala.collection.Seq;
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
-import org.scalacheck._;
+import org.scalacheck._
+import scalanlp.math.{SemiringAxioms, Semiring}
+;
 
 object OneBestSetup {
   import scalanlp.math.Semiring.LogSpace._;
@@ -33,7 +36,7 @@ class OneBestSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
   def simpleWeight = for {
     ch <- Gen.alphaChar;
-    w <- arbitrary[Double];
+    w <- arbitrary[Double].map{_ % 1000};
     if !w.isNaN
   } yield promote(Arc(0,0,ch,w));
 

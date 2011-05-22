@@ -139,6 +139,7 @@ class TransducerTest extends FunSuite {
     val pushed = (a >> ed).pushWeights(doubleIsLogSpace);
     val pC = pushed.cost;
     val prC = pushed.relabel.cost;
+    println(pushed + " " + pushed.relabel);
     assert( (pC - prC).abs < 1E-6, pC + " " + prC);
   }
 

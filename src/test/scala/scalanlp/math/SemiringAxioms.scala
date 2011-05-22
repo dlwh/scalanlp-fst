@@ -64,27 +64,3 @@ trait SemiringAxioms[W] extends FunSuite with Checkers {
   
 }
 
-@RunWith(classOf[JUnitRunner])
-class BooleanSemiringTest extends SemiringAxioms[Boolean] {
-  def arb = Arbitrary.arbBool;
-  def makeRing = Semiring.booleanSemiring;   
-}
-
-@RunWith(classOf[JUnitRunner])
-class ProbabilitySemiringTest extends SemiringAxioms[Double] {
-  def arb = Arbitrary.arbDouble;
-  def makeRing = Semiring.Probability.semiring;   
-}
-
-
-@RunWith(classOf[JUnitRunner])
-class TropicalSemiringTest extends SemiringAxioms[Double] {
-  def arb = Arbitrary.arbDouble;
-  def makeRing = Semiring.Tropical.doubleIsTropical;
-}
-
-@RunWith(classOf[JUnitRunner])
-class LogSpaceSemiringTest extends SemiringAxioms[Double] {
-  def arb = Arbitrary.arbDouble;
-  def makeRing = Semiring.LogSpace.doubleIsLogSpace;
-}

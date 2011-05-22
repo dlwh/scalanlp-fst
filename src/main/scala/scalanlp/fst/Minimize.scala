@@ -20,7 +20,9 @@ import scala.collection.mutable.HashMap;
 import scala.collection.mutable.ArrayBuffer;
 import scalanlp.collection.mutable.ArrayMap;
 
-import scalanlp.math._;
+import scalanlp.math._
+import scalala.collection.sparse.DefaultArrayValue
+;
 
 /**
 * Minimization routines for automata.
@@ -31,7 +33,7 @@ object Minimizer {
   // two states are potentially equivalent if they have the same follow set (nextStates)
   // and are equivalent if their final states are similar, and their individual
   // arcs have similar weights.
-  case class EquivalenceInfo[W,T](val finalWeight: W, val arcs: HashMap[(Int,T),W]);
+  case class EquivalenceInfo[W,T](finalWeight: W, arcs: HashMap[(Int,T),W]);
 
   type Partition[W,State,T] = (EquivalenceInfo[W,T],Set[State]);
 
@@ -53,8 +55,8 @@ object Minimizer {
   def minimize[W,State,T](trans: Automaton[W,State,T])
                               (implicit ring: Semiring[W],
                               partitioner: Partitioner[W,State,T],
-                              alphabet: Alphabet[T], man: ClassManifest[W]) = {
-    new MinimizeWorker[W,State,T](trans)(partitioner,ring,alphabet, man).minimize;
+                              alphabet: Alphabet[T], man: ClassManifest[W], default: DefaultArrayValue[W]) = {
+    new MinimizeWorker[W,State,T](trans)(partitioner,ring,alphabet, man, default).minimize;
   }
   
 
@@ -63,7 +65,7 @@ object Minimizer {
                                               (implicit partitioner: Partitioner[W,State,T],
                                                 ring: Semiring[W],
                                                 alpha: Alphabet[T],
-                                                man: ClassManifest[W]) {
+                                                man: ClassManifest[W], default: DefaultArrayValue[W]) {
     private val edgesByOrigin = trans.allEdgesByOrigin;
 
     def minimize = {

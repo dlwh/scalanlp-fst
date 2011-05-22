@@ -15,12 +15,13 @@ package scalanlp.fst
  limitations under the License.
 */
 
-import scalala.Scalala._;
 import scalala.tensor.sparse._
-import scalala.tensor.counters.LogCounters.{logSum=>_,_};
 import scalanlp.math.Semiring
 import scalanlp.util.Index
-
+import scalanlp.tensor.sparse.OldSparseVector
+import scalala.library.Numerics._
+import scalala.tensor.Counter
+;
 
 /**
 * Encodes the sufficient statistics for a unigram model of an automaton.
@@ -31,13 +32,13 @@ class UnigramSemiring[@specialized(Char) T:Alphabet](chars: Set[T], beginningUni
   val beginningUnigramId = charIndex.index(beginningUnigram)
   for( ch <- chars) { charIndex.index(ch) }
 
-  case class Elem(totalProb: Double, counts: SparseVector) {
-    def decode: LogDoubleCounter[T] = {
-      aggregate( counts.activeElements.map { (iv:(Int,Double)) => (charIndex.get(iv._1),iv._2)});
+  case class Elem(totalProb: Double, counts: OldSparseVector) {
+    def decode: Counter[T,Double] = {
+      Counter( counts.activeIterator.map { (iv:(Int,Double)) => (charIndex.get(iv._1),iv._2)});
     }
   }
 
-  private def mnorm(x: SparseVector, y: SparseVector): Boolean = {
+  private def mnorm(x: OldSparseVector, y: OldSparseVector): Boolean = {
     var i = 0;
     var ok = true;
     //if(x.used != y.used) false
@@ -81,7 +82,7 @@ class UnigramSemiring[@specialized(Char) T:Alphabet](chars: Set[T], beginningUni
     def times(x: Elem, y: Elem) = {
       val newProb = x.totalProb + y.totalProb;
 
-      val counts = x.counts + y.totalProb value;
+      val counts = x.counts + y.totalProb;
       counts(beginningUnigramId) = Double.NegativeInfinity;
       logAddInPlace(counts,y.counts,x.totalProb);
 
@@ -102,16 +103,16 @@ class UnigramSemiring[@specialized(Char) T:Alphabet](chars: Set[T], beginningUni
     }
 
     val one = {
-      Elem(0.0, mkSparseVector);
+      Elem(0.0, mkOldSparseVector);
     }
 
-    val zero = Elem(-1.0/0.0, mkSparseVector);
+    val zero = Elem(-1.0/0.0, mkOldSparseVector);
 
   }
 
 
   def promote[S](a: Arc[Double,S,T]) = {
-    val counts = mkSparseVector;
+    val counts = mkOldSparseVector;
     if (a.label != implicitly[Alphabet[T]].epsilon) {
       counts(charIndex(a.label)) = a.weight;
     }
@@ -119,30 +120,30 @@ class UnigramSemiring[@specialized(Char) T:Alphabet](chars: Set[T], beginningUni
   }
 
   def promoteOnlyWeight(w: Double) = if(w == Double.NegativeInfinity) ring.zero else {
-    val vec = mkSparseVector;
+    val vec = mkOldSparseVector;
     vec(beginningUnigramId) = w;
     Elem(w, vec);
   }
 
-  private def mkSparseVector = {
-    val r = new SparseVector(charIndex.size);
+  private def mkOldSparseVector = {
+    val r = new OldSparseVector(charIndex.size);
     r.default = Double.NegativeInfinity;
     r
   }
 
-  private def logAdd(to: SparseVector, from: SparseVector, scale: Double=0.0) = {
+  private def logAdd(to: OldSparseVector, from: OldSparseVector, scale: Double=0.0) = {
     val ret = to.copy;
     logAddInPlace(ret,from,scale);
     ret;
   }
 
 
-  private def logAddInPlace(to: SparseVector, from: SparseVector, scale: Double=0.0) {
+  private def logAddInPlace(to: OldSparseVector, from: OldSparseVector, scale: Double=0.0) {
     if (scale != Double.NegativeInfinity) {
       var offset = 0;
-      while( offset < from.used) {
-        val k = from.index(offset);
-        val v  = from.data(offset);
+      while( offset < from.activeSize) {
+        val k = from.indexAt(offset);
+        val v  = from.valueAt(offset);
         to(k) = logSum(to(k),v + scale);
         offset += 1;
       }

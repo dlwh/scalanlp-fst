@@ -18,6 +18,7 @@ package scalanlp.fst
 
 
 import scalanlp.math.Semiring
+import scalala.collection.sparse.DefaultArrayValue
 
 /**
 * Epsilon-removal removes all epsilons from an automaton by essentially collapsing
@@ -27,7 +28,7 @@ import scalanlp.math.Semiring
 * @author dlwh
 */
 object EpsilonRemoval {
-  def removeEpsilons[W:Semiring:ClassManifest,S,T:Alphabet](a: Automaton[W,S,T]):Automaton[W,S,T] = {
+  def removeEpsilons[W:Semiring:ClassManifest:DefaultArrayValue,S,T:Alphabet](a: Automaton[W,S,T]):Automaton[W,S,T] = {
     val epsilon = implicitly[Alphabet[T]].epsilon;
     val ring = implicitly[Semiring[W]];
     import ring._;

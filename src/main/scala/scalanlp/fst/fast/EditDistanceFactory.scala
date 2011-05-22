@@ -59,7 +59,7 @@ trait EditDistanceFactory[T] { this: AutomatonFactory[T] =>
     def initialWeight = 0.0;
     val finalWeights = Array(math.log(1 - math.exp(math.log(totalChars) + insCost)));
     def numStates = 1;
-    val arcs = encoder.fillSparseArray(encoder.fillSparseArray(mkSparseVector(1)));
+    val arcs = encoder.fillSparseArrayMap(encoder.fillSparseArrayMap(mkSparseVector(1)));
     for(i <- charIndices;  aI = arcs.getOrElseUpdate(i); j <- charIndices) {
       aI.getOrElseUpdate(j)(0) = costOf(i,j)
     }

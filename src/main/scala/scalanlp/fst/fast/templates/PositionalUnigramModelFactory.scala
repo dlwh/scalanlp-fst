@@ -36,7 +36,7 @@ trait PositionalUnigramModelFactory[T] { this: AutomatonFactory[T] =>
     val numStates = maxLength;
 
     val arcs = Array.tabulate(numStates) { i =>
-       val arr = encoder.fillSparseArray(mkSparseVector(numStates));
+       val arr = encoder.fillSparseArrayMap(mkSparseVector(numStates));
        if(i < numStates - 1)
          for(ch <- 0 until index.size if ch != epsilonIndex) {
            arr.getOrElseUpdate(ch)(next(i)) = ring.one;
@@ -66,7 +66,7 @@ trait PositionalUnigramModelFactory[T] { this: AutomatonFactory[T] =>
     val numStates = maxLength;
 
     val arcs = Array.tabulate(numStates) { i =>
-       val arr = encoder.fillSparseArray(mkSparseVector(numStates));
+       val arr = encoder.fillSparseArrayMap(mkSparseVector(numStates));
        if(i < numStates)
          for(ch <- 0 until index.size if ch != epsilonIndex) {
            arr.getOrElseUpdate(ch)(next(i)) = ring.one;

@@ -18,7 +18,7 @@ package scalanlp.fst;
 
 
 import scalanlp.math.Semiring.LogSpace.doubleIsLogSpace;
-import scalanlp.math.Numerics._;
+import scalala.library.Numerics._;
 
 /**
  * Levhenstein transducer over sum of alignments (not viterbi

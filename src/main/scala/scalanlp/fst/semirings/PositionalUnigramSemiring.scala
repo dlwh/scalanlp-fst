@@ -1,4 +1,6 @@
-package scalanlp.fst;
+package scalanlp.fst
+package semirings
+
 /*
  Copyright 2010 David Hall
 
@@ -18,44 +20,17 @@ package scalanlp.fst;
 import scalanlp.math._;
 import scala.reflect.OptManifest;
 import scala.runtime.ScalaRunTime;
-import scalala.Scalala._;
-import scalala.tensor.adaptive._;
 import scalala.tensor.sparse._;
 import scalala.tensor.dense._;
 import scalanlp.collection.mutable.ArrayMap;
-import scalala.tensor.counters.LogCounters.{logSum=>_,_};
 import java.util.Arrays
+import scalala.library.Numerics.logSum;
 
 
-import scalanlp.util.Index
-import it.unimi.dsi.fastutil.chars.Char2IntOpenHashMap
 import collection.mutable.{ArrayBuffer, Seq => MSeq}
-
-class CharIndex(beginningUnigram: Char, chars:Set[Char]) extends Index[Char] {
-  val map = new Char2IntOpenHashMap(chars.size + 1);
-  map.defaultReturnValue(-1);
-  val objects = new ArrayBuffer[Char](chars.size + 1);
-  var _size = 0;
-  map.put(beginningUnigram, _size);
-  objects += beginningUnigram;
-  _size += 1;
-  for(c <- chars) {
-    if(map.put(c, _size) == -1) {
-      objects += c
-      _size += 1;
-    }
-  }
-
-  override def size = _size;
-
-  def iterator = objects.iterator
-
-  def pairs = (objects zipWithIndex).iterator
-
-  def unapply(i: Int) = Some(objects(i));
-
-  def apply(t: Char) = map.get(t);
-}
+import scalanlp.tensor.sparse.OldSparseVector
+import scalala.tensor.Counter
+import scalanlp.util.{Encoder, Index}
 
 /*
  * Encodes the sufficient statistics for an automaton that has p(character|position) up to some max length.
@@ -66,23 +41,24 @@ class CharIndex(beginningUnigram: Char, chars:Set[Char]) extends Index[Char] {
 class PositionalUnigramSemiring(maxPosition: Int, chars: Set[Char], beginningUnigram: Char, cheatOnEquals: Boolean=false)
                                                        (implicit alpha: Alphabet[Char], man: OptManifest[Char]) {
 
-  case class Elem(counts: MSeq[AdaptiveVector], positionScores: Array[Double], totalProb: Double) {
-    def decode: Seq[LogDoubleCounter[Char]] = {
-      val result = counts.map { v => aggregate(v.activeElements.map { (iv:(Int,Double)) => (charIndex.get(iv._1),iv._2) } )};
+  case class Elem(counts: MSeq[OldSparseVector], positionScores: Array[Double], totalProb: Double) {
+    def decode: Seq[Counter[Char,Double]] = {
+      val result = counts.map { v => Encoder.fromIndex(charIndex).decode(v)}
       result;
     }
   }
 
-  val charIndex = new CharIndex(beginningUnigram, chars);
-  val beginningUnigramId = 0;
+  val charIndex = Index[Char]();
+  charIndex.index(beginningUnigram);
+  for(ch <- chars) charIndex.index(ch);
+  val beginningUnigramId = charIndex(beginningUnigram);
 
-  private def mkAdaptiveVector = {
-    val r = new AdaptiveVector(charIndex.size);
-    r.default = Double.NegativeInfinity;
+  private def mkOldSparseVector = {
+    val r = new OldSparseVector(charIndex.size,Double.NegativeInfinity);
     r
   }
 
-  private def logAddInPlace2D(to: MSeq[AdaptiveVector], from: MSeq[AdaptiveVector], scale: Double=0.0) {
+  private def logAddInPlace2D(to: MSeq[OldSparseVector], from: MSeq[OldSparseVector], scale: Double=0.0) {
     var i = 0;
     while(i < maxPosition) {
       if(from(i) != null) {
@@ -92,44 +68,31 @@ class PositionalUnigramSemiring(maxPosition: Int, chars: Set[Char], beginningUni
           logAddInPlace(to(i),from(i),scale);
         }
       }
-      i +=1 ;
+      i += 1;
     }
   }
 
 
-  private def logAdd(to: AdaptiveVector,  from: AdaptiveVector, scale: Double=0.0) = {
+  private def logAdd(to: OldSparseVector,  from: OldSparseVector, scale: Double=0.0) = {
     val ret = to.copy;
     logAddInPlace(ret,from,scale);
     ret;
   }
 
-  private def logAddInPlace(to: AdaptiveVector, from: AdaptiveVector, scale: Double=0.0) {
+  private def logAddInPlace(to: OldSparseVector, from: OldSparseVector, scale: Double=0.0) {
     if (scale != Double.NegativeInfinity) {
-      from.innerVector match {
-        case from: SparseVector =>
-          var offset = 0;
-          // this just iterates over the array, but we can't pay the boxing penalty
-          while(offset < from.used) {
-            val k = from.index(offset);
-            val v = from.data(offset);
-            to(k) = logSum(to(k),v+scale);
-            offset += 1;
-          }
-          //println(from.used * 1.0 / from.size);
-        case from: DenseVector =>
-          to.densify();
-          var offset = 0;
-          while(offset < from.size) {
-            val k = offset
-            val v = from(offset);
-            if(v != Double.NegativeInfinity) to(k) = logSum(to(k),v+scale);
-            offset += 1;
-          }
+      var offset = 0;
+      // this just iterates over the array, but we can't pay the boxing penalty
+      while(offset < from.activeSize) {
+        val k = from.indexAt(offset);
+        val v = from.valueAt(offset);
+        to(k) = logSum(to(k),v+scale);
+        offset += 1;
       }
     }
   }
 
-  private def mnorm(x: AdaptiveVector, y: AdaptiveVector): Boolean = (x == null && y == null) || {
+  private def mnorm(x: OldSparseVector, y: OldSparseVector): Boolean = (x == null && y == null) || {
     var i = 0;
     if(x != null && y != null) {
       while(i < x.size) {
@@ -198,14 +161,14 @@ class PositionalUnigramSemiring(maxPosition: Int, chars: Set[Char], beginningUni
       val newProb = x.totalProb + y.totalProb;
 
       val counts = x.counts.map { arr =>
-        if(arr eq null) null else arr + y.totalProb value
+        if(arr eq null) null else arr + y.totalProb
       };
       for( i <- 0 until maxPosition;
           if x.positionScores(i) != Double.NegativeInfinity;
            j <- 0 until (maxPosition - i)) {
          if(y.counts(j) != null) {
            if(counts(i+j) == null) {
-             counts(i+j) = y.counts(j) + x.positionScores(i) value;
+             counts(i+j) = y.counts(j) + x.positionScores(i);
            } else {
              logAddInPlace(counts(i+j),y.counts(j),x.positionScores(i));
            }
@@ -235,8 +198,8 @@ class PositionalUnigramSemiring(maxPosition: Int, chars: Set[Char], beginningUni
 
       // counts. We're just going to assume that we're only closing over counts in position 0
       // XXX TODO
-      val counts = Array.fill(maxPosition)(mkAdaptiveVector);
-      val x0 = if(x.counts(0) == null) mkAdaptiveVector else x.counts(0);
+      val counts = Array.fill(maxPosition)(mkOldSparseVector);
+      val x0 = if(x.counts(0) == null) mkOldSparseVector else x.counts(0);
       counts(0) := x0;
       val total = logSum(x0.toArray);
       for( i <- 1 until maxPosition) {
@@ -253,18 +216,18 @@ class PositionalUnigramSemiring(maxPosition: Int, chars: Set[Char], beginningUni
     val one = {
       val arr = Array.fill(maxPosition)(Double.NegativeInfinity);
       arr(0) = 0.0;
-      Elem(new Array[AdaptiveVector](maxPosition),arr,0.0);
+      Elem(new Array[OldSparseVector](maxPosition),arr,0.0);
     }
 
-    val zero = Elem(new Array[AdaptiveVector](maxPosition),Array.fill(maxPosition)(Double.NegativeInfinity),-1.0/0.0);
+    val zero = Elem(new Array[OldSparseVector](maxPosition),Array.fill(maxPosition)(Double.NegativeInfinity),-1.0/0.0);
   }
 
   def promote[S](a: Arc[Double,S,Char]) = {
-    val counts = new Array[AdaptiveVector](maxPosition);
+    val counts = new Array[OldSparseVector](maxPosition);
     val posScores = new Array[Double](maxPosition);
     Arrays.fill(posScores,Double.NegativeInfinity);
     if (a.label != implicitly[Alphabet[Char]].epsilon) {
-      counts(0) = mkAdaptiveVector;
+      counts(0) = mkOldSparseVector;
       counts(0)(charIndex(a.label)) = a.weight;
       posScores(1) = a.weight;
     } else {
@@ -276,8 +239,8 @@ class PositionalUnigramSemiring(maxPosition: Int, chars: Set[Char], beginningUni
   def promoteOnlyWeight(w: Double) = if(w == Double.NegativeInfinity) ring.zero else {
     val posScores = new Array[Double](maxPosition);
     Arrays.fill(posScores,Double.NegativeInfinity);
-    val counts = new Array[AdaptiveVector](maxPosition);
-    counts(0) = mkAdaptiveVector;
+    val counts = new Array[OldSparseVector](maxPosition);
+    counts(0) = mkOldSparseVector;
     counts(0)(beginningUnigramId) = w;
     posScores(1) = w;
     Elem(counts, posScores, w);

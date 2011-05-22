@@ -1,8 +1,7 @@
 package scalanlp.fst.fast
 
 import scalanlp.fst.Alphabet
-import scalanlp.collection.mutable.{SparseArray, ArrayMap}
-import scalala.tensor.sparse.SparseVector
+import scalanlp.tensor.sparse.OldSparseVector
 
 /**
  * 
@@ -26,8 +25,8 @@ trait DSL[T] { outer:AutomatonFactory[T] =>
     def transducer(initialState: (Int,Double), finalWeights: Map[Int,Double])(arcs: (Int,(Int,T,T,Double))*): Transducer = {
       val numStates = (arcs.map(_._1).max max arcs.map(_._2._1).max max finalWeights.keys.max max initialState._1)+1
       val allArcs = Array.fill(numStates){
-        encoder.fillSparseArray(encoder.fillSparseArray{
-          val vec = new SparseVector(numStates);
+        encoder.fillSparseArrayMap(encoder.fillSparseArrayMap{
+          val vec = new OldSparseVector(numStates);
           vec.default = ring.zero
           vec
         });
@@ -44,8 +43,8 @@ trait DSL[T] { outer:AutomatonFactory[T] =>
     def automaton(initialState: (Int,Double), finalWeights: Map[Int,Double])(arcs: (Int,(Int,T,Double))*): Automaton = {
       val numStates = arcs.map(_._1).max max arcs.map(_._2._1).max max finalWeights.keys.max max initialState._1
       val allArcs = Array.fill(numStates){
-        encoder.fillSparseArray{
-          val vec = new SparseVector(numStates);
+        encoder.fillSparseArrayMap{
+          val vec = new OldSparseVector(numStates);
           vec.default = ring.zero
           vec
         };

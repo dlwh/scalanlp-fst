@@ -20,7 +20,7 @@ import scala.collection.mutable.ArrayBuffer;
 import scalanlp.collection.mutable._;
 import scalanlp.math._;
 import math._;
-import Numerics._;
+import scalala.library.Numerics._;
 
 /**
 * KLMinimize will merge two states if the induced distribution of suffixes

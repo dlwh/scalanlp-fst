@@ -20,6 +20,7 @@ package scalanlp.fst
  */
 import scala.collection.mutable.ArrayBuffer
 import scalanlp.math.Semiring
+import scalala.collection.sparse.DefaultArrayValue
 
 object Composition {
 
@@ -29,7 +30,7 @@ object Composition {
    * where we can handle two distinct weight types as long as we have a way of composing them
    * into a composite weight. In normal composition, this is just product.
    */
-  def compose[W1:Semiring,W2:Semiring,S1,S2,In:Alphabet,Mid:Alphabet,Out:Alphabet,W3:Semiring:ClassManifest]
+  def compose[W1:Semiring,W2:Semiring,S1,S2,In:Alphabet,Mid:Alphabet,Out:Alphabet,W3:Semiring:ClassManifest:DefaultArrayValue]
             (transA: Transducer[W1,S1,In,Mid], transB: Transducer[W2,S2,Mid,Out], composeW: (W1,W2)=>W3)
             :Transducer[W3,(S1,S2,InboundEpsilon),In,Out] = {
     compose(transA,transB,{(a:Option[Any],b:W1,c:W2) => composeW(b,c)});
@@ -42,7 +43,7 @@ object Composition {
    * where we can handle two distinct weight types as long as we have a way of composing them
    * into a composite weight. In normal composition, this is just product.
    */
-  def compose[W1:Semiring,W2:Semiring,S1,S2,In:Alphabet,Mid:Alphabet,Out:Alphabet,W3:Semiring:ClassManifest, S3]
+  def compose[W1:Semiring,W2:Semiring,S1,S2,In:Alphabet,Mid:Alphabet,Out:Alphabet,W3:Semiring:ClassManifest:DefaultArrayValue, S3]
               (transA: Transducer[W1,S1,In,Mid],
                transB: Transducer[W2,S2,Mid,Out],
                composeW: (Option[(In,Mid,Out)],W1,W2)=>W3)

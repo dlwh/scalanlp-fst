@@ -30,7 +30,7 @@ trait BigramModelFactory[T] { this: AutomatonFactory[T]  =>
 
     def numStates = index.size;
 
-    val theArcs = encoder.fillSparseArray(mkSparseVector(numStates));
+    val theArcs = encoder.fillSparseArrayMap(mkSparseVector(numStates));
     for(i <- 0 until index.size if i != epsilonIndex) {
       theArcs.getOrElseUpdate(i)(i) = ring.one;
     }

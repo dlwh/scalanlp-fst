@@ -17,7 +17,9 @@ package scalanlp.fst;
 
 
 
-import scalanlp.math._;
+import scalanlp.math._
+import scalala.collection.sparse.DefaultArrayValue
+;
 
 /**
 * Used to remove arcs from automata.
@@ -28,7 +30,7 @@ object Pruning {
    * For probabilistic automata (with partition 1) it's the score of posterior probability of being in any given state.
    *
    */
-  def calculateStateFlow[W:Semiring:ClassManifest,State,T](auto: Automaton[W,State,T]): Map[State,W] = {
+  def calculateStateFlow[W:Semiring:ClassManifest:DefaultArrayValue,State,T](auto: Automaton[W,State,T]): Map[State,W] = {
     val ring = implicitly[Semiring[W]];
     val forward = Distance.singleSourceShortestDistances(auto);
     val backward = Distance.singleSourceShortestDistances(auto.reverse)
@@ -47,7 +49,7 @@ object Pruning {
   /**
   * prunes arcs that are below some posterior probability/weight of being visited.
   */
-  def prune[W:Semiring:ClassManifest,State,T:Alphabet](auto: Automaton[W,State,T], belowThreshold: W=>Boolean): Automaton[W,State,T] = {
+  def prune[W:Semiring:ClassManifest:DefaultArrayValue,State,T:Alphabet](auto: Automaton[W,State,T], belowThreshold: W=>Boolean): Automaton[W,State,T] = {
     val zero = implicitly[Semiring[W]].zero;
 
     val fb = calculateStateFlow(auto);

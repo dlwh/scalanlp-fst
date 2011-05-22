@@ -1,4 +1,6 @@
-package scalanlp.fst;
+package scalanlp.fst
+package semirings
+
 /*
  Copyright 2010 David Hall
 

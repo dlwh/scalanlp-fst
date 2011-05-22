@@ -1,4 +1,4 @@
-package scalanlp.fst;
+package scalanlp.fst.semirings;
 
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.FunSuite
@@ -12,7 +12,7 @@ import scala.collection.Traversable;
 import scala.collection.Seq;
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
-import org.scalacheck._;
+import org.scalacheck._
 
 object BigramSetup {
   val acceptableChars = Set.empty ++ ('a' to 'e') ++ "Hellom"

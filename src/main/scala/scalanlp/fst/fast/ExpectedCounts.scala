@@ -20,7 +20,7 @@ package scalanlp.fst.fast
 
 import scalanlp.math.Semiring
 import collection.mutable.HashMap
-import scalala.tensor.sparse.{SparseVector, SparseHashVector}
+import scalanlp.tensor.sparse.OldSparseVector
 
 /**
  * Given a weighted automaton, computes the expected number of visits to states in another unweighted automaton.
@@ -37,7 +37,7 @@ trait ExpectedCounts[T] { this: AutomatonFactory[T] =>
     val backward = allPathDistances(inter.reverse)
 
     val scores = Array.fill(template.numStates,encoder.index.size){
-      val r = new SparseVector(template.numStates,1);
+      val r = new OldSparseVector(template.numStates,1);
       r.default = ring.zero
       r
     }

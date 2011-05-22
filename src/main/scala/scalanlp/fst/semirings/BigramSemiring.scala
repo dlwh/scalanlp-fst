@@ -1,4 +1,5 @@
 package scalanlp.fst;
+package semirings
 /*
  Copyright 2010 David Hall
 
@@ -18,15 +19,17 @@ package scalanlp.fst;
 import scalanlp.math._;
 import java.util.Arrays
 import scala.runtime.ScalaRunTime;
-import scalala.Scalala._;
-import scalala.tensor.adaptive.AdaptiveVector;
-import scalala.tensor.Vector;
+
 import scalala.tensor.dense._;
 import scalala.tensor.sparse._;
-import scalanlp.collection.mutable.SparseArray;
-import scalala.tensor.counters.LogCounters.{logSum=>_,_};
 
-import scalanlp.util.Index;
+import scalanlp.util.Index
+import scalanlp.tensor.sparse.OldSparseVector
+import scalala.tensor.{Counter, Vector, Counter2}
+import scalala.library.Numerics.logSum
+import scalanlp.collection.mutable.SparseArrayMap
+;
+
 /*
  * This class contains code to convert fst arcs to use a bigram semiring.
  * The bigram semiring allows you to compute sufficient statistics
@@ -47,43 +50,41 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
     charIndex.index(ab);
   }
 
-  private def mkGramCharMap = new SparseArray[AdaptiveVector](charIndex.size,mkAdaptiveVector,0);
+  private def mkGramCharMap = new SparseArrayMap[OldSparseVector](charIndex.size,mkOldSparseVector);
 
-  private def copyGramMap(other: SparseArray[AdaptiveVector]) = {
-    val ret = new SparseArray[AdaptiveVector]( Int.MaxValue,mkAdaptiveVector,other.size);
+  private def copyGramMap(other: SparseArrayMap[OldSparseVector]) = {
+    val ret = new SparseArrayMap[OldSparseVector]( Int.MaxValue,mkOldSparseVector);
 
-    for( (i,vec) <- other if vec.activeDomain.size > 0) {
+    for( (i,vec) <- other if vec.activeSize > 0) {
       ret.update(i,vec.copy)
     }
     ret
   }
 
 
-  private def mkAdaptiveVector:AdaptiveVector = {
-    val r = new AdaptiveVector(charIndex.size);
-    r.default = Double.NegativeInfinity;
-    assert(r.default == Double.NegativeInfinity);
+  private def mkOldSparseVector:OldSparseVector = {
+    val r = new OldSparseVector(charIndex.size, Double.NegativeInfinity);
     r
   }
 
   private def mkDenseVector = {
     val data = new Array[Double](charIndex.size);
     java.util.Arrays.fill(data,Double.NegativeInfinity);
-    val r = new DenseVector(data);
+    val r = new DenseVectorCol(data);
     r
   }
 
 
-  case class Elem(leftUnigrams: AdaptiveVector,
-                  bigramCounts: SparseArray[AdaptiveVector],
+  case class Elem(leftUnigrams: OldSparseVector,
+                  bigramCounts: SparseArrayMap[OldSparseVector],
                   length0Score: Double,
                   totalProb: Double,
-                  rightUnigrams: AdaptiveVector) {
+                  rightUnigrams: OldSparseVector) {
 
-    private def decodeVector[T](vec: AdaptiveVector, index: Index[T]) = {
-      val result = LogDoubleCounter[T]();
+    private def decodeVector[T](vec: OldSparseVector, index: Index[T]) = {
+      val result = Counter[T,Double]();
       for {
-        (ycI, v) <- vec.activeElements;
+        (ycI, v) <- vec.activeIterator;
         yc = index.get(ycI)
       } {
         result(yc) = v;
@@ -92,22 +93,21 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
     }
 
     override def toString = (
-      "Elem(lUni" + decodeVector(leftUnigrams,charIndex) + leftUnigrams.innerVector.getClass
+      "Elem(lUni" + decodeVector(leftUnigrams,charIndex) + leftUnigrams
       + ",\nlBi="
       + counts + ",\nl0Sc="
       + length0Score + ",\ntotal="
       + totalProb + ",\nrUni="
-      + rightUnigrams.innerVector.getClass
       + decodeVector(rightUnigrams,charIndex)
     )
 
     def counts = {
-      val result = LogPairedDoubleCounter[T,T]();
+      val result = Counter2[T,T,Double]();
       if(bigramCounts != null)
         for {
           (xcI, row) <- bigramCounts.iterator;
           xc = charIndex.get(xcI);
-          (ycI, v) <- row.activeElements;
+          (ycI, v) <- row.activeIterator;
           yc = charIndex.get(ycI)
         } {
           result(xc,yc) = v;
@@ -131,24 +131,19 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
 
   private val epsilon = Alphabet.zeroEpsCharBet.epsilon;
 
-  private def logAddInPlace2D(to: SparseArray[AdaptiveVector], from: SparseArray[AdaptiveVector], scale: Double=0.0) {
+  private def logAddInPlace2D(to: SparseArrayMap[OldSparseVector], from: SparseArrayMap[OldSparseVector], scale: Double=0.0) {
     if (scale != Double.NegativeInfinity) {
       for( (k,vec) <- from) {
-        if (!to.contains(k)) vec.innerVector match {
-          case row: SparseVector =>
-            val old = mkAdaptiveVector;
-            var offset = 0;
-            while(offset < row.used) {
-              val k = row.index(offset);
-              val v = row.data(offset);
-              old(k) = v+scale;
-              offset += 1;
-            }
-            to(k) = old;
-          case row: DenseVector =>
-            val old = mkAdaptiveVector;
-            old := (row +scale).value;
-            to(k) = old;
+        if (!to.contains(k)) {
+          val old = mkOldSparseVector;
+          var offset = 0;
+          while(offset < vec.activeSize) {
+            val k = vec.indexAt(offset);
+            val v = vec.valueAt(offset);
+            old(k) = v+scale;
+            offset += 1;
+          }
+          to(k) = old;
         } else {
           val old = to(k);
           logAddInPlace(old,vec,scale);
@@ -157,41 +152,28 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
     }
   }
 
-  private def logAdd(to: AdaptiveVector,from: AdaptiveVector, scale: Double=0.0) = {
-    val ret = mkAdaptiveVector;
+  private def logAdd(to: OldSparseVector,from: OldSparseVector, scale: Double=0.0) = {
+    val ret = mkOldSparseVector;
     logAddInPlace(ret,to);
     logAddInPlace(ret,from,scale);
     ret;
   }
 
-  private def logAddInPlace(to: AdaptiveVector, from: AdaptiveVector, scale: Double=0.0) {
+  private def logAddInPlace(to: OldSparseVector, from: OldSparseVector, scale: Double=0.0) {
     if (scale != Double.NegativeInfinity) {
-      from.innerVector match {
-        case from: SparseVector =>
-          var offset = 0;
-          // this just iterates over the array, but we can't pay the boxing penalty
-          while(offset < from.used) {
-            val k = from.index(offset);
-            val v = from.data(offset);
-            to(k) = logSum(to(k),v+scale);
-            offset += 1;
-          }
-          //println(from.used * 1.0 / from.size);
-        case from: DenseVector =>
-          to.densify();
-          var offset = 0;
-          while(offset < from.size) {
-            val k = offset
-            val v = from(offset);
-            if(v != Double.NegativeInfinity) to(k) = logSum(to(k),v+scale);
-            offset += 1;
-          }
+      var offset = 0;
+      // this just iterates over the array, but we can't pay the boxing penalty
+      while(offset < from.activeSize) {
+        val k = from.indexAt(offset);
+        val v = from.valueAt(offset);
+        to(k) = logSum(to(k),v+scale);
+        offset += 1;
       }
     }
   }
 
-  private def mnorm(x: Vector, y: Vector): Boolean = {
-    for(i <- x.activeDomain) {
+  private def mnorm(x: OldSparseVector, y: Vector[Double]): Boolean = {
+    for(i <- x.activeKeys) {
       if(!Semiring.LogSpace.doubleIsLogSpace.closeTo(x(i),y(i))) return false
     }
     true
@@ -261,25 +243,25 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
 
     def times(x: Elem, y: Elem) = {
       val newProb = x.totalProb + y.totalProb;
-      val active = mkAdaptiveVector;
+      val active = mkOldSparseVector;
 
       val newBigrams = mkGramCharMap;
       if(x.bigramCounts != null) logAddInPlace2D(newBigrams,x.bigramCounts,y.totalProb)
       if(y.bigramCounts != null) logAddInPlace2D(newBigrams,y.bigramCounts,x.totalProb)
 
       // X Y --> Z (bigram)
-      for( (yc,yprob) <- y.leftUnigrams.activeElements;
-          (xc,xprob) <- x.rightUnigrams.activeElements) {
+      for( (yc,yprob) <- y.leftUnigrams.activeIterator;
+          (xc,xprob) <- x.rightUnigrams.activeIterator) {
         newBigrams.getOrElseUpdate(xc)(yc) = logSum(newBigrams.getOrElseUpdate(xc)(yc), yprob + xprob);
       }
 
       // frontier:
       // the left unigram frontier consists of x's old left frontier, plus y's left frontier + x's empty score
-      val leftUnigrams:AdaptiveVector = mkAdaptiveVector;
+      val leftUnigrams:OldSparseVector = mkOldSparseVector;
       leftUnigrams := x.leftUnigrams + y.totalProb;
       logAddInPlace(leftUnigrams,y.leftUnigrams,x.length0Score);
       // the right unigram frontier consists of y's old right frontier, plus x's right frontier + y's empty score
-      val rightUnigrams = mkAdaptiveVector;
+      val rightUnigrams = mkOldSparseVector;
       rightUnigrams := y.rightUnigrams + x.totalProb
       logAddInPlace(rightUnigrams,x.rightUnigrams,y.length0Score);
 
@@ -299,8 +281,8 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
 
       val newBigrams = mkGramCharMap;
       if(x.bigramCounts != null) logAddInPlace2D(newBigrams,x.bigramCounts);
-      for( (xc,xprob) <- x.rightUnigrams.activeElements;
-          (yc,yprob) <- x.leftUnigrams.activeElements) {
+      for( (xc,xprob) <- x.rightUnigrams.activeIterator;
+          (yc,yprob) <- x.leftUnigrams.activeIterator) {
         newBigrams.getOrElseUpdate(xc)(yc) = logSum(newBigrams.getOrElseUpdate(xc)(yc), yprob + xprob);
       }
       val newBigrams2 = mkGramCharMap;
@@ -326,13 +308,13 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
       r
     }
 
-    val one = Elem(mkAdaptiveVector,mkGramCharMap ,0.0,0.0,mkAdaptiveVector);
-    val zero = Elem(mkAdaptiveVector,mkGramCharMap ,-1.0/0.0,-1.0/0.0,mkAdaptiveVector);
+    val one = Elem(mkOldSparseVector,mkGramCharMap ,0.0,0.0,mkOldSparseVector);
+    val zero = Elem(mkOldSparseVector,mkGramCharMap ,-1.0/0.0,-1.0/0.0,mkOldSparseVector);
   }
 
   def promote[S](a: Arc[Double,S,T]) = {
-    val border = mkAdaptiveVector;
-    val active = mkAdaptiveVector
+    val border = mkOldSparseVector;
+    val active = mkOldSparseVector
     if (a.label != implicitly[Alphabet[T]].epsilon) {
       assert(charIndex.contains(a.label));
       val id = charIndex(a.label);
@@ -355,7 +337,7 @@ class BigramSemiring[@specialized(Char) T:Alphabet](acceptableChars: Set[T],
   }
 
   def promoteOnlyWeight(w: Double) = if(w == Double.NegativeInfinity) ring.zero else {
-    val active = mkAdaptiveVector;
+    val active = mkOldSparseVector;
     active(beginningUnigramId) = w;
     Elem(active,null,Double.NegativeInfinity,w,active);
   }

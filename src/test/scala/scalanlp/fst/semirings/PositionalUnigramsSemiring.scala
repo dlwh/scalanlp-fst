@@ -1,4 +1,5 @@
-package scalanlp.fst;
+package scalanlp.fst
+package semirings
 
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.FunSuite
@@ -8,11 +9,9 @@ import org.junit.Before
 
 
 import scalanlp.math._;
-import scala.collection.Traversable;
-import scala.collection.Seq;
-import scala.collection.mutable.ArrayBuffer;
-import scala.collection.mutable.PriorityQueue;
-import org.scalacheck._;
+import org.scalacheck._
+import scalala.library.Numerics
+import scalala.library.Library.softmax;
 
 object PositionalUnigramSetup {
   val validChars = Set.empty ++ "Helloabcdem";
@@ -33,7 +32,7 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
   def simpleWeight = for {
     ch <- Gen.elements(validChars.toSeq:_*);
-    w <- arbitrary[Double];
+    w <- arbitrary[Double] map { _ % 300};
     if !w.isNaN
   } yield promote(Arc(0,0,ch,w));
 
@@ -81,20 +80,20 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
     val counts = cost.decode;
 
     assert( counts(0)('#') === 0.0);
-    assert( counts(0).logTotal === 0.0);
+    assert( softmax(counts(0)) === 0.0);
     assert( counts(1)('H') === 0.0);
-    assert( counts(1).logTotal === 0.0);
+    assert( softmax(counts(1)) === 0.0);
     assert( counts(2)('e') === 0.0);
-    assert( counts(2).logTotal === 0.0);
+    assert( softmax(counts(2)) === 0.0);
     assert( counts(3)('l') === 0.0);
-    assert( counts(3).logTotal === 0.0);
+    assert( softmax(counts(3)) === 0.0);
     assert( counts(4)('l') === 0.0);
-    assert( counts(4).logTotal === 0.0);
+    assert( softmax(counts(4)) === 0.0);
     assert( counts(5)('o') === 0.0);
-    assert( counts(5).logTotal === 0.0);
+    assert( softmax(counts(5)) === 0.0);
     assert( counts(6)('#') === 0.0);
-    assert( counts(6).logTotal === 0.0);
-    assert( counts(7).logTotal ===Double.NegativeInfinity);
+    assert( softmax(counts(6)) === 0.0);
+    assert( softmax(counts(7)) ===Double.NegativeInfinity);
   }
 
   test("split automaton") {
@@ -110,17 +109,18 @@ class PositionalUnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
     assert( counts(0)('#') === logSum(0.0,0.0));
     assert( counts(1)('H') === logSum(0.0,0.0));
-    assert( counts(1).logTotal === logSum(0.0,0.0));
+    assert( softmax(counts(1)) === logSum(0.0,0.0));
     assert( counts(2)('e') === logSum(0.0,0.0));
-    assert( counts(2).logTotal === logSum(0.0,0.0));
+    assert( softmax(counts(2)) === logSum(0.0,0.0));
     assert( counts(3)('l') === 0.0);
     assert( counts(3)('m') === 0.0);
-    assert( counts(3).logTotal === logSum(0.0,0.0));
+    assert( softmax(counts(3)) === logSum(0.0,0.0));
     assert( counts(5)('o') === logSum(0.0,0.0));
-    assert( counts(5).logTotal === logSum(0.0,0.0));
+    assert( softmax(counts(5)) === logSum(0.0,0.0));
     assert( counts(6)('#') === logSum(0.0,0.0));
-    assert( counts(6).logTotal === logSum(0.0,0.0));
-    assert( counts(7).logTotal === Double.NegativeInfinity);
+    assert( softmax(counts(6)) === logSum(0.0,0.0));
+    println(counts(7));
+    assert( softmax(counts(7)) === Double.NegativeInfinity);
   }
 
   

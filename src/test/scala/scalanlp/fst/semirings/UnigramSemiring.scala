@@ -1,4 +1,5 @@
-package scalanlp.fst;
+package scalanlp.fst
+package semirings
 
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.FunSuite
@@ -8,12 +9,14 @@ import org.junit.Before
 
 
 import scalanlp.math._;
-import Numerics._;
+import scalala.library.Numerics._;
 import scala.collection.Traversable;
 import scala.collection.Seq;
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.PriorityQueue;
-import org.scalacheck._;
+import org.scalacheck._
+import scalala.library.Numerics
+import scalanlp.fst.UnigramSemiring
 
 object UnigramSetup {
   val validChars = Set.empty ++ "Helloabcdem";
@@ -21,6 +24,7 @@ object UnigramSetup {
 }
 import UnigramSetup._;
 import tgring._;
+import tgring.Elem;
 
 
 @RunWith(classOf[JUnitRunner])
@@ -33,7 +37,7 @@ class UnigramSemiringTest extends FunSuite with SemiringAxioms[Elem] {
 
   def simpleWeight = for {
     ch <- Gen.elements(validChars.toSeq:_*);
-    w <- arbitrary[Double];
+    w <- arbitrary[Double].map { _ % 100 };
     if !w.isNaN
   } yield promote(Arc(0,0,ch,w));
 

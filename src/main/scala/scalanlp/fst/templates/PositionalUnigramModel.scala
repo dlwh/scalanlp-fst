@@ -16,9 +16,11 @@ package scalanlp.fst.templates
 */
 
 import scalanlp.math.Semiring
+import scalala.collection.sparse.DefaultArrayValue
 import scalanlp.fst._
+import semirings.PositionalUnigramSemiring
 
-class PositionalUnigramModel[W:Semiring:ClassManifest,T:Alphabet](init: T, chars: Set[T], maxLength: Int) extends Automaton[W,Int,T] {
+class PositionalUnigramModel[W:Semiring:ClassManifest:DefaultArrayValue,T:Alphabet](init: T, chars: Set[T], maxLength: Int) extends Automaton[W,Int,T] {
   val initialStateWeights = Map( 0 -> ring.one);
 
   def finalWeight(s: Int) = if(s == -1) ring.one else ring.zero;
