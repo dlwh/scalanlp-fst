@@ -1,4 +1,5 @@
-package scalanlp.fst
+package scalanlp.newfst
+
 /*
  Copyright 2010 David Hall
 
@@ -17,8 +18,9 @@ package scalanlp.fst
 
 
 import scalanlp.math._
-import collection.mutable.HashMap
 import scalala.collection.sparse.DefaultArrayValue
+import util.MapMaker
+import scalanlp.collection.mutable.AutoUpdater
 ;
 
 /**
@@ -32,17 +34,20 @@ object Distance {
   * Selects between singleSourceShortestDistance and allPairDistances
   * based on cyclicity
   */
-  def allPathDistances[@specialized(Double) W:Semiring:ClassManifest:DefaultArrayValue,State,@specialized(Char) T](fst: Automaton[W,State,T]) = if(fst.isCyclic) {
-    val ring = implicitly[Semiring[W]];
-
+  def allPathDistances[CC,@specialized(Double) W,State,@specialized(Char) T]
+                      (fst: CC)(implicit  mm2: MapMaker[CC,State,collection.mutable.Map[State,W]],
+                                mm3: MapMaker[CC,State,Int],
+                                mm: MapMaker[CC,State,W],
+                                ring: Semiring[W],
+                                ev: CC<:<Automaton[W,State,T]) = if(fst.isCyclic) {
     val allPairs = allPairDistances(fst);
 
-    val paths = fst.makeMap(ring.zero);
+    val paths = mm.mkMap(fst).withDefaultValue(ring.zero);
     for( (from,initWeight) <- fst.initialStateWeights;
          (to,pathWeight) <- allPairs(from)) {
       paths(to) = ring.maybe_+=(paths(to),ring.times(initWeight,pathWeight))._1;
     }
-    Map.empty ++ paths;
+    Map.empty ++ paths withDefaultValue(ring.zero);
   } else {
     singleSourceShortestDistances(fst);
   }
@@ -57,32 +62,37 @@ object Distance {
   * for acyclic graphs, k-closed semirings, or grahs that are acyclic except
   * for self-loops
   */
-  def singleSourceShortestDistances[@specialized(Double) W:Semiring:ClassManifest:DefaultArrayValue,State,@specialized(Char) T](fst: Automaton[W,State,T]):Map[State,W] = {
-    val ring = implicitly[Semiring[W]];
+  def singleSourceShortestDistances[CC, @specialized(Double) W, State, @specialized(Char) T]
+                                    (fst: CC)(implicit  mm2: MapMaker[CC,State,collection.mutable.Map[State,W]],
+                                              mm3: MapMaker[CC,State,Int],
+                                              mm: MapMaker[CC,State,W],
+                                              ring: Semiring[W],
+                                              ev: CC<:<Automaton[W,State,T]) :Map[State,W] = {
     import ring._;
-
     val (distances,allStates) = neighborDistances(fst);
 
-    import fst._;
+    val auto = ev(fst);
+    import auto._;
 
-    val d = makeMap[W](zero);
-    val r = makeMap[W](zero);
-    val selfLoops = makeMap[W](zero);
+
+    val d = AutoUpdater(mm.mkMap(fst), zero);
+    val r = AutoUpdater(mm.mkMap(fst), zero);
+    val selfLoops = AutoUpdater(mm.mkMap(fst), zero);
 
     val S = new collection.mutable.Queue[State]();
-    val visited = makeMap(0);
-    val enqueued = makeMap(false);
+    val visited = AutoUpdater(mm3.mkMap(fst),0)
+    val enqueued = AutoUpdater(mm3.mkMap(fst),0);
     for( (s,w) <- initialStateWeights if !closeTo(w,zero)) {
       d(s) = plus(w,zero);
       r(s) = plus(w,zero);
       S += s;
-      enqueued(s) = true;
+      enqueued(s) = 1;
     }
 
     while(!S.isEmpty) {
       val from = S.head;
       S.dequeue();
-      enqueued(from) = false;
+      enqueued(from) = 0;
 
       visited(from) += 1;
 
@@ -105,9 +115,9 @@ object Distance {
         if( !tooCloseToMatter ) {
           r(to) = maybe_+=(r(to),wRFrom)._1;
           d(to) = dt_p_wRFrom;
-          if(!enqueued(to)) {
+          if(enqueued(to) == 0) {
             S += to;
-            enqueued(to) = true
+            enqueued(to) = 1
           }
         }
       }
@@ -117,23 +127,23 @@ object Distance {
       d(s) = times(d(s),mass);
     }
 
-    Map.empty ++ d;
+    Map.empty ++ d withDefaultValue(zero);
   }
 
   /*
   * Returns the distances between individual pairs of states using
   * only one hop
   */
-  private def neighborDistances[W:Semiring:ClassManifest:DefaultArrayValue,State, T](fst: Automaton[W,State,T]) = {
-    val ring = implicitly[Semiring[W]];
+  private def neighborDistances[CC, W, State, T](fst: CC)(implicit  ev: CC<:<Automaton[W,State,T],
+                                                          mm2: MapMaker[CC,State,collection.mutable.Map[State,W]],
+                                                          mm: MapMaker[CC,State,W],
+                                                          ring: Semiring[W]) = {
     import ring._;
-    import fst._;
-
-    val distances = makeMap(makeMap(zero));
+    val distances = AutoUpdater(mm2.mkMap(fst), mm.mkMap(fst).withDefaultValue(ring.zero));
     val allStates = new collection.mutable.HashSet[State];
-    allEdges.foreach { case Arc(from,to,_,w) =>
-      val current = distances.getOrElseUpdate(from,makeMap(zero))(to);
-      distances.getOrElseUpdate(from,makeMap(zero))(to) = maybe_+=(current,w)._1;
+    fst.edges.foreach { case a@Arc(from,to,_,w) =>
+      val current = distances(from)(to)
+      distances(from)(to) = maybe_+=(current,w)._1;
       allStates += from;
       allStates += to;
     }
@@ -145,13 +155,14 @@ object Distance {
   * Finds all pair-wise distances between all points in O(n^3),
   * where n is the number of states. Works for any complete semiring.
   */
-  def allPairDistances[@specialized(Double) W:Semiring:ClassManifest:DefaultArrayValue,State, @specialized(Char) T](fst: Automaton[W,State,T]) = {
-    val ring = implicitly[Semiring[W]];
+  def allPairDistances[CC, @specialized(Double) W, State, @specialized(Char) T]
+          (fst: CC)
+          (implicit mm2: MapMaker[CC,State,collection.mutable.Map[State,W]],
+           mm: MapMaker[CC,State,W],
+           ring: Semiring[W],
+           ev: CC<:<Automaton[W,State,T]) = {
     import ring._;
     val (distances,allStates) = neighborDistances(fst);
-
-    import fst._;
-   
 
     for {
       k <- allStates

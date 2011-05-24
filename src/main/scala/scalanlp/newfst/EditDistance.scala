@@ -1,4 +1,4 @@
-package scalanlp.fst;
+package scalanlp.newfst
 
 /*
  Copyright 2010 David Hall
@@ -17,7 +17,7 @@ package scalanlp.fst;
 */
 
 import scalanlp.math.Semiring.LogSpace._;
-import scala.annotation.switch;
+
 
 /**
  * Levhenstein transducer over sum of alignments (not viterbi
@@ -31,8 +31,9 @@ import scala.annotation.switch;
  *
  * @author dlwh
  */
-class EditDistance(subRatio: Double, insRatio: Double, private val alpha: Set[Char]) extends Transducer[Double,Int,Char,Char] {
-  import Transducer._;
+class EditDistance(subRatio: Double, insRatio: Double, alpha: Set[Char])
+  extends Transducer[Double,Int,Char,Char] with DenseAutomaton[Double,(Char,Char)] with AutomatonLike[Double,Int,(Char,Char),EditDistance] {
+
   require( subRatio < 0);
   require( insRatio < 0);
 
@@ -55,15 +56,26 @@ class EditDistance(subRatio: Double, insRatio: Double, private val alpha: Set[Ch
 
   private val inAlpha = implicitly[Alphabet[Char]];
   private val Eps = inAlpha.epsilon;
-  private val Sigma = inAlpha.sigma;
   private val allChars = alpha + Eps;
 
   val initialStateWeights = Map( 0 -> 0.0);
 
   def finalWeight(s: Int) = math.log(1 - math.exp(math.log(totalChars) + insCost));
 
-  override def allEdges:IndexedSeq[Arc] = (edgesMatching(0,(Sigma,Sigma))).toIndexedSeq;
+  override def edges = (edgesFrom(0)).toIndexedSeq;
 
+  def edgesFrom(s: Int) = {
+    for {
+      a <- allChars.iterator;
+      b <- allChars.iterator;
+      cost = costOf(a,b)
+      if cost != Double.NegativeInfinity
+    } yield {
+      Arc(0,0,(a,b), cost);
+    }
+  }
+
+  /*
   def edgesMatching(s: Int, ab: (Char,Char)) = if(s != 0) Iterator.empty else {
     val (a,b) = ab;
     if(a == Sigma && b == Sigma) {
@@ -98,6 +110,7 @@ class EditDistance(subRatio: Double, insRatio: Double, private val alpha: Set[Ch
     }
 
   }
+  */
 
   private def costOf(a: Char, b: Char) = {
     if(a == Eps && b == Eps) Double.NegativeInfinity
