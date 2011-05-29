@@ -26,7 +26,7 @@ package scalanlp.newfst
  *
  * @author dlwh
  */
-class DecayAutomaton(val expectedLength:Double, chars: Set[Char]) extends DenseAutomaton[Double,Char] with AutomatonLike[Double,Int,Char,DecayAutomaton] {
+class DecayAutomaton(val expectedLength:Double, chars: Set[Char]) extends DenseAutomaton[Double,Char] with SelectingAutomaton[Double,Int,Char] with AutomatonLike[Double,Int,Char,DecayAutomaton] {
   require( expectedLength > 0);
   // E[|X|] = p / (1-p)
   // p = E[X] / (1+E[X])
@@ -49,6 +49,11 @@ class DecayAutomaton(val expectedLength:Double, chars: Set[Char]) extends DenseA
 
   override def edgesFrom(s: Int) = {
     for(a <- chars.iterator) yield Arc(0,0,a,arcCost)
+  }
+
+  def selectEdges(from: Int, label: Char) = {
+    if(chars(label)) Iterator(Arc(0,0,label,arcCost));
+    else Iterator.empty;
   }
 }
 

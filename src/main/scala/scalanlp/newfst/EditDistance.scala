@@ -32,7 +32,7 @@ import scalanlp.math.Semiring.LogSpace._;
  * @author dlwh
  */
 class EditDistance(subRatio: Double, insRatio: Double, alpha: Set[Char])
-  extends Transducer[Double,Int,Char,Char] with DenseAutomaton[Double,(Char,Char)] with AutomatonLike[Double,Int,(Char,Char),EditDistance] {
+  extends Transducer[Double,Int,Char,Char] with DenseAutomaton[Double,(Char,Char)] with SelectingAutomaton[Double,Int,(Char,Char)] with AutomatonLike[Double,Int,(Char,Char),EditDistance] {
 
   require( subRatio < 0);
   require( insRatio < 0);
@@ -75,6 +75,13 @@ class EditDistance(subRatio: Double, insRatio: Double, alpha: Set[Char])
     }
   }
 
+
+  def selectEdges(from: Int, label: (Char,Char)) = {
+    if( allChars(label._1) && allChars(label._2) )
+      Iterator.single(Arc(0,0,label,costOf(label._1,label._2)))
+    else Iterator.empty
+  }
+
   /*
   def edgesMatching(s: Int, ab: (Char,Char)) = if(s != 0) Iterator.empty else {
     val (a,b) = ab;
@@ -112,6 +119,7 @@ class EditDistance(subRatio: Double, insRatio: Double, alpha: Set[Char])
   }
   */
 
+
   private def costOf(a: Char, b: Char) = {
     if(a == Eps && b == Eps) Double.NegativeInfinity
     else if(a == Eps || b == Eps) {
@@ -121,3 +129,36 @@ class EditDistance(subRatio: Double, insRatio: Double, alpha: Set[Char])
   }
 }
 
+object EditDistance {
+  implicit def tSigmaMatcher = new ArcMatcher[EditDistance,Double,Int,(Char,Char),(Char,Sigma.type)] {
+    def arcsMatching(cc: EditDistance, s: Int, mt: (Char, Sigma.type)) = {
+      import cc._;
+      val a = mt._1
+      if (allChars(a)) {
+        for {
+          b <- allChars.iterator;
+          cost = costOf(a,b)
+          if cost != Double.NegativeInfinity
+        } yield {
+          Arc(0,0,(a,b), cost);
+        }
+      } else Iterator.empty;
+    }
+  }
+
+  implicit def sigmaTMatcher = new ArcMatcher[EditDistance,Double,Int,(Char,Char),(Sigma.type, Char)] {
+    def arcsMatching(cc: EditDistance, s: Int, mt: (Sigma.type, Char)) = {
+      import cc._;
+      val b = mt._2
+      if (allChars(b)) {
+        for {
+          a <- allChars.iterator;
+          cost = costOf(a,b)
+          if cost != Double.NegativeInfinity
+        } yield {
+          Arc(0,0,(a,b), cost);
+        }
+      } else Iterator.empty;
+    }
+  }
+}

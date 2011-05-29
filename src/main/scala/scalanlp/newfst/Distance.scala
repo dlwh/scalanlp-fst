@@ -40,7 +40,7 @@ object Distance {
                                 mm: MapMaker[CC,State,W],
                                 ring: Semiring[W],
                                 ev: CC<:<Automaton[W,State,T]) = if(fst.isCyclic) {
-    val allPairs = allPairDistances(fst);
+    val allPairs = allPairDistances[CC,W,State,T](fst);
 
     val paths = mm.mkMap(fst).withDefaultValue(ring.zero);
     for( (from,initWeight) <- fst.initialStateWeights;
@@ -69,7 +69,7 @@ object Distance {
                                               ring: Semiring[W],
                                               ev: CC<:<Automaton[W,State,T]) :Map[State,W] = {
     import ring._;
-    val (distances,allStates) = neighborDistances(fst);
+    val (distances,allStates) = neighborDistances[CC,W,State,T](fst);
 
     val auto = ev(fst);
     import auto._;
@@ -162,7 +162,7 @@ object Distance {
            ring: Semiring[W],
            ev: CC<:<Automaton[W,State,T]) = {
     import ring._;
-    val (distances,allStates) = neighborDistances(fst);
+    val (distances,allStates) = neighborDistances[CC,W,State,T](fst);
 
     for {
       k <- allStates
