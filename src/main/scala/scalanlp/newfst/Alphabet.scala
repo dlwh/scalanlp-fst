@@ -36,6 +36,10 @@ object Alphabet {
     val epsilon = '\0';
   }
 
+  implicit object minIntEpsIntBet extends Alphabet[Int] {
+    val epsilon = Int.MinValue;
+  }
+
   implicit def tupleize[A:Alphabet,B:Alphabet] = new TupleAlphabet[A,B];
 
   final class TupleAlphabet[A:Alphabet,B:Alphabet] extends Alphabet[(A,B)] {
