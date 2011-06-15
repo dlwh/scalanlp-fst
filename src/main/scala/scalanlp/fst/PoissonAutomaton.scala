@@ -18,7 +18,7 @@ package scalanlp.fst;
 
 
 import scalanlp.math.Semiring.LogSpace._;
-import scalanlp.stats.sampling.Poisson;
+import scalanlp.stats.distributions.Poisson;
 
 /**
 * Generates a poisson distribution over string lengths, and a uniform

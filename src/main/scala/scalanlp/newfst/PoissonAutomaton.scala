@@ -19,12 +19,12 @@ package scalanlp.newfst
 
 
 
-import scalanlp.stats.sampling.Poisson;
+import scalanlp.stats.distributions.Poisson;
 
 /**
 * Generates a poisson distribution over string lengths, and a uniform
 * distribution over individual characters, up to some maximum length.
-* Afterwards, it is a geometric distrbution.
+* Afterwards, it is a geometric distribution.
 *
 * Uses log probabilities.
 *
