@@ -115,7 +115,7 @@ package object newfst {
                     midAlpha: Alphabet[Out],
                     outAlpha: Alphabet[Out2],
                     ring: Semiring[W]) = {
-      Composition.compose(outer,t2,ring.times _ )
+      Composition.compose(outer,t2)
     }
 
     /**

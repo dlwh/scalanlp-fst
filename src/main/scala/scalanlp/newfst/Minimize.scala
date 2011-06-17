@@ -74,7 +74,7 @@ object Minimizer {
       val partitions = new ArrayBuffer[Partition[W,State,T]];
       partitions ++= partition(trans.states.toSet, _ => 0);
 
-      val partitionOf = AutoUpdater(mm.mkMap(trans),error("??"));
+      val partitionOf = AutoUpdater(mm.mkMap(trans),sys.error("??"));
       for( (partition,index) <- partitions.zipWithIndex;
           state <- partition._2) {
         partitionOf(state) = index;
