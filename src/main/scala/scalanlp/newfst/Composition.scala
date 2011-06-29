@@ -23,6 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 import scalanlp.math.Semiring
 import scalanlp.newfst.Composition.InboundEpsilon
 import Composition._
+import annotation.switch
 
 object Composition {
 
