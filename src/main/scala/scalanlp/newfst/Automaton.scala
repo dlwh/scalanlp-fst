@@ -123,11 +123,8 @@ trait AutomatonLike[W,State,T,+CC<:AutomatonLike[W,State,T,CC] with Automaton[W,
 
   def pushWeights[CC2](implicit rev: WeightPusher[CC,CC2]):CC2 = rev(this)
 
-  def cost(implicit mm2: MapMaker[CC,State,collection.mutable.Map[State,W]],
-           mm3: MapMaker[CC,State,Int],
-           mm: MapMaker[CC,State,W],
-           ring: Semiring[W]):W = if(false) { //if(isCyclic) {
-    val costs = Distance.allPairDistances(this);
+  def cost(implicit distance: Distance[CC,W,State], ring: Semiring[W]):W = if(false) { //if(isCyclic) {
+    val costs = distance.allPairDistances(this);
     var cost = ring.zero;
     for( (from,initWeight) <- initialStateWeights;
         (to,pathWeight) <- costs(from)) {
@@ -136,7 +133,7 @@ trait AutomatonLike[W,State,T,+CC<:AutomatonLike[W,State,T,CC] with Automaton[W,
     }
     cost;
   } else {
-    val costs = Distance.singleSourceShortestDistances(this);
+    val costs = distance.singleSourceShortestDistances(this);
     var cost = ring.zero;
     for( (s,w) <- costs) {
       cost = ring.plus(cost,ring.times(w,finalWeight(s)));

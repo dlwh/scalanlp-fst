@@ -30,7 +30,6 @@ import util.MapMaker
  * weights and normalizing appropriately.
  *
  *  @author dlwh
- */
 object ExpectedCounts {
   def counts[W, S1,S2,T](weighted: Automaton[W,S1,T],
                          template: Automaton[W,S2,T])(implicit ring: Semiring[W], alphabet: Alphabet[T]) = {
@@ -42,7 +41,9 @@ object ExpectedCounts {
     // TODO; make this fast, and not ugly.
     type TMap = AutoUpdater[mutable.Map[T,W],T,W];
     type S2TMap = AutoUpdater[mutable.Map[S2,TMap],S2,TMap];
-    type S2S2TMap = AutoUpdater[mutable.Map[S2,S2TMap],S2,S2TMap];
+//    type S2S2TMap = AutoUpdater[mutable.Map[S2,S2TMap],S2,S2TMap];
+
+    val scores = AutoUpdater[S2,AutoUpdater[AutoUpdater[
 
     inter.edges foreach { case Arc(from, to, label, weight) =>
       val srcIndex = from._1;
@@ -61,4 +62,5 @@ object ExpectedCounts {
     scores.mapValues(_.theMap.mapValues(_.theMap));
   }
 }
+ */
 

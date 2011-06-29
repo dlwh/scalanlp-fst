@@ -34,13 +34,13 @@ object EpsilonRemoval {
   def removeEpsilons[W,S,T](a: Automaton[W,S,T])
                            (implicit ring: Semiring[W],
                             alpha: Alphabet[T],
-                            mm: MapMaker[Automaton[W,S,T],S,W],
-                            mm2: MapMaker[Automaton[W,S,T],S,collection.mutable.Map[S,W]]):Automaton[W,S,T] = {
+                            distance: Distance[Automaton[W,S,T],W,S],
+                            mm: MapMaker[Automaton[W,S,T],S,W]): Automaton[W,S,T] = {
     val epsilon = alpha.epsilon;
     import ring._;
 
     val epsilonsOnly = a.filterArcs(_.label == epsilon);
-    val pairDistances = Distance.allPairDistances(epsilonsOnly);
+    val pairDistances = distance.allPairDistances(epsilonsOnly);
 
     val newArcs = for {
       (p,distances) <- pairDistances.iterator

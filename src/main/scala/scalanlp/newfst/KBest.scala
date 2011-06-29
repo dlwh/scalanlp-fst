@@ -107,11 +107,8 @@ trait KBest {
 object KBest extends KBest {
 
   implicit def aStarHeuristic[CC,CCR,W,State,T](implicit reverser: Reverser[CC,CCR],
-                                                mm2: MapMaker[CCR,State,collection.mutable.Map[State,W]],
-                                                mm3: MapMaker[CCR,State,Int],
-                                                mm: MapMaker[CCR,State,W],
-                                                ring: Semiring[W],
-                                                evr: CCR<:<Automaton[W,State,T]):Heuristic[CC,State,W]  = new Heuristic[CC,State,W] {
+                                                dist: Distance[CCR,W,State],
+                                                ring: Semiring[W]):Heuristic[CC,State,W]  = new Heuristic[CC,State,W] {
     def computeHeuristics(auto: CC) = {
       Distance.allPathDistances(reverser(auto)) withDefaultValue ring.zero
     }

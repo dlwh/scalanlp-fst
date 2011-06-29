@@ -12,11 +12,9 @@ trait WeightPusher[-CC,+CC2] extends AutomatonTransformer[CC,CC2]
 
 object WeightPusher {
   implicit def basicWeightPusher[CC,CCR, W,State,T](implicit reverser: Reverser[CC,CCR],
+                                                    distance: Distance[CCR,W,State],
                                                     ev: CC<:<Automaton[W,State,T],
                                                     evR: CCR<:<Automaton[W,State,T],
-                                                    mm: MapMaker[CCR,State,W],
-                                                    mm2: MapMaker[CCR,State,collection.mutable.Map[State,W]],
-                                                    mm3: MapMaker[CCR,State,Int],
                                                     ring: WLDSemiring[W]):  WeightPusher[CC,Automaton[W,State,T]] = {
     new WeightPusher[CC,Automaton[W,State,T]] {
       def apply(auto: CC) = {
@@ -24,7 +22,7 @@ object WeightPusher {
         import autoCC._;
         import ring._;
         val rev : CCR = reverser(auto);
-        val costs = Distance.allPathDistances(rev); // \sum_{state q in final} weight(path(p,q))
+        val costs = distance.allPathDistances(rev); // \sum_{state q in final} weight(path(p,q))
         val initWeights = initialStateWeights map { case (k,v) => (k,times(v,costs(k))) } withDefaultValue (ring.zero)
         val finalWeights = {for( (s,w) <- rev.initialStateWeights;
                                 d = costs(s);
