@@ -23,6 +23,7 @@ import collection.mutable.HashMap
 import scalanlp.collection.mutable.AutoUpdater
 import collection.mutable
 import util.MapMaker
+import java.util.TreeMap
 
 /**
  * Given a weighted automaton, computes the expected number of visits to states in another unweighted automaton.
@@ -30,12 +31,13 @@ import util.MapMaker
  * weights and normalizing appropriately.
  *
  *  @author dlwh
+ */
 object ExpectedCounts {
   def counts[W, S1,S2,T](weighted: Automaton[W,S1,T],
                          template: Automaton[W,S2,T])(implicit ring: Semiring[W], alphabet: Alphabet[T]) = {
     val inter = (weighted & template);
     // compute posterior probability of being in any given state.
-    val forward = Distance.allPathDistances(inter);
+    val forward = Distance.allPathDistances(inter)
     val backward = Distance.allPathDistances(inter.reverse)
 
     // TODO; make this fast, and not ugly.
@@ -43,11 +45,14 @@ object ExpectedCounts {
     type S2TMap = AutoUpdater[mutable.Map[S2,TMap],S2,TMap];
 //    type S2S2TMap = AutoUpdater[mutable.Map[S2,S2TMap],S2,S2TMap];
 
-    val scores = AutoUpdater[S2,AutoUpdater[AutoUpdater[
+    // S2 -> S2 -> T -> W
+    val scores = AutoUpdater[collection.mutable.Map[S2,S2TMap],S2,S2TMap](collection.mutable.Map(),
+                                        AutoUpdater(collection.mutable.Map(),
+                                                    AutoUpdater(collection.mutable.Map[T,W](),ring.zero)))
 
     inter.edges foreach { case Arc(from, to, label, weight) =>
-      val srcIndex = from._1;
-      val sinkIndex = from._2;
+      val srcIndex = from._2;
+      val sinkIndex = to._2;
       for {
         fScore <- forward.get(from);
         bScore <- backward.get(to)
@@ -62,5 +67,4 @@ object ExpectedCounts {
     scores.mapValues(_.theMap.mapValues(_.theMap));
   }
 }
- */
 

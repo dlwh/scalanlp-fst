@@ -69,11 +69,11 @@ object Distance {
     distance.allPairDistances(fst)
   }
 
-  implicit def defaultDistancer[CC,W,State,T](implicit  mm2: MapMaker[CC,State,collection.mutable.Map[State,W]],
+  implicit def defaultDistancer[CC,W,State,T](implicit ev: CC<:<Automaton[W,State,T],
+                                              mm2: MapMaker[CC,State,collection.mutable.Map[State,W]],
                                               mm3: MapMaker[CC,State,Int],
                                               mm: MapMaker[CC,State,W],
-                                              ring: Semiring[W],
-                                              ev: CC<:<Automaton[W,State,T]) = {
+                                              ring: Semiring[W]) = {
     new DefaultDistancer[CC,W,State,T];
   }
 
