@@ -19,11 +19,8 @@ package scalanlp.newfst
 
 
 import scalanlp.math.Semiring
-import collection.mutable.HashMap
 import scalanlp.collection.mutable.AutoUpdater
 import collection.mutable
-import util.MapMaker
-import java.util.TreeMap
 
 /**
  * Given a weighted automaton, computes the expected number of visits to states in another unweighted automaton.
