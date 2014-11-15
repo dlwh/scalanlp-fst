@@ -33,7 +33,7 @@ abstract class Alphabet[@specialized(Char) T] {
 object Alphabet {
   def apply[T:Alphabet] = implicitly[Alphabet[T]];
   implicit object zeroEpsCharBet extends Alphabet[Char] {
-    val epsilon = '\0';
+    val epsilon = '\u0000';
   }
 
   implicit object minIntEpsIntBet extends Alphabet[Int] {

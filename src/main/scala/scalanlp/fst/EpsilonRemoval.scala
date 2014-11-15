@@ -3,7 +3,7 @@ package scalanlp.fst
 /*
  Copyright 2010 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -17,11 +17,10 @@ package scalanlp.fst
 */
 
 
+import breeze.collection.mutable.AutoUpdater
+import breeze.math.Semiring
 
-import scalanlp.math.Semiring
-import scalala.collection.sparse.DefaultArrayValue
 import util.MapMaker
-import scalanlp.collection.mutable.AutoUpdater
 
 /**
 * Epsilon-removal removes all epsilons from an automaton by essentially collapsing
@@ -36,11 +35,11 @@ object EpsilonRemoval {
                             alpha: Alphabet[T],
                             distance: Distance[Automaton[W,S,T],W,S],
                             mm: MapMaker[Automaton[W,S,T],S,W]): Automaton[W,S,T] = {
-    val epsilon = alpha.epsilon;
-    import ring._;
+    val epsilon = alpha.epsilon
+    import ring._
 
-    val epsilonsOnly = a.filterArcs(_.label == epsilon);
-    val pairDistances = distance.allPairDistances(epsilonsOnly);
+    val epsilonsOnly = a.filterArcs(_.label == epsilon)
+    val pairDistances = distance.allPairDistances(epsilonsOnly)
 
     val newArcs = for {
       (p,distances) <- pairDistances.iterator
@@ -48,29 +47,29 @@ object EpsilonRemoval {
       if w != zero
       Arc(_,r,label,arcWeight) <- a.edgesFrom(q)
       if label != epsilon
-    } yield Arc(p,r,label,times(w,arcWeight));
+    } yield Arc(p,r,label,*(w,arcWeight))
 
 
-    val newInitialWeights = AutoUpdater(mm.mkMap(a),zero);
+    val newInitialWeights = AutoUpdater(mm.mkMap(a),zero)
     for {
-      (p,startW) <- a.initialStateWeights;
-      (q,w) <- pairDistances(p);
+      (p,startW) <- a.initialStateWeights
+      (q,w) <- pairDistances(p)
       if w != zero
     } {
-      newInitialWeights(p) = plus(newInitialWeights(p),times(startW,w));
+      newInitialWeights(p) = ring.+(newInitialWeights(p),*(startW,w))
     }
 
-    val newFinalWeights = AutoUpdater(mm.mkMap(a),zero);
+    val newFinalWeights = AutoUpdater(mm.mkMap(a),zero)
 
     for {
-      (p,distances) <- pairDistances;
-      (q,w) <- distances;
+      (p,distances) <- pairDistances
+      (q,w) <- distances
       if w != zero
       endWeight = a.finalWeight(q)
     } {
-      newFinalWeights(p) = plus(newFinalWeights(p),times(w,endWeight));
+      newFinalWeights(p) = ring.+(newFinalWeights(p),*(w,endWeight))
     }
 
-    Automaton.automaton(Map.empty ++ newInitialWeights,Map.empty ++ newFinalWeights)( (newArcs.toSeq):_*);
+    Automaton.automaton(Map.empty ++ newInitialWeights,Map.empty ++ newFinalWeights)( (newArcs.toSeq):_*)
   }
 }

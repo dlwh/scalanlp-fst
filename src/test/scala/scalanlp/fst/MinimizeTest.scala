@@ -7,7 +7,7 @@ import org.junit.runner.RunWith
 import org.junit.Before
 
 
-import scalanlp.math._;
+import breeze.math._;
 import scala.collection.immutable.IntMap
 
 
@@ -16,7 +16,7 @@ class MinimizeTest extends FunSuite {
   import Transducer._;
 
   test("Mohri hwa fig12d minimization") {
-    import scalanlp.math._;
+    import breeze.math._;
     import Semiring.Tropical._;
     val dsl = new DSL[Int,Double,Char,Char]();
     import dsl._;
@@ -47,7 +47,7 @@ class MinimizeTest extends FunSuite {
   }
 
   test("Mohri hwa fig12d minimization with ApproxPartitioner") {
-    import scalanlp.math._;
+    import breeze.math._;
     import Semiring.Tropical._;
     val dsl = new DSL[Int,Double,Char,Char]();
     import dsl._;

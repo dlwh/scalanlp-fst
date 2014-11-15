@@ -21,7 +21,7 @@ import scala.collection.mutable.HashMap;
 import scala.collection.mutable.ArrayBuffer;
 
 
-import scalanlp.math._
+import breeze.math._
 import util.MapMaker
 import scalanlp.collection.mutable.{AutoUpdater, ArrayMap}
 ;

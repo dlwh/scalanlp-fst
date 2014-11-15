@@ -1,6 +1,11 @@
 package scalanlp.fst
 package templates
 
+import breeze.math.Semiring
+import breeze.storage.Zero
+
+import scala.reflect.ClassTag
+
 /*
  Copyright 2010 David Hall
 
@@ -17,10 +22,8 @@ package templates
  limitations under the License.
 */
 
-import scalanlp.math.Semiring
-import scalala.collection.sparse.DefaultArrayValue
 
-class BigramModel[W:Semiring:ClassManifest:DefaultArrayValue,T:Alphabet](init: T, chars: Set[T]) extends Automaton[W,T,T] {
+class BigramModel[W:Semiring:ClassTag:Zero,T:Alphabet](init: T, chars: Set[T]) extends Automaton[W,T,T] {
   protected val alphabet = implicitly[Alphabet[T]]
   protected val ring = implicitly[Semiring[W]]
   val initialStateWeights = Map( init -> ring.one)

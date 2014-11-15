@@ -17,8 +17,9 @@ package scalanlp.fst
 */
 
 
-import scalanlp.math._
-import scalala.collection.sparse.DefaultArrayValue
+import breeze.collection.mutable.AutoUpdater
+import breeze.math._
+import breeze.storage.Zero
 import util.MapMaker
 import scalanlp.collection.mutable.AutoUpdater
 
@@ -112,7 +113,7 @@ object Distance {
      * for self-loops
      */
     def singleSourceShortestDistances(fst: CC) :Map[State,W] = {
-      import ring._;
+      import ring._
       val (distances,allStates) = neighborDistances(fst);
 
       val auto = ev(fst);
@@ -127,8 +128,8 @@ object Distance {
       val visited = AutoUpdater(mm3.mkMap(fst),0)
       val enqueued = AutoUpdater(mm3.mkMap(fst),0);
       for( (s,w) <- initialStateWeights if !closeTo(w,zero)) {
-        d(s) = plus(w,zero);
-        r(s) = plus(w,zero);
+        d(s) = +(w,zero);
+        r(s) = +(w,zero);
         S += s;
         enqueued(s) = 1;
       }

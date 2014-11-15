@@ -18,7 +18,7 @@ package scalanlp.fst
 
 
 
-import scalanlp.math.Semiring
+import breeze.math.Semiring
 import scalanlp.collection.mutable.AutoUpdater
 import collection.mutable
 

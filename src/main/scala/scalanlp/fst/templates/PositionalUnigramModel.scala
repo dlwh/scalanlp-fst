@@ -17,10 +17,10 @@ package templates
  limitations under the License.
 */
 
-import scalanlp.math.Semiring
-import scalala.collection.sparse.DefaultArrayValue
+import breeze.math.Semiring
+import breeze.storage.Zero
 
-class PositionalUnigramModel[W:Semiring:ClassManifest:DefaultArrayValue,T:Alphabet](init: T, chars: Set[T], maxLength: Int) extends Automaton[W,Int,T] {
+class PositionalUnigramModel[W:Semiring:ClassManifest:Zero,T:Alphabet](init: T, chars: Set[T], maxLength: Int) extends Automaton[W,Int,T] {
   protected val alphabet = implicitly[Alphabet[T]]
   protected val ring = implicitly[Semiring[W]]
   val initialStateWeights = Map( 0 -> ring.one)

@@ -5,7 +5,7 @@ import org.scalatest.junit.JUnitRunner
 import org.scalatest.FunSuite
 import org.junit.runner.RunWith
 import org.scalatest.prop._
-import scalanlp.math.Semiring
+import breeze.math.Semiring
 
 
 

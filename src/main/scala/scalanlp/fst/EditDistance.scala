@@ -16,7 +16,7 @@ package scalanlp.fst
  limitations under the License.
 */
 
-import scalanlp.math.Semiring.LogSpace._;
+import breeze.math.Semiring.LogSpace._;
 
 
 /**

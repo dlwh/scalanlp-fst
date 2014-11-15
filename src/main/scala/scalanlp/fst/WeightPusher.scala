@@ -1,7 +1,6 @@
 package scalanlp.fst
 
 import util.MapMaker
-import scalanlp.math.{Semiring, WLDSemiring}
 
 /**
  * 

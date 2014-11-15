@@ -7,7 +7,7 @@ import org.junit.runner.RunWith
 import org.junit.Before
 
 
-import scalanlp.math._;
+import breeze.math._;
 import scala.collection.Traversable;
 import scala.collection.Seq;
 import scala.collection.mutable.PriorityQueue

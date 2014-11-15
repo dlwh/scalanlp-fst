@@ -17,12 +17,9 @@ package scalanlp
 */
 
 
-import scalanlp.collection.mutable.ArrayMap
-import scalanlp.math.Semiring
+import breeze.math.Semiring
 
-import scalanlp.fst._;
 
-import scalala.collection.sparse.DefaultArrayValue
 
 package object fst {
   /**
@@ -90,8 +87,8 @@ package object fst {
       val dsl = new DSL[Int,Double,Char,Char];
       import dsl._;
       dsl.transducer(initialStates=Map(1->1.0),finalWeights=Map(3->1.0))(
-        1 -> 2 (in='3',out=eps,weight=10.),
-        1 -> 3 (in='4',out=eps,weight=11.),
+        1 -> 2 (in='3',out=eps,weight=10.0),
+        1 -> 3 (in='4',out=eps,weight=11.0),
         2 -> 3 (in='5',out=eps,weight=1.0),
         1 -> 2 (in=eps,out='3',weight=1.0),
         2 -> 2 (in='3',out=eps,weight= -1.0)

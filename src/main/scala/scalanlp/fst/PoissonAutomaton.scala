@@ -17,9 +17,7 @@ package scalanlp.fst
 */
 
 
-
-
-import scalanlp.stats.distributions.Poisson;
+import breeze.stats.distributions.Poisson
 
 /**
 * Generates a poisson distribution over string lengths, and a uniform
@@ -38,7 +36,7 @@ class PoissonAutomaton(val expectedLength: Double,
 
   private val poi = new Poisson(expectedLength);
   private val arcCost = -math.log(chars.size);
-  private val leftOverProb = scalala.library.Numerics.logDiff(0.0,poi.logCdf(maxLength-1));
+  private val leftOverProb = breeze.linalg.logDiff(0.0,poi.logCdf(maxLength-1));
 
   val initialStateWeights = Map(0 -> 0.0);
   def finalWeight(s: Int) = if(s < maxLength) poi.logProbabilityOf(s) else leftOverProb + math.log(geometricStoppingProb);
